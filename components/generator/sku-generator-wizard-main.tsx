@@ -51,7 +51,7 @@ export function SkuGeneratorWizardMain({
   const designation = buildDesignation(family, selections);
   const designationLength = designation.length;
   const isDesignationTooLong = designationLength > MAX_DESIGNATION_LENGTH;
-  const skuPreview = buildSkuPreview(family, selections, 125);
+  const skuPreview = buildSkuPreview(family, selections);
   const completedCount = Object.keys(selections).length;
   const hasConfiguredLevels = family.levels.length > 0;
   const hasRequiredLevels = family.levels.length === MAX_FAMILY_LEVELS;

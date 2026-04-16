@@ -71,7 +71,6 @@ export function buildDesignation(
 export function buildSkuPreview(
   family: GeneratorFamily,
   selections: Record<string, string>,
-  sequenceValue: number,
 ) {
   const segments = [
     family.name.slice(0, 3).toUpperCase(),
@@ -84,5 +83,5 @@ export function buildSkuPreview(
     ),
   ];
 
-  return `${segments.join("-")}-${String(sequenceValue).padStart(6, "0")}`;
+  return segments.join("-");
 }
