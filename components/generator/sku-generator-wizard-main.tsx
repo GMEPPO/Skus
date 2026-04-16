@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { GeneratorFamily, GeneratorLevel, GeneratorWord } from "@/lib/types";
-import { buildDesignation, buildSkuPreview, getAvailableOptions } from "@/lib/sku";
+import { buildDesignation, buildSkuPreview, getAvailableOptions, MAX_DESIGNATION_LENGTH } from "@/lib/sku";
 
 type Selections = Record<string, string>;
 
@@ -41,6 +41,8 @@ export function SkuGeneratorWizardMain({
   }
 
   const designation = buildDesignation(family, selections);
+  const designationLength = designation.length;
+  const isDesignationTooLong = designationLength > MAX_DESIGNATION_LENGTH;
   const skuPreview = buildSkuPreview(family, selections, 125);
   const completedCount = Object.keys(selections).length;
   const hasConfiguredLevels = family.levels.length > 0;
@@ -197,11 +199,21 @@ export function SkuGeneratorWizardMain({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-amber-300">Designacao</p>
-            <p className="mt-2 text-base text-slate-100">
+            <p className={`mt-2 text-base ${isDesignationTooLong ? "text-red-300" : "text-slate-100"}`}>
               {designation || "Seleciona os campos para construir a designacao final."}
             </p>
+            {designation ? (
+              <p className={`mt-2 text-xs ${isDesignationTooLong ? "text-red-300" : "text-slate-400"}`}>
+                {designationLength}/{MAX_DESIGNATION_LENGTH} caracteres
+                {isDesignationTooLong ? " - limite excedido" : ""}
+              </p>
+            ) : null}
           </div>
-          <Button disabled={!hasConfiguredLevels || completedCount !== family.levels.length}>Gerar SKU</Button>
+          <Button
+            disabled={!hasConfiguredLevels || completedCount !== family.levels.length || isDesignationTooLong}
+          >
+            Gerar SKU
+          </Button>
         </div>
       </div>
     </div>

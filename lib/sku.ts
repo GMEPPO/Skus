@@ -1,5 +1,7 @@
 import type { GeneratorFamily, GeneratorWord } from "@/lib/types";
 
+export const MAX_DESIGNATION_LENGTH = 60;
+
 export function getAvailableOptions(
   family: GeneratorFamily,
   levelId: string,
@@ -18,15 +20,18 @@ export function getAvailableOptions(
   const previousSelection = selections[previousLevel.id];
   if (!previousSelection) return [];
 
+  const levelEdges = family.edges.filter(
+    (edge) => edge.fromLevelId === previousLevel.id && edge.toLevelId === level.id,
+  );
+
+  // Fallback: se não há dependências configuradas entre os dois níveis,
+  // libera todas as opções do nível atual.
+  if (levelEdges.length === 0) {
+    return level.options;
+  }
+
   const allowedIds = new Set(
-    family.edges
-      .filter(
-        (edge) =>
-          edge.fromLevelId === previousLevel.id &&
-          edge.fromWordId === previousSelection &&
-          edge.toLevelId === level.id,
-      )
-      .map((edge) => edge.toWordId),
+    levelEdges.filter((edge) => edge.fromWordId === previousSelection).map((edge) => edge.toWordId),
   );
 
   return level.options.filter((option) => allowedIds.has(option.id));
@@ -36,14 +41,16 @@ export function buildDesignation(
   family: GeneratorFamily,
   selections: Record<string, string>,
 ) {
-  return family.levels
+  const segments = family.levels
     .map((level) => {
       const option = level.options.find((item) => item.id === selections[level.id]);
       if (!option || !option.includeInDesignation) return null;
       return option.designation || option.label;
     })
-    .filter(Boolean)
-    .join(" ");
+    .filter((value): value is string => Boolean(value));
+
+  const designation = [family.name, ...segments].join(" ").trim();
+  return designation.replace(/\s+/g, " ");
 }
 
 export function buildSkuPreview(
