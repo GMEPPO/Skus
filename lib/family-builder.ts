@@ -1,1 +1,1 @@
-export const MAX_FAMILY_LEVELS = 6;
+export const MAX_FAMILY_LEVELS = 5;

@@ -1,18 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Boxes, GitBranchPlus, Layers3, Link2, Trash2 } from "lucide-react";
+import { ArrowLeft, Boxes, GitBranchPlus, Layers3, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
 import {
   attachWordToFamilyLevelAction,
   createFamilyDraftTreeAction,
-  createFamilyLevelAction,
-  deleteFamilyLevelAction,
   getFamilyBuilderDetail,
-  getFieldTypeOptions,
   getWordsCatalog,
+  updateFamilyLevelLabelAction,
 } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
@@ -29,17 +26,14 @@ export default async function FamilyBuilderDetailPage({
   params: { id: string };
   searchParams?: { status?: string; message?: string };
 }) {
-  const [family, fieldTypes, words] = await Promise.all([
+  const [family, words] = await Promise.all([
     getFamilyBuilderDetail(params.id),
-    getFieldTypeOptions(),
     getWordsCatalog(),
   ]);
 
   if (!family) {
     notFound();
   }
-
-  const reachedMaxLevels = family.levels.length >= MAX_FAMILY_LEVELS;
 
   return (
     <div className="space-y-6">
@@ -141,57 +135,6 @@ export default async function FamilyBuilderDetailPage({
         </Card>
       </div>
 
-      {family.draftTreeVersionId ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Adicionar nivel</CardTitle>
-            <CardDescription>
-              Cada nivel representa um passo do fluxo de selecao para esta familia. Maximo: {MAX_FAMILY_LEVELS} niveis.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {reachedMaxLevels ? (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Esta familia ja atingiu o maximo de {MAX_FAMILY_LEVELS} niveis. Remove um nivel antes de criar outro.
-              </div>
-            ) : (
-              <form action={createFamilyLevelAction} className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-                <input type="hidden" name="familyId" value={family.id} />
-                <input type="hidden" name="treeVersionId" value={family.draftTreeVersionId} />
-                <label className="space-y-2">
-                  <span className="text-sm text-slate-300">Tipo de campo</span>
-                  <select
-                    name="fieldTypeId"
-                    required
-                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                  >
-                    <option value="">Seleciona um tipo</option>
-                    {fieldTypes.map((fieldType) => (
-                      <option key={fieldType.id} value={fieldType.id}>
-                        {fieldType.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm text-slate-300">Etiqueta personalizada</span>
-                  <input
-                    name="labelOverride"
-                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    placeholder="Ex: Tipo de embalagem"
-                  />
-                </label>
-                <div className="flex items-end">
-                  <Button type="submit" className="w-full md:w-auto">
-                    Adicionar nivel
-                  </Button>
-                </div>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader>
@@ -204,11 +147,14 @@ export default async function FamilyBuilderDetailPage({
             {family.levels.length > 0 ? (
               family.levels.map((level) => {
                 const usedWordIds = new Set(level.words.map((word) => word.id));
+                const previousLevel = family.levels.find((item) => item.order === level.order - 1);
+                const previousLevelWordIds = new Set(previousLevel?.words.map((word) => word.id) ?? []);
                 const availableWords = words.filter(
                   (word) =>
                     !usedWordIds.has(word.id) &&
                     word.fieldTypeId === level.fieldTypeId &&
-                    word.familyIds.includes(family.id),
+                    word.familyIds.includes(family.id) &&
+                    (level.order === 1 || word.parentWordIds.some((parentWordId) => previousLevelWordIds.has(parentWordId))),
                 );
                 const hasAvailableWords = availableWords.length > 0;
 
@@ -220,20 +166,25 @@ export default async function FamilyBuilderDetailPage({
                         <p className="text-lg font-medium text-slate-100">{level.label}</p>
                         <p className="text-sm text-slate-400">{level.fieldTypeName}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
-                          {level.words.length} palavras
-                        </div>
-                        <form action={deleteFamilyLevelAction}>
-                          <input type="hidden" name="familyId" value={family.id} />
-                          <input type="hidden" name="treeLevelId" value={level.id} />
-                          <Button type="submit" variant="outline" className="h-9 px-3 text-red-100 hover:bg-red-500/10">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Eliminar nivel
-                          </Button>
-                        </form>
+                      <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                        {level.words.length} palavras
                       </div>
                     </div>
+
+                    <form action={updateFamilyLevelLabelAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                      <input type="hidden" name="familyId" value={family.id} />
+                      <input type="hidden" name="treeLevelId" value={level.id} />
+                      <input type="hidden" name="defaultLabel" value={level.fieldTypeName} />
+                      <input
+                        name="labelOverride"
+                        defaultValue={level.label === level.fieldTypeName ? "" : level.label}
+                        placeholder={`Etiqueta para ${level.fieldTypeName}`}
+                        className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                      />
+                      <Button type="submit" variant="outline">
+                        Guardar etiqueta
+                      </Button>
+                    </form>
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       {level.words.length > 0 ? (
@@ -283,7 +234,7 @@ export default async function FamilyBuilderDetailPage({
               })
             ) : (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-400">
-                Ainda nao existem niveis neste draft. Cria o draft e adiciona o primeiro passo da familia.
+                Ainda nao existem niveis neste draft. Cria o draft e os 5 niveis obrigatorios vao aparecer automaticamente.
               </div>
             )}
           </CardContent>

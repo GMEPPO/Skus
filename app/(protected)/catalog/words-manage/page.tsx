@@ -2,7 +2,15 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createWordAction, deleteWordAction, getFamilyOptions, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
+import { WordForm } from "@/components/catalog/word-form";
+import {
+  createWordAction,
+  deleteWordAction,
+  getFamilyOptions,
+  getFieldTypeOptions,
+  getWordDependencyOptions,
+  getWordsCatalog,
+} from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -16,10 +24,11 @@ export default async function CatalogWordsManagePage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
-  const [words, fieldTypes, families] = await Promise.all([
+  const [words, fieldTypes, families, dependencyOptions] = await Promise.all([
     getWordsCatalog(),
     getFieldTypeOptions(),
     getFamilyOptions(),
+    getWordDependencyOptions(),
   ]);
 
   return (
@@ -41,90 +50,26 @@ export default async function CatalogWordsManagePage({
         <CardHeader>
           <CardTitle>Nova palavra</CardTitle>
           <CardDescription>
-            Cria uma nova variavel para ser usada nas familias e no gerador de SKU.
+            Cria uma nova palavra para ser usada nas familias e no gerador de SKU.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={createWordAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <label className="space-y-2">
-              <span className="text-sm text-slate-300">Palavra</span>
-              <input
-                name="label"
-                required
-                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Ex: Frasco"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm text-slate-300">Referencia</span>
-              <input
-                name="referenceCode"
-                required
-                minLength={3}
-                maxLength={3}
-                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm uppercase text-slate-100"
-                placeholder="FRA"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm text-slate-300">Tipo de campo</span>
-              <select
-                name="fieldTypeId"
-                required
-                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-              >
-                <option value="">Selecionar...</option>
-                {fieldTypes.map((fieldType) => (
-                  <option key={fieldType.id} value={fieldType.id}>
-                    {fieldType.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm text-slate-300">Designacao</span>
-              <input
-                name="designation"
-                required
-                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Texto que pode aparecer na designacao final"
-              />
-            </label>
-            <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 md:col-span-2 xl:col-span-1">
-              <input
-                type="checkbox"
-                name="includeInDesignation"
-                defaultChecked
-                className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-amber-400 focus:ring-amber-400"
-              />
-              <div>
-                <p className="text-sm font-medium text-slate-100">Incluir na designacao final</p>
-                <p className="text-xs text-slate-400">
-                  Desativa se esta palavra so deve entrar na referencia/codigo.
-                </p>
-              </div>
-            </label>
-            <label className="space-y-2 md:col-span-2 xl:col-span-3">
-              <span className="text-sm text-slate-300">Familias associadas</span>
-              <select
-                name="familyIds"
-                multiple
-                className="min-h-[10rem] w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100"
-              >
-                {families.map((family) => (
-                  <option key={family.id} value={family.id}>
-                    {family.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500">
-                Podes selecionar uma ou varias familias. Em Windows usa `Ctrl` para selecao multipla.
-              </p>
-            </label>
-            <div className="md:col-span-2 xl:col-span-3">
-              <Button type="submit">Guardar palavra</Button>
-            </div>
-          </form>
+          <WordForm
+            action={createWordAction}
+            submitLabel="Guardar palavra"
+            fieldTypes={fieldTypes}
+            families={families}
+            dependencyOptions={dependencyOptions}
+            initialValues={{
+              label: "",
+              referenceCode: "",
+              fieldTypeId: "",
+              designation: "",
+              includeInDesignation: true,
+              familyIds: [],
+              parentWordIds: [],
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -150,6 +95,7 @@ export default async function CatalogWordsManagePage({
               <div className="space-y-2 text-sm text-slate-400">
                 <div>{word.includeInDesignation ? "Entra na designacao" : "So entra no codigo"}</div>
                 <div>{word.familyLabels.length > 0 ? word.familyLabels.join(", ") : "Sem familias associadas"}</div>
+                {word.parentWordLabels.length > 0 ? <div>Depende de: {word.parentWordLabels.join(", ")}</div> : null}
               </div>
               <Button asChild variant="outline">
                 <Link href={`/catalog/words-manage/${word.id}`}>Editar palavra</Link>

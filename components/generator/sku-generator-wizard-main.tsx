@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, Lock, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
 import type { GeneratorFamily, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import { buildDesignation, buildSkuPreview, getAvailableOptions, MAX_DESIGNATION_LENGTH } from "@/lib/sku";
 
@@ -46,6 +47,7 @@ export function SkuGeneratorWizardMain({
   const skuPreview = buildSkuPreview(family, selections, 125);
   const completedCount = Object.keys(selections).length;
   const hasConfiguredLevels = family.levels.length > 0;
+  const hasRequiredLevels = family.levels.length === MAX_FAMILY_LEVELS;
 
   function handleSelection(level: GeneratorLevel, word: GeneratorWord) {
     setSelections((current) => {
@@ -148,8 +150,8 @@ export function SkuGeneratorWizardMain({
               })
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-400">
-                Esta familia ainda nao tem niveis configurados. Vai a <span className="text-slate-200">Familias</span>
-                , abre o builder dessa familia e cria os niveis e palavras do fluxo.
+                Esta familia ainda nao tem os 5 niveis obrigatorios. Vai a <span className="text-slate-200">Familias</span>
+                , abre o builder dessa familia e configura Formato, Produto, Tamanho, Embalagem e Extra.
               </div>
             )}
           </div>
@@ -209,9 +211,7 @@ export function SkuGeneratorWizardMain({
               </p>
             ) : null}
           </div>
-          <Button
-            disabled={!hasConfiguredLevels || completedCount !== family.levels.length || isDesignationTooLong}
-          >
+          <Button disabled={!hasConfiguredLevels || !hasRequiredLevels || completedCount !== family.levels.length || isDesignationTooLong}>
             Gerar SKU
           </Button>
         </div>

@@ -34,6 +34,11 @@ type LevelWordRow = {
     | null;
 };
 
+type WordDependencyRow = {
+  child_word_id: string;
+  parent_word_id: string;
+};
+
 type EdgeRow = {
   from_level_id: string;
   from_word_id: string;
@@ -63,7 +68,7 @@ function getFieldTypeRelation(
   };
 }
 
-function getWordRelation(row: LevelWordRow): GeneratorWord | null {
+function getWordRelation(row: LevelWordRow, parentWordIds: string[]): GeneratorWord | null {
   const relation = Array.isArray(row.skus_words) ? row.skus_words[0] : row.skus_words;
   if (!relation?.id) return null;
 
@@ -73,6 +78,7 @@ function getWordRelation(row: LevelWordRow): GeneratorWord | null {
     referenceCode: String(relation.reference_code ?? ""),
     designation: String(relation.designation ?? relation.label ?? ""),
     includeInDesignation: Boolean(relation.include_in_designation ?? true),
+    parentWordIds,
   };
 }
 
@@ -141,9 +147,22 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
         .eq("is_active", true)
     : { data: [] as Array<Record<string, unknown>> };
 
+  const wordDependenciesResult = await supabase
+    .from("skus_word_dependencies")
+    .select("child_word_id, parent_word_id");
+
+  const parentWordIdsByWord = new Map<string, string[]>();
+  for (const row of (wordDependenciesResult.data ?? []) as WordDependencyRow[]) {
+    const items = parentWordIdsByWord.get(row.child_word_id) ?? [];
+    items.push(row.parent_word_id);
+    parentWordIdsByWord.set(row.child_word_id, items);
+  }
+
   const wordsByLevelId = new Map<string, GeneratorWord[]>();
   for (const row of (levelWordsResult.data ?? []) as LevelWordRow[]) {
-    const word = getWordRelation(row);
+    const relation = Array.isArray(row.skus_words) ? row.skus_words[0] : row.skus_words;
+    const parentWordIds = relation?.id ? parentWordIdsByWord.get(String(relation.id)) ?? [] : [];
+    const word = getWordRelation(row, parentWordIds);
     if (!word) continue;
 
     const items = wordsByLevelId.get(row.tree_level_id) ?? [];

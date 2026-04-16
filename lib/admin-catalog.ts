@@ -24,6 +24,15 @@ export interface FamilyBuilderLevelWord {
   referenceCode: string;
 }
 
+export interface WordDependencyOption {
+  id: string;
+  label: string;
+  referenceCode: string;
+  fieldTypeId: string;
+  fieldTypeLabel: string;
+  familyIds: string[];
+}
+
 export interface FamilyBuilderLevel {
   id: string;
   order: number;
@@ -61,6 +70,15 @@ type SupabaseWordFamilyRow = {
   skus_families:
     | { id?: string; name?: string }
     | Array<{ id?: string; name?: string }>
+    | null;
+};
+
+type SupabaseWordDependencyRow = {
+  child_word_id: string;
+  parent_word_id: string;
+  parent_word?:
+    | { id?: string; label?: string; reference_code?: string }
+    | Array<{ id?: string; label?: string; reference_code?: string }>
     | null;
 };
 
@@ -115,6 +133,12 @@ const deleteLevelSchema = z.object({
   treeLevelId: z.string().uuid(),
 });
 
+const updateLevelLabelSchema = z.object({
+  familyId: z.string().uuid(),
+  treeLevelId: z.string().uuid(),
+  labelOverride: z.string().trim().optional().transform((value) => value || ""),
+});
+
 const deleteWordSchema = z.object({
   wordId: z.string().uuid(),
 });
@@ -126,6 +150,7 @@ const createWordSchema = z.object({
   designation: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
   familyIds: z.array(z.string().uuid()).default([]),
+  parentWordIds: z.array(z.string().uuid()).default([]),
 });
 
 const updateWordSchema = z.object({
@@ -136,6 +161,7 @@ const updateWordSchema = z.object({
   designation: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
   familyIds: z.array(z.string().uuid()).default([]),
+  parentWordIds: z.array(z.string().uuid()).default([]),
 });
 
 const createFamilySchema = z.object({
@@ -154,6 +180,75 @@ function normalizeLabel(value: string) {
   return value.trim().toLowerCase();
 }
 
+const FIXED_LEVEL_SEQUENCE = ["format", "product", "size", "packaging", "extra"] as const;
+const PARENT_FIELD_TYPE_BY_CODE: Partial<Record<(typeof FIXED_LEVEL_SEQUENCE)[number], string>> = {
+  product: "format",
+  size: "product",
+  packaging: "size",
+  extra: "packaging",
+};
+
+function getManagedFieldTypeOptions(options: FieldTypeOption[]) {
+  return options.filter((option) => FIXED_LEVEL_SEQUENCE.includes(option.code as (typeof FIXED_LEVEL_SEQUENCE)[number]));
+}
+
+function getRequiredParentFieldTypeCode(fieldTypeCode: string) {
+  return PARENT_FIELD_TYPE_BY_CODE[fieldTypeCode as keyof typeof PARENT_FIELD_TYPE_BY_CODE] ?? null;
+}
+
+async function ensureFixedLevelsForTreeVersion(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  treeVersionId: string,
+) {
+  const [fieldTypesResult, levelsResult] = await Promise.all([
+    supabase
+      .from("skus_field_types")
+      .select("id, code, name")
+      .in("code", [...FIXED_LEVEL_SEQUENCE]),
+    supabase
+      .from("skus_family_tree_levels")
+      .select("id, tree_version_id, field_type_id, level_order, label_override, skus_field_types(name)")
+      .eq("tree_version_id", treeVersionId)
+      .order("level_order", { ascending: true }),
+  ]);
+
+  const fieldTypes = getManagedFieldTypeOptions((fieldTypesResult.data ?? []) as FieldTypeOption[]);
+  const fieldTypeByCode = new Map(fieldTypes.map((fieldType) => [fieldType.code, fieldType]));
+  const existingLevels = (levelsResult.data ?? []) as SupabaseFamilyLevelRow[];
+  const existingLevelByFieldTypeId = new Map(
+    existingLevels
+      .filter((level) => level.field_type_id)
+      .map((level) => [String(level.field_type_id), level]),
+  );
+
+  for (const [index, code] of FIXED_LEVEL_SEQUENCE.entries()) {
+    const fieldType = fieldTypeByCode.get(code);
+    if (!fieldType) continue;
+
+    const existingLevel = existingLevelByFieldTypeId.get(fieldType.id);
+    const expectedOrder = index + 1;
+
+    if (!existingLevel) {
+      await supabase.from("skus_family_tree_levels").insert({
+        tree_version_id: treeVersionId,
+        field_type_id: fieldType.id,
+        level_order: expectedOrder,
+        label_override: null,
+        is_required: true,
+        designation_included: true,
+      });
+      continue;
+    }
+
+    if (Number(existingLevel.level_order ?? 0) !== expectedOrder) {
+      await supabase
+        .from("skus_family_tree_levels")
+        .update({ level_order: expectedOrder })
+        .eq("id", String(existingLevel.id));
+    }
+  }
+}
+
 function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefined, fallback: string) {
   if (!relation) return fallback;
   if (Array.isArray(relation)) {
@@ -165,14 +260,13 @@ function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefine
 export async function getFieldTypeOptions(): Promise<FieldTypeOption[]> {
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
-    return [
-      { id: "00000000-0000-0000-0000-000000000001", code: "family", name: "Familia" },
+    return getManagedFieldTypeOptions([
       { id: "00000000-0000-0000-0000-000000000002", code: "format", name: "Formato" },
       { id: "00000000-0000-0000-0000-000000000003", code: "product", name: "Produto" },
       { id: "00000000-0000-0000-0000-000000000004", code: "size", name: "Tamanho" },
       { id: "00000000-0000-0000-0000-000000000005", code: "packaging", name: "Embalagem" },
       { id: "00000000-0000-0000-0000-000000000006", code: "extra", name: "Extra" },
-    ];
+    ]);
   }
 
   const result = await supabase
@@ -181,7 +275,7 @@ export async function getFieldTypeOptions(): Promise<FieldTypeOption[]> {
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  return (result.data ?? []) as FieldTypeOption[];
+  return getManagedFieldTypeOptions((result.data ?? []) as FieldTypeOption[]);
 }
 
 export async function getFamilyOptions(): Promise<FamilyOption[]> {
@@ -216,6 +310,10 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     .from("skus_word_families")
     .select("word_id, skus_families(id, name)");
 
+  const dependenciesResult = await supabase
+    .from("skus_word_dependencies")
+    .select("child_word_id, parent_word_id, parent_word:parent_word_id(id, label, reference_code)");
+
   const familyLabelsByWord = new Map<string, string[]>();
   const familyIdsByWord = new Map<string, string[]>();
   for (const row of (familiesResult.data ?? []) as SupabaseWordFamilyRow[]) {
@@ -231,6 +329,22 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     familyIdsByWord.set(row.word_id, idItems);
   }
 
+  const parentWordIdsByWord = new Map<string, string[]>();
+  const parentWordLabelsByWord = new Map<string, string[]>();
+  for (const row of (dependenciesResult.data ?? []) as SupabaseWordDependencyRow[]) {
+    const relation = Array.isArray(row.parent_word) ? row.parent_word[0] : row.parent_word;
+
+    const parentIds = parentWordIdsByWord.get(row.child_word_id) ?? [];
+    parentIds.push(row.parent_word_id);
+    parentWordIdsByWord.set(row.child_word_id, parentIds);
+
+    if (relation?.label) {
+      const parentLabels = parentWordLabelsByWord.get(row.child_word_id) ?? [];
+      parentLabels.push(`${String(relation.label)} - ${String(relation.reference_code ?? "")}`);
+      parentWordLabelsByWord.set(row.child_word_id, parentLabels);
+    }
+  }
+
   return ((wordsResult.data ?? []) as SupabaseWordRow[]).map((row) => ({
     id: row.id,
     label: row.label,
@@ -241,6 +355,20 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     includeInDesignation: row.include_in_designation ?? true,
     familyIds: familyIdsByWord.get(row.id) ?? [],
     familyLabels: familyLabelsByWord.get(row.id) ?? [],
+    parentWordIds: parentWordIdsByWord.get(row.id) ?? [],
+    parentWordLabels: parentWordLabelsByWord.get(row.id) ?? [],
+  }));
+}
+
+export async function getWordDependencyOptions(): Promise<WordDependencyOption[]> {
+  const words = await getWordsCatalog();
+  return words.map((word) => ({
+    id: word.id,
+    label: word.label,
+    referenceCode: word.referenceCode,
+    fieldTypeId: word.fieldTypeId,
+    fieldTypeLabel: word.fieldTypeLabel,
+    familyIds: word.familyIds,
   }));
 }
 
@@ -313,10 +441,14 @@ export async function getFamilyBuilderDetail(familyId: string): Promise<FamilyBu
   const versions = (versionsResult.data ?? []) as SupabaseTreeVersionRow[];
   const draftTree = versions.find((item) => item.status === "draft") ?? null;
 
+  if (draftTree) {
+    await ensureFixedLevelsForTreeVersion(supabase, draftTree.id);
+  }
+
   const levelsResult = draftTree
     ? await supabase
         .from("skus_family_tree_levels")
-        .select("id, tree_version_id, level_order, label_override, skus_field_types(name)")
+        .select("id, tree_version_id, field_type_id, level_order, label_override, skus_field_types(name)")
         .eq("tree_version_id", draftTree.id)
         .order("level_order", { ascending: true })
     : { data: [] as Array<Record<string, unknown>> };
@@ -382,6 +514,7 @@ export async function createWordAction(formData: FormData) {
     designation: formData.get("designation"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
     familyIds: formData.getAll("familyIds"),
+    parentWordIds: formData.getAll("parentWordIds"),
   });
 
   if (!parsed.success) {
@@ -393,7 +526,19 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const { label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds } = parsed.data;
+  const { label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds, parentWordIds } = parsed.data;
+
+  const fieldTypeResult = await supabase
+    .from("skus_field_types")
+    .select("code")
+    .eq("id", fieldTypeId)
+    .maybeSingle();
+
+  const fieldTypeCode = String(fieldTypeResult.data?.code ?? "");
+  const requiredParentFieldTypeCode = getRequiredParentFieldTypeCode(fieldTypeCode);
+  if (requiredParentFieldTypeCode && parentWordIds.length === 0) {
+    redirect("/catalog/words-manage?status=error&message=Esta+palavra+precisa+de+associacao+ao+nivel+anterior");
+  }
 
   const insertResult = await supabase
     .from("skus_words")
@@ -418,6 +563,15 @@ export async function createWordAction(formData: FormData) {
       familyIds.map((familyId) => ({
         word_id: insertResult.data.id,
         family_id: familyId,
+      })),
+    );
+  }
+
+  if (parentWordIds.length > 0) {
+    await supabase.from("skus_word_dependencies").insert(
+      parentWordIds.map((parentWordId) => ({
+        child_word_id: insertResult.data.id,
+        parent_word_id: parentWordId,
       })),
     );
   }
@@ -454,6 +608,15 @@ export async function deleteWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Palavra+em+uso+no+builder+nao+pode+ser+eliminada");
   }
 
+  const dependencyUsageResult = await supabase
+    .from("skus_word_dependencies")
+    .select("child_word_id", { count: "exact", head: true })
+    .eq("parent_word_id", parsed.data.wordId);
+
+  if ((dependencyUsageResult.count ?? 0) > 0) {
+    redirect("/catalog/words-manage?status=error&message=Palavra+em+uso+como+dependencia+nao+pode+ser+eliminada");
+  }
+
   const deleteResult = await supabase
     .from("skus_words")
     .delete()
@@ -482,6 +645,7 @@ export async function updateWordAction(formData: FormData) {
     designation: formData.get("designation"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
     familyIds: formData.getAll("familyIds"),
+    parentWordIds: formData.getAll("parentWordIds"),
   });
 
   if (!parsed.success) {
@@ -493,7 +657,19 @@ export async function updateWordAction(formData: FormData) {
     redirect(`/catalog/words-manage/${parsed.data.wordId}?status=error&message=Supabase+service+role+nao+configurada`);
   }
 
-  const { wordId, label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds } = parsed.data;
+  const { wordId, label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds, parentWordIds } = parsed.data;
+
+  const fieldTypeResult = await supabase
+    .from("skus_field_types")
+    .select("code")
+    .eq("id", fieldTypeId)
+    .maybeSingle();
+
+  const fieldTypeCode = String(fieldTypeResult.data?.code ?? "");
+  const requiredParentFieldTypeCode = getRequiredParentFieldTypeCode(fieldTypeCode);
+  if (requiredParentFieldTypeCode && parentWordIds.length === 0) {
+    redirect(`/catalog/words-manage/${wordId}?status=error&message=Esta+palavra+precisa+de+associacao+ao+nivel+anterior`);
+  }
 
   const updateResult = await supabase
     .from("skus_words")
@@ -512,12 +688,22 @@ export async function updateWordAction(formData: FormData) {
   }
 
   await supabase.from("skus_word_families").delete().eq("word_id", wordId);
+  await supabase.from("skus_word_dependencies").delete().eq("child_word_id", wordId);
 
   if (familyIds.length > 0) {
     await supabase.from("skus_word_families").insert(
       familyIds.map((familyId) => ({
         word_id: wordId,
         family_id: familyId,
+      })),
+    );
+  }
+
+  if (parentWordIds.length > 0) {
+    await supabase.from("skus_word_dependencies").insert(
+      parentWordIds.map((parentWordId) => ({
+        child_word_id: wordId,
+        parent_word_id: parentWordId,
       })),
     );
   }
@@ -608,8 +794,42 @@ export async function createFamilyDraftTreeAction(formData: FormData) {
     redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+criar+o+draft`);
   }
 
+  await ensureFixedLevelsForTreeVersion(supabase, inserted.data.id);
+
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
   redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Draft+criado+com+sucesso`);
+}
+
+export async function updateFamilyLevelLabelAction(formData: FormData) {
+  "use server";
+
+  const parsed = updateLevelLabelSchema.safeParse({
+    familyId: formData.get("familyId"),
+    treeLevelId: formData.get("treeLevelId"),
+    labelOverride: formData.get("labelOverride"),
+  });
+
+  if (!parsed.success) {
+    redirect(`/families-manage/${String(formData.get("familyId") ?? "")}?status=error&message=Etiqueta+invalida`);
+  }
+
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
+  }
+
+  const updateResult = await supabase
+    .from("skus_family_tree_levels")
+    .update({ label_override: parsed.data.labelOverride || null })
+    .eq("id", parsed.data.treeLevelId);
+
+  if (updateResult.error) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+guardar+a+etiqueta`);
+  }
+
+  revalidatePath(`/families-manage/${parsed.data.familyId}`);
+  revalidatePath("/generator");
+  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Etiqueta+atualizada+com+sucesso`);
 }
 
 export async function deleteFamilyAction(formData: FormData) {
@@ -681,7 +901,18 @@ export async function createFamilyLevelAction(formData: FormData) {
   const nextOrder = ((levelsResult.data ?? [])[0]?.level_order ?? 0) + 1;
 
   if (nextOrder > MAX_FAMILY_LEVELS) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Esta+familia+so+pode+ter+ate+6+niveis`);
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Esta+familia+so+pode+ter+ate+5+niveis`);
+  }
+
+  const fieldTypeResult = await supabase
+    .from("skus_field_types")
+    .select("code")
+    .eq("id", parsed.data.fieldTypeId)
+    .maybeSingle();
+
+  const expectedFieldTypeCode = FIXED_LEVEL_SEQUENCE[nextOrder - 1];
+  if (String(fieldTypeResult.data?.code ?? "") !== expectedFieldTypeCode) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Os+niveis+devem+seguir+a+ordem+fixa+Formato+Produto+Tamanho+Embalagem+Extra`);
   }
 
   const insertResult = await supabase.from("skus_family_tree_levels").insert({

@@ -94,6 +94,14 @@ create table if not exists public.skus_word_families (
   primary key (word_id, family_id)
 );
 
+create table if not exists public.skus_word_dependencies (
+  child_word_id uuid not null references public.skus_words(id) on delete cascade,
+  parent_word_id uuid not null references public.skus_words(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (child_word_id, parent_word_id),
+  constraint skus_word_dependencies_no_self check (child_word_id <> parent_word_id)
+);
+
 create table if not exists public.skus_family_tree_versions (
   id uuid primary key default gen_random_uuid(),
   family_id uuid not null references public.skus_families(id) on delete cascade,
@@ -191,6 +199,7 @@ alter table public.skus_field_types enable row level security;
 alter table public.skus_words enable row level security;
 alter table public.skus_word_contexts enable row level security;
 alter table public.skus_word_families enable row level security;
+alter table public.skus_word_dependencies enable row level security;
 alter table public.skus_families enable row level security;
 alter table public.skus_family_tree_versions enable row level security;
 alter table public.skus_family_tree_levels enable row level security;
@@ -267,6 +276,13 @@ using (true);
 drop policy if exists "skus_word_families_select_authenticated" on public.skus_word_families;
 create policy "skus_word_families_select_authenticated"
 on public.skus_word_families
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_word_dependencies_select_authenticated" on public.skus_word_dependencies;
+create policy "skus_word_dependencies_select_authenticated"
+on public.skus_word_dependencies
 for select
 to authenticated
 using (true);

@@ -26,6 +26,8 @@ export interface WordListItem {
   includeInDesignation: boolean;
   familyIds: string[];
   familyLabels: string[];
+  parentWordIds: string[];
+  parentWordLabels: string[];
 }
 
 export interface FamilyListItem {
@@ -42,6 +44,7 @@ export interface GeneratorWord {
   referenceCode: string;
   designation: string;
   includeInDesignation: boolean;
+  parentWordIds: string[];
 }
 
 export interface GeneratorLevel {
