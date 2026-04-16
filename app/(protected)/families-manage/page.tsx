@@ -50,7 +50,9 @@ export default async function FamiliesManagePage({
       <Card>
         <CardHeader>
           <CardTitle>Nova familia</CardTitle>
-          <CardDescription>Crias a familia e ja defines as palavras iniciais disponiveis por nivel.</CardDescription>
+          <CardDescription>
+            Crias a familia e, se quiseres, ja defines palavras iniciais por nivel. Esta selecao e opcional.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={createFamilyAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -128,6 +130,9 @@ export default async function FamiliesManagePage({
                         </option>
                       ))}
                     </select>
+                    <p className="text-xs text-slate-500">
+                      Opcional. Seleciona apenas palavras ja existentes que queiras disponibilizar nesta familia.
+                    </p>
                   </label>
                 );
               })}
