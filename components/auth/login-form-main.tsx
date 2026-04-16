@@ -16,11 +16,13 @@ export function LoginFormMain({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setStatus(null);
 
     if (isDemo) {
       router.push("/dashboard");
@@ -47,6 +49,20 @@ export function LoginFormMain({
       setError(signInError.message);
       return;
     }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      setError(`Login aceite, mas a sessao falhou: ${sessionError.message}`);
+      return;
+    }
+
+    if (!sessionData.session) {
+      setError("Login aceite, mas nao existe sessao ativa no cliente.");
+      return;
+    }
+
+    setStatus("Credenciais aceites. A abrir o dashboard...");
 
     router.push("/dashboard");
     router.refresh();
@@ -90,6 +106,12 @@ export function LoginFormMain({
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      ) : null}
+
+      {status ? (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+          {status}
         </div>
       ) : null}
 
