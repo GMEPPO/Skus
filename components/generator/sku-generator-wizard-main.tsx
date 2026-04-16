@@ -49,7 +49,7 @@ export function SkuGeneratorWizardMain({
   const hasConfiguredLevels = family.levels.length > 0;
   const hasRequiredLevels = family.levels.length === MAX_FAMILY_LEVELS;
 
-  function handleSelection(level: GeneratorLevel, word: GeneratorWord) {
+  function handleSelection(level: GeneratorLevel, word?: GeneratorWord) {
     setSelections((current) => {
       const next: Selections = {};
       for (const item of family.levels) {
@@ -58,7 +58,9 @@ export function SkuGeneratorWizardMain({
           if (existing) next[item.id] = existing;
         }
       }
-      next[level.id] = word.id;
+      if (word) {
+        next[level.id] = word.id;
+      }
       return next;
     });
   }
@@ -118,6 +120,26 @@ export function SkuGeneratorWizardMain({
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <button
+                        type="button"
+                        disabled={isBlocked}
+                        onClick={() => handleSelection(level)}
+                        className={[
+                          "rounded-xl border px-4 py-3 text-left transition",
+                          !selectedId
+                            ? "border-amber-400 bg-amber-400/10"
+                            : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
+                          isBlocked ? "cursor-not-allowed opacity-50" : "",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-slate-100">&nbsp;</p>
+                            <p className="mt-1 text-xs text-slate-500">000</p>
+                          </div>
+                          {!selectedId ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
+                        </div>
+                      </button>
                       {options.map((option) => {
                         const isSelected = selectedId === option.id;
                         return (

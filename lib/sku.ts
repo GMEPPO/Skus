@@ -64,7 +64,7 @@ export function buildSkuPreview(
   const segments = [
     family.name.slice(0, 3).toUpperCase(),
     ...family.levels.map(
-      (level) => level.options.find((option) => option.id === selections[level.id])?.referenceCode ?? "---",
+      (level) => level.options.find((option) => option.id === selections[level.id])?.referenceCode ?? "000",
     ),
   ];
 
