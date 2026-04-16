@@ -1,9 +1,15 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
+import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function LoginPage() {
+export default async function LoginPage() {
   const isDemo = process.env.SKIP_AUTH === "true";
+  const user = await getCurrentUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
@@ -28,14 +34,7 @@ export default function LoginPage() {
               `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button asChild className="sm:flex-1">
-              <Link href="/dashboard">Entrar na aplicação</Link>
-            </Button>
-            <Button asChild variant="outline" className="sm:flex-1">
-              <Link href="/generator">Ver gerador SKU</Link>
-            </Button>
-          </div>
+          <LoginForm isDemo={isDemo} />
         </CardContent>
       </Card>
     </main>
