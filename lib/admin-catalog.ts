@@ -90,6 +90,10 @@ const createDraftTreeSchema = z.object({
   familyId: z.string().uuid(),
 });
 
+const deleteFamilySchema = z.object({
+  familyId: z.string().uuid(),
+});
+
 const createLevelSchema = z.object({
   familyId: z.string().uuid(),
   treeVersionId: z.string().uuid(),
@@ -479,6 +483,46 @@ export async function createFamilyDraftTreeAction(formData: FormData) {
 
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
   redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Draft+criado+com+sucesso`);
+}
+
+export async function deleteFamilyAction(formData: FormData) {
+  "use server";
+
+  const parsed = deleteFamilySchema.safeParse({
+    familyId: formData.get("familyId"),
+  });
+
+  if (!parsed.success) {
+    redirect("/families-manage?status=error&message=Familia+invalida+para+eliminar");
+  }
+
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    redirect("/families-manage?status=error&message=Supabase+service+role+nao+configurada");
+  }
+
+  const generationsResult = await supabase
+    .from("skus_sku_generations")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", parsed.data.familyId);
+
+  if ((generationsResult.count ?? 0) > 0) {
+    redirect("/families-manage?status=error&message=Familia+com+historico+de+SKUs+nao+pode+ser+eliminada");
+  }
+
+  const deleteResult = await supabase
+    .from("skus_families")
+    .delete()
+    .eq("id", parsed.data.familyId);
+
+  if (deleteResult.error) {
+    redirect("/families-manage?status=error&message=Nao+foi+possivel+eliminar+a+familia");
+  }
+
+  revalidatePath("/families");
+  revalidatePath("/families-manage");
+  revalidatePath("/generator");
+  redirect("/families-manage?status=success&message=Familia+eliminada+com+sucesso");
 }
 
 export async function createFamilyLevelAction(formData: FormData) {
