@@ -20,9 +20,11 @@ export interface WordListItem {
   id: string;
   label: string;
   referenceCode: string;
+  fieldTypeId: string;
   fieldTypeLabel: string;
   designation: string;
   includeInDesignation: boolean;
+  familyIds: string[];
   familyLabels: string[];
 }
 

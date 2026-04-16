@@ -8,7 +8,7 @@ export default async function CatalogWordsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Vocabulario</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Biblioteca</h1>
         <p className="mt-2 text-sm text-slate-400">
           Catalogo mestre de palavras, referencias curtas e designacoes reutilizaveis entre familias.
         </p>

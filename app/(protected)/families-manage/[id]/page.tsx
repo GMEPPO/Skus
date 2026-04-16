@@ -134,7 +134,7 @@ export default async function FamilyBuilderDetailPage({
               ))
             ) : (
               <div className="rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-500">
-                Ainda nao existem palavras no vocabulario.
+                Ainda nao existem palavras na biblioteca.
               </div>
             )}
           </CardContent>
@@ -204,7 +204,13 @@ export default async function FamilyBuilderDetailPage({
             {family.levels.length > 0 ? (
               family.levels.map((level) => {
                 const usedWordIds = new Set(level.words.map((word) => word.id));
-                const availableWords = words.filter((word) => !usedWordIds.has(word.id));
+                const availableWords = words.filter(
+                  (word) =>
+                    !usedWordIds.has(word.id) &&
+                    word.fieldTypeId === level.fieldTypeId &&
+                    word.familyIds.includes(family.id),
+                );
+                const hasAvailableWords = availableWords.length > 0;
 
                 return (
                   <div key={level.id} className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
@@ -252,16 +258,23 @@ export default async function FamilyBuilderDetailPage({
                       <select
                         name="wordId"
                         required
+                        disabled={!hasAvailableWords}
                         className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                       >
-                        <option value="">Associar palavra a este nivel</option>
-                        {availableWords.map((word) => (
-                          <option key={word.id} value={word.id}>
-                            {word.label} - {word.referenceCode} - {word.fieldTypeLabel}
-                          </option>
-                        ))}
+                        {hasAvailableWords ? (
+                          <>
+                            <option value="">Associar palavra a este nivel</option>
+                            {availableWords.map((word) => (
+                              <option key={word.id} value={word.id}>
+                                {word.label} - {word.referenceCode} - {word.fieldTypeLabel}
+                              </option>
+                            ))}
+                          </>
+                        ) : (
+                          <option value="">Sem palavras disponiveis para este nivel</option>
+                        )}
                       </select>
-                      <Button type="submit" variant="outline">
+                      <Button type="submit" variant="outline" disabled={!hasAvailableWords}>
                         Associar palavra
                       </Button>
                     </form>

@@ -25,16 +25,16 @@ const users: AppUser[] = [
 ];
 
 const words: WordListItem[] = [
-  { id: "w-gue", label: "Guerla", referenceCode: "GUE", fieldTypeLabel: "Familia", designation: "Guerla", includeInDesignation: true, familyLabels: ["Guerla"] },
-  { id: "w-sav", label: "Savoy", referenceCode: "SAV", fieldTypeLabel: "Familia", designation: "Savoy", includeInDesignation: true, familyLabels: ["Savoy"] },
-  { id: "w-fra", label: "Frasco", referenceCode: "FRA", fieldTypeLabel: "Formato", designation: "Frasco", includeInDesignation: true, familyLabels: ["Guerla", "Savoy"] },
-  { id: "w-bis", label: "Bisnaga", referenceCode: "BIS", fieldTypeLabel: "Formato", designation: "Bisnaga", includeInDesignation: true, familyLabels: ["Guerla"] },
-  { id: "w-sha", label: "Shampoo", referenceCode: "SHA", fieldTypeLabel: "Produto", designation: "Shampoo", includeInDesignation: true, familyLabels: ["Guerla"] },
-  { id: "w-gel", label: "Gel", referenceCode: "GEL", fieldTypeLabel: "Produto", designation: "Gel", includeInDesignation: true, familyLabels: ["Guerla", "Savoy"] },
-  { id: "w-300", label: "300ml", referenceCode: "300", fieldTypeLabel: "Tamanho", designation: "300ml", includeInDesignation: true, familyLabels: ["Guerla"] },
-  { id: "w-500", label: "500ml", referenceCode: "500", fieldTypeLabel: "Tamanho", designation: "500ml", includeInDesignation: true, familyLabels: ["Guerla", "Savoy"] },
-  { id: "w-cai", label: "Caixa", referenceCode: "CAI", fieldTypeLabel: "Embalagem", designation: "Caixa", includeInDesignation: true, familyLabels: ["Guerla", "Savoy"] },
-  { id: "w-kit", label: "Kit", referenceCode: "KIT", fieldTypeLabel: "Dados extra", designation: "Kit", includeInDesignation: false, familyLabels: ["Guerla"] },
+  { id: "w-gue", label: "Guerla", referenceCode: "GUE", fieldTypeId: "ft-family", fieldTypeLabel: "Familia", designation: "Guerla", includeInDesignation: true, familyIds: ["family-guerla"], familyLabels: ["Guerla"] },
+  { id: "w-sav", label: "Savoy", referenceCode: "SAV", fieldTypeId: "ft-family", fieldTypeLabel: "Familia", designation: "Savoy", includeInDesignation: true, familyIds: ["family-savoy"], familyLabels: ["Savoy"] },
+  { id: "w-fra", label: "Frasco", referenceCode: "FRA", fieldTypeId: "ft-format", fieldTypeLabel: "Formato", designation: "Frasco", includeInDesignation: true, familyIds: ["family-guerla", "family-savoy"], familyLabels: ["Guerla", "Savoy"] },
+  { id: "w-bis", label: "Bisnaga", referenceCode: "BIS", fieldTypeId: "ft-format", fieldTypeLabel: "Formato", designation: "Bisnaga", includeInDesignation: true, familyIds: ["family-guerla"], familyLabels: ["Guerla"] },
+  { id: "w-sha", label: "Shampoo", referenceCode: "SHA", fieldTypeId: "ft-product", fieldTypeLabel: "Produto", designation: "Shampoo", includeInDesignation: true, familyIds: ["family-guerla"], familyLabels: ["Guerla"] },
+  { id: "w-gel", label: "Gel", referenceCode: "GEL", fieldTypeId: "ft-product", fieldTypeLabel: "Produto", designation: "Gel", includeInDesignation: true, familyIds: ["family-guerla", "family-savoy"], familyLabels: ["Guerla", "Savoy"] },
+  { id: "w-300", label: "300ml", referenceCode: "300", fieldTypeId: "ft-size", fieldTypeLabel: "Tamanho", designation: "300ml", includeInDesignation: true, familyIds: ["family-guerla"], familyLabels: ["Guerla"] },
+  { id: "w-500", label: "500ml", referenceCode: "500", fieldTypeId: "ft-size", fieldTypeLabel: "Tamanho", designation: "500ml", includeInDesignation: true, familyIds: ["family-guerla", "family-savoy"], familyLabels: ["Guerla", "Savoy"] },
+  { id: "w-cai", label: "Caixa", referenceCode: "CAI", fieldTypeId: "ft-packaging", fieldTypeLabel: "Embalagem", designation: "Caixa", includeInDesignation: true, familyIds: ["family-guerla", "family-savoy"], familyLabels: ["Guerla", "Savoy"] },
+  { id: "w-kit", label: "Kit", referenceCode: "KIT", fieldTypeId: "ft-extra", fieldTypeLabel: "Dados extra", designation: "Kit", includeInDesignation: false, familyIds: ["family-guerla"], familyLabels: ["Guerla"] },
 ];
 
 function findWord(id: string): GeneratorWord {

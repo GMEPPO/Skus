@@ -149,7 +149,7 @@ export default async function FamiliesManagePage({
           <CardHeader>
             <CardTitle>Preview do builder</CardTitle>
             <CardDescription>
-              A biblioteca ja reflete o vocabulario real. O drag and drop persistente sera o proximo passo.
+              A biblioteca ja reflete a biblioteca real. O drag and drop persistente sera o proximo passo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

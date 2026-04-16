@@ -28,6 +28,7 @@ export interface FamilyBuilderLevel {
   id: string;
   order: number;
   label: string;
+  fieldTypeId: string;
   fieldTypeName: string;
   words: FamilyBuilderLevelWord[];
 }
@@ -49,6 +50,7 @@ type SupabaseWordRow = {
   id: string;
   label: string;
   reference_code: string;
+  default_field_type_id: string;
   designation: string | null;
   include_in_designation: boolean | null;
   skus_field_types?: SupabaseFieldTypeRelation;
@@ -74,6 +76,7 @@ type SupabaseFamilyRow = {
 type SupabaseFamilyLevelRow = {
   id?: string;
   tree_version_id: string;
+  field_type_id?: string;
   level_order?: number;
   label_override: string | null;
   skus_field_types?: SupabaseFieldTypeRelation;
@@ -112,7 +115,21 @@ const deleteLevelSchema = z.object({
   treeLevelId: z.string().uuid(),
 });
 
+const deleteWordSchema = z.object({
+  wordId: z.string().uuid(),
+});
+
 const createWordSchema = z.object({
+  label: z.string().trim().min(2),
+  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
+  fieldTypeId: z.string().uuid(),
+  designation: z.string().trim().min(1),
+  includeInDesignation: z.boolean(),
+  familyIds: z.array(z.string().uuid()).default([]),
+});
+
+const updateWordSchema = z.object({
+  wordId: z.string().uuid(),
   label: z.string().trim().min(2),
   referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
   fieldTypeId: z.string().uuid(),
@@ -192,7 +209,7 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
 
   const wordsResult = await supabase
     .from("skus_words")
-    .select("id, label, reference_code, designation, include_in_designation, skus_field_types(name)")
+    .select("id, label, reference_code, default_field_type_id, designation, include_in_designation, skus_field_types(name)")
     .order("label", { ascending: true });
 
   const familiesResult = await supabase
@@ -200,22 +217,29 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     .select("word_id, skus_families(id, name)");
 
   const familyLabelsByWord = new Map<string, string[]>();
+  const familyIdsByWord = new Map<string, string[]>();
   for (const row of (familiesResult.data ?? []) as SupabaseWordFamilyRow[]) {
     const relation = Array.isArray(row.skus_families) ? row.skus_families[0] : row.skus_families;
-    if (!relation?.name) continue;
+    if (!relation?.id || !relation?.name) continue;
 
-    const items = familyLabelsByWord.get(row.word_id) ?? [];
-    items.push(String(relation.name));
-    familyLabelsByWord.set(row.word_id, items);
+    const labelItems = familyLabelsByWord.get(row.word_id) ?? [];
+    labelItems.push(String(relation.name));
+    familyLabelsByWord.set(row.word_id, labelItems);
+
+    const idItems = familyIdsByWord.get(row.word_id) ?? [];
+    idItems.push(String(relation.id));
+    familyIdsByWord.set(row.word_id, idItems);
   }
 
   return ((wordsResult.data ?? []) as SupabaseWordRow[]).map((row) => ({
     id: row.id,
     label: row.label,
     referenceCode: row.reference_code,
+    fieldTypeId: row.default_field_type_id,
     fieldTypeLabel: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
     designation: row.designation ?? row.label,
     includeInDesignation: row.include_in_designation ?? true,
+    familyIds: familyIdsByWord.get(row.id) ?? [],
     familyLabels: familyLabelsByWord.get(row.id) ?? [],
   }));
 }
@@ -341,6 +365,7 @@ export async function getFamilyBuilderDetail(familyId: string): Promise<FamilyBu
       id: String(row.id),
       order: Number(row.level_order ?? 0),
       label: row.label_override || getFieldTypeRelationName(row.skus_field_types, "Nivel"),
+      fieldTypeId: String(row.field_type_id ?? ""),
       fieldTypeName: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
       words: wordsByLevel.get(String(row.id)) ?? [],
     })),
@@ -402,6 +427,108 @@ export async function createWordAction(formData: FormData) {
   revalidatePath("/families");
   revalidatePath("/families-manage");
   redirect("/catalog/words-manage?status=success&message=Palavra+criada+com+sucesso");
+}
+
+export async function deleteWordAction(formData: FormData) {
+  "use server";
+
+  const parsed = deleteWordSchema.safeParse({
+    wordId: formData.get("wordId"),
+  });
+
+  if (!parsed.success) {
+    redirect("/catalog/words-manage?status=error&message=Palavra+invalida+para+eliminar");
+  }
+
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
+  }
+
+  const levelUsageResult = await supabase
+    .from("skus_family_tree_level_words")
+    .select("id", { count: "exact", head: true })
+    .eq("word_id", parsed.data.wordId);
+
+  if ((levelUsageResult.count ?? 0) > 0) {
+    redirect("/catalog/words-manage?status=error&message=Palavra+em+uso+no+builder+nao+pode+ser+eliminada");
+  }
+
+  const deleteResult = await supabase
+    .from("skus_words")
+    .delete()
+    .eq("id", parsed.data.wordId);
+
+  if (deleteResult.error) {
+    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+eliminar+a+palavra");
+  }
+
+  revalidatePath("/catalog/words");
+  revalidatePath("/catalog/words-manage");
+  revalidatePath("/families");
+  revalidatePath("/families-manage");
+  revalidatePath("/generator");
+  redirect("/catalog/words-manage?status=success&message=Palavra+eliminada+com+sucesso");
+}
+
+export async function updateWordAction(formData: FormData) {
+  "use server";
+
+  const parsed = updateWordSchema.safeParse({
+    wordId: formData.get("wordId"),
+    label: formData.get("label"),
+    referenceCode: formData.get("referenceCode"),
+    fieldTypeId: formData.get("fieldTypeId"),
+    designation: formData.get("designation"),
+    includeInDesignation: formData.get("includeInDesignation") === "on",
+    familyIds: formData.getAll("familyIds"),
+  });
+
+  if (!parsed.success) {
+    redirect(`/catalog/words-manage/${String(formData.get("wordId") ?? "")}?status=error&message=Dados+invalidos+na+edicao`);
+  }
+
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    redirect(`/catalog/words-manage/${parsed.data.wordId}?status=error&message=Supabase+service+role+nao+configurada`);
+  }
+
+  const { wordId, label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds } = parsed.data;
+
+  const updateResult = await supabase
+    .from("skus_words")
+    .update({
+      label,
+      normalized_label: normalizeLabel(label),
+      reference_code: referenceCode,
+      default_field_type_id: fieldTypeId,
+      designation,
+      include_in_designation: includeInDesignation,
+    })
+    .eq("id", wordId);
+
+  if (updateResult.error) {
+    redirect(`/catalog/words-manage/${wordId}?status=error&message=Nao+foi+possivel+editar+a+palavra`);
+  }
+
+  await supabase.from("skus_word_families").delete().eq("word_id", wordId);
+
+  if (familyIds.length > 0) {
+    await supabase.from("skus_word_families").insert(
+      familyIds.map((familyId) => ({
+        word_id: wordId,
+        family_id: familyId,
+      })),
+    );
+  }
+
+  revalidatePath("/catalog/words");
+  revalidatePath("/catalog/words-manage");
+  revalidatePath(`/catalog/words-manage/${wordId}`);
+  revalidatePath("/families");
+  revalidatePath("/families-manage");
+  revalidatePath("/generator");
+  redirect("/catalog/words-manage?status=success&message=Palavra+editada+com+sucesso");
 }
 
 export async function createFamilyAction(formData: FormData) {
