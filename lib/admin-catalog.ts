@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import type { FamilyListItem, WordListItem } from "@/lib/types";
 
@@ -36,8 +37,6 @@ export interface FamilyBuilderDetail {
   publishedTreeVersionId: string | null;
   levels: FamilyBuilderLevel[];
 }
-
-export const MAX_FAMILY_LEVELS = 6;
 
 type SupabaseFieldTypeRelation = { name?: string | null } | Array<{ name?: string | null }> | null;
 

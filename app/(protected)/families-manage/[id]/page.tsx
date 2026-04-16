@@ -4,8 +4,8 @@ import { ArrowLeft, Boxes, GitBranchPlus, Layers3, Link2, Trash2 } from "lucide-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
 import {
-  MAX_FAMILY_LEVELS,
   attachWordToFamilyLevelAction,
   createFamilyDraftTreeAction,
   createFamilyLevelAction,
