@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import type { GeneratorEdge, GeneratorFamily, GeneratorLevel, GeneratorWord } from "@/lib/types";
 
@@ -87,6 +88,8 @@ function getWordRelation(relation: WordRow, parentWordIds: string[]): GeneratorW
 }
 
 export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
+  noStore();
+
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
     const { getGeneratorFamilies: getDemoGeneratorFamilies } = await import("@/lib/data");

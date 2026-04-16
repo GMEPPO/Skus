@@ -111,6 +111,15 @@ create table if not exists public.skus_families (
   updated_at timestamptz not null default now()
 );
 
+alter table public.skus_families
+  add column if not exists name_pt text;
+
+alter table public.skus_families
+  add column if not exists name_es text;
+
+alter table public.skus_families
+  add column if not exists name_en text;
+
 update public.skus_families
 set name_pt = coalesce(name_pt, name)
 where name_pt is null;
