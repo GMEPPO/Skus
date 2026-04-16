@@ -5,6 +5,9 @@ import type { GeneratorEdge, GeneratorFamily, GeneratorLevel, GeneratorWord } fr
 type FamilyRow = {
   id: string;
   name: string;
+  name_pt: string | null;
+  name_es: string | null;
+  name_en: string | null;
   description: string | null;
   status: string;
   active_tree_version_id: string | null;
@@ -34,6 +37,9 @@ type WordRow = {
   reference_code: string;
   default_field_type_id: string;
   designation?: string | null;
+  designation_pt?: string | null;
+  designation_es?: string | null;
+  designation_en?: string | null;
   include_in_designation?: boolean | null;
 };
 
@@ -82,6 +88,9 @@ function getWordRelation(relation: WordRow, parentWordIds: string[]): GeneratorW
     label: relation.label,
     referenceCode: relation.reference_code,
     designation: String(relation.designation ?? relation.label ?? ""),
+    designationPt: String(relation.designation_pt ?? relation.designation ?? relation.label ?? ""),
+    designationEs: String(relation.designation_es ?? relation.designation ?? relation.label ?? ""),
+    designationEn: String(relation.designation_en ?? relation.designation ?? relation.label ?? ""),
     includeInDesignation: Boolean(relation.include_in_designation ?? true),
     parentWordIds,
   };
@@ -98,7 +107,7 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
 
   const familiesResult = await supabase
     .from("skus_families")
-    .select("id, name, description, status, active_tree_version_id")
+    .select("id, name, name_pt, name_es, name_en, description, status, active_tree_version_id")
     .neq("status", "archived")
     .order("name", { ascending: true });
 
@@ -152,7 +161,7 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
   const [wordsResult, wordFamiliesResult] = await Promise.all([
     supabase
       .from("skus_words")
-      .select("id, label, reference_code, default_field_type_id, designation, include_in_designation")
+      .select("id, label, reference_code, default_field_type_id, designation, designation_pt, designation_es, designation_en, include_in_designation")
       .eq("is_active", true)
       .order("label", { ascending: true }),
     supabase
@@ -219,6 +228,9 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
     return {
       id: family.id,
       name: family.name,
+      namePt: family.name_pt ?? family.name,
+      nameEs: family.name_es ?? family.name,
+      nameEn: family.name_en ?? family.name,
       description: family.description ?? "Sem descricao",
       treeVersionId,
       levels: treeVersionId ? levelsByTreeVersion.get(treeVersionId) ?? [] : [],

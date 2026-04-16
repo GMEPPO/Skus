@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
@@ -11,6 +10,9 @@ const generateSkuSchema = z.object({
   treeVersionId: z.string().uuid(),
   generatedCode: z.string().trim().min(3),
   designation: z.string().trim().min(1),
+  designationPt: z.string().trim().min(1),
+  designationEs: z.string().trim().min(1),
+  designationEn: z.string().trim().min(1),
   selectionSnapshot: z.string().trim().min(2),
   unitsPerBox: z.coerce.number().positive(),
   unitsPerBoxStatus: z.enum(["real", "estimated"]),
@@ -20,12 +22,33 @@ const generateSkuSchema = z.object({
   weightStatus: z.enum(["real", "estimated"]),
 });
 
-export async function generateSkuAction(formData: FormData) {
+export type GenerateSkuActionResult =
+  | {
+      ok: true;
+      message: string;
+      generatedCode: string;
+      generatedCodeCompact: string;
+      designationPt: string;
+      designationEs: string;
+      designationEn: string;
+      unitsPerBox: number;
+      unitsPerBoxStatus: "real" | "estimated";
+      multiples: number;
+      multiplesStatus: "real" | "estimated";
+      weight: number;
+      weightStatus: "real" | "estimated";
+    }
+  | { ok: false; message: string };
+
+export async function generateSkuAction(formData: FormData): Promise<GenerateSkuActionResult> {
   const parsed = generateSkuSchema.safeParse({
     familyId: formData.get("familyId"),
     treeVersionId: formData.get("treeVersionId"),
     generatedCode: formData.get("generatedCode"),
     designation: formData.get("designation"),
+    designationPt: formData.get("designationPt"),
+    designationEs: formData.get("designationEs"),
+    designationEn: formData.get("designationEn"),
     selectionSnapshot: formData.get("selectionSnapshot"),
     unitsPerBox: formData.get("unitsPerBox"),
     unitsPerBoxStatus: formData.get("unitsPerBoxStatus"),
@@ -36,12 +59,12 @@ export async function generateSkuAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect("/generator?status=error&message=Dados+invalidos+na+geracao+do+SKU");
+    return { ok: false, message: "Dados invalidos na geracao do SKU." };
   }
 
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
-    redirect("/generator?status=error&message=Supabase+service+role+nao+configurada");
+    return { ok: false, message: "Supabase service role nao configurada." };
   }
 
   const authSupabase = createSupabaseServerClient();
@@ -85,7 +108,7 @@ export async function generateSkuAction(formData: FormData) {
     .single();
 
   if (insertResult.error || !insertResult.data) {
-    redirect("/generator?status=error&message=Nao+foi+possivel+guardar+o+SKU");
+    return { ok: false, message: "Nao foi possivel guardar o SKU." };
   }
 
   await supabase.from("skus_sku_generation_measurement_history").insert([
@@ -112,5 +135,20 @@ export async function generateSkuAction(formData: FormData) {
   revalidatePath("/generator");
   revalidatePath("/sku-history");
   revalidatePath("/dashboard");
-  redirect("/generator?status=success&message=SKU+guardado+com+sucesso");
+
+  return {
+    ok: true,
+    message: "SKU guardado com sucesso.",
+    generatedCode: parsed.data.generatedCode,
+    generatedCodeCompact: parsed.data.generatedCode.replaceAll("-", ""),
+    designationPt: parsed.data.designationPt,
+    designationEs: parsed.data.designationEs,
+    designationEn: parsed.data.designationEn,
+    unitsPerBox: parsed.data.unitsPerBox,
+    unitsPerBoxStatus: parsed.data.unitsPerBoxStatus,
+    multiples: parsed.data.multiples,
+    multiplesStatus: parsed.data.multiplesStatus,
+    weight: parsed.data.weight,
+    weightStatus: parsed.data.weightStatus,
+  };
 }

@@ -38,7 +38,7 @@ export default async function AdminUsersPage({
       <Card>
         <CardHeader>
           <CardTitle>Novo utilizador</CardTitle>
-          <CardDescription>Envia convite por email e cria o perfil administrativo.</CardDescription>
+          <CardDescription>Cria utilizador diretamente com senha provisoria e perfil administrativo.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={createAdminUserAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -80,8 +80,18 @@ export default async function AdminUsersPage({
                 <option value="viewer">viewer</option>
               </select>
             </label>
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm text-slate-300">Senha provisoria</span>
+              <input
+                name="provisionalPassword"
+                type="password"
+                minLength={8}
+                required
+                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+              />
+            </label>
             <div className="md:col-span-2 xl:col-span-4">
-              <Button type="submit">Convidar utilizador</Button>
+              <Button type="submit">Criar utilizador</Button>
             </div>
           </form>
         </CardContent>

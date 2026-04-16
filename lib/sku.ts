@@ -2,6 +2,7 @@ import type { GeneratorFamily, GeneratorWord } from "@/lib/types";
 
 export const MAX_DESIGNATION_LENGTH = 60;
 export const EMPTY_SELECTION_PREFIX = "__empty__:";
+type DesignationLocale = "pt" | "es" | "en";
 
 export function buildEmptySelectionId(levelId: string) {
   return `${EMPTY_SELECTION_PREFIX}${levelId}`;
@@ -54,18 +55,31 @@ export function buildDesignation(
   family: GeneratorFamily,
   selections: Record<string, string>,
 ) {
+  const designation = buildDesignationByLocale(family, selections, "pt");
+  return designation.replace(/\s+/g, " ");
+}
+
+export function buildDesignationByLocale(
+  family: GeneratorFamily,
+  selections: Record<string, string>,
+  locale: DesignationLocale,
+) {
+  const familyNameByLocale =
+    locale === "en" ? family.nameEn : locale === "es" ? family.nameEs : family.namePt;
+
   const segments = family.levels
     .map((level) => {
       const selectedValue = selections[level.id];
       if (isEmptySelection(selectedValue)) return null;
       const option = level.options.find((item) => item.id === selections[level.id]);
       if (!option || !option.includeInDesignation) return null;
-      return option.designation || option.label;
+      if (locale === "en") return option.designationEn || option.designation || option.label;
+      if (locale === "es") return option.designationEs || option.designation || option.label;
+      return option.designationPt || option.designation || option.label;
     })
     .filter((value): value is string => Boolean(value));
 
-  const designation = [family.name, ...segments].join(" ").trim();
-  return designation.replace(/\s+/g, " ");
+  return [familyNameByLocale || family.name, ...segments].join(" ").trim().replace(/\s+/g, " ");
 }
 
 export function buildSkuPreview(

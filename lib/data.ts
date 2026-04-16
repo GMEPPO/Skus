@@ -73,6 +73,9 @@ function findWord(id: string): GeneratorWord {
     label: item.label,
     referenceCode: item.referenceCode,
     designation: item.designation,
+    designationPt: item.designationPt,
+    designationEs: item.designationEs,
+    designationEn: item.designationEn,
     includeInDesignation: item.includeInDesignation,
     parentWordIds: item.parentWordIds,
   };
@@ -82,6 +85,9 @@ const generatorFamilies: GeneratorFamily[] = [
   {
     id: "family-guerla",
     name: "Guerla",
+    namePt: "Guerla",
+    nameEs: "Guerla",
+    nameEn: "Guerla",
     description: "Familia com 5 passos fixos e dependencias entre niveis.",
     treeVersionId: "tree-guerla",
     levels: [
@@ -96,6 +102,9 @@ const generatorFamilies: GeneratorFamily[] = [
   {
     id: "family-savoy",
     name: "Savoy",
+    namePt: "Savoy",
+    nameEs: "Savoy",
+    nameEn: "Savoy",
     description: "Fluxo alternativo com menos combinacoes validas.",
     treeVersionId: "tree-savoy",
     levels: [

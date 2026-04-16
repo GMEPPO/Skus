@@ -10,6 +10,7 @@ const createUserSchema = z.object({
   name: z.string().trim().min(2),
   department: z.string().trim().min(1),
   roleCode: z.enum(["admin", "manager", "editor", "viewer"]),
+  provisionalPassword: z.string().min(8),
 });
 
 const updateUserSchema = z.object({
@@ -25,6 +26,7 @@ export async function createAdminUserAction(formData: FormData) {
     name: formData.get("name"),
     department: formData.get("department"),
     roleCode: formData.get("roleCode"),
+    provisionalPassword: formData.get("provisionalPassword"),
   });
 
   if (!parsed.success) {
@@ -41,16 +43,21 @@ export async function createAdminUserAction(formData: FormData) {
     redirect("/admin/users?status=error&message=Papel+invalido");
   }
 
-  const invited = await supabase.auth.admin.inviteUserByEmail(parsed.data.email, {
-    data: { name: parsed.data.name },
+  const created = await supabase.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.provisionalPassword,
+    email_confirm: true,
+    user_metadata: {
+      name: parsed.data.name,
+    },
   });
 
-  if (invited.error || !invited.data.user) {
-    redirect("/admin/users?status=error&message=Nao+foi+possivel+convidar+o+utilizador");
+  if (created.error || !created.data.user) {
+    redirect("/admin/users?status=error&message=Nao+foi+possivel+criar+o+utilizador+diretamente");
   }
 
   const profileUpsert = await supabase.from("skus_profiles").upsert({
-    id: invited.data.user.id,
+    id: created.data.user.id,
     email: parsed.data.email,
     name: parsed.data.name,
     department: parsed.data.department,
@@ -59,12 +66,12 @@ export async function createAdminUserAction(formData: FormData) {
   });
 
   if (profileUpsert.error) {
-    redirect("/admin/users?status=error&message=Convite+criado+mas+o+perfil+nao+foi+guardado");
+    redirect("/admin/users?status=error&message=Utilizador+criado+mas+o+perfil+nao+foi+guardado");
   }
 
   revalidatePath("/admin/users");
   revalidatePath("/dashboard");
-  redirect("/admin/users?status=success&message=Utilizador+convidado+com+sucesso");
+  redirect("/admin/users?status=success&message=Utilizador+criado+com+senha+provisoria");
 }
 
 export async function updateAdminUserAction(formData: FormData) {

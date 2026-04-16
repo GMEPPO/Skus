@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { ArrowRight, CheckCircle2, Lock, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
-import { generateSkuAction } from "@/lib/sku-actions";
+import { generateSkuAction, type GenerateSkuActionResult } from "@/lib/sku-actions";
 import type { GeneratorFamily, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import {
   buildDesignation,
+  buildDesignationByLocale,
   buildEmptySelectionId,
   buildSkuPreview,
   getAvailableOptions,
@@ -18,6 +20,7 @@ import {
 } from "@/lib/sku";
 
 type Selections = Record<string, string>;
+type GeneratedSkuModalData = Extract<GenerateSkuActionResult, { ok: true }>;
 
 export function SkuGeneratorWizardMain({
   families,
@@ -32,6 +35,9 @@ export function SkuGeneratorWizardMain({
   const [multiplesStatus, setMultiplesStatus] = useState<"real" | "estimated">("estimated");
   const [weight, setWeight] = useState("");
   const [weightStatus, setWeightStatus] = useState<"real" | "estimated">("estimated");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [modalData, setModalData] = useState<GeneratedSkuModalData | null>(null);
 
   const family = useMemo(
     () => families.find((item) => item.id === familyId) ?? families[0],
@@ -62,6 +68,9 @@ export function SkuGeneratorWizardMain({
   }
 
   const designation = buildDesignation(family, selections);
+  const designationPt = buildDesignationByLocale(family, selections, "pt");
+  const designationEs = buildDesignationByLocale(family, selections, "es");
+  const designationEn = buildDesignationByLocale(family, selections, "en");
   const designationLength = designation.length;
   const isDesignationTooLong = designationLength > MAX_DESIGNATION_LENGTH;
   const skuPreview = buildSkuPreview(family, selections);
@@ -95,13 +104,43 @@ export function SkuGeneratorWizardMain({
     });
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    const formData = new FormData(event.currentTarget);
+    const result = await generateSkuAction(formData);
+    if (!result.ok) {
+      setSubmitError(result.message);
+      setModalData(null);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setModalData(result);
+    setIsSubmitting(false);
+  }
+
+  async function copyValue(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      setSubmitError("Nao foi possivel copiar automaticamente. Verifica as permissoes do navegador.");
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <form action={generateSkuAction} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <input type="hidden" name="familyId" value={family.id} />
         <input type="hidden" name="treeVersionId" value={family.treeVersionId ?? ""} />
         <input type="hidden" name="generatedCode" value={skuPreview} />
         <input type="hidden" name="designation" value={designation} />
+        <input type="hidden" name="designationPt" value={designationPt} />
+        <input type="hidden" name="designationEs" value={designationEs} />
+        <input type="hidden" name="designationEn" value={designationEn} />
         <input type="hidden" name="selectionSnapshot" value={JSON.stringify(selections)} />
       <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
         <div className="space-y-4">
@@ -367,12 +406,99 @@ export function SkuGeneratorWizardMain({
               </p>
             ) : null}
           </div>
-          <Button disabled={!canSubmit}>
-            Gerar SKU
+          <Button type="submit" disabled={!canSubmit || isSubmitting}>
+            {isSubmitting ? "A guardar..." : "Gerar SKU"}
           </Button>
         </div>
       </div>
+      {submitError ? (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          {submitError}
+        </div>
+      ) : null}
       </form>
+      {modalData ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-slate-50">SKU gerado com sucesso</h3>
+              <Button type="button" variant="outline" onClick={() => setModalData(null)}>
+                Fechar
+              </Button>
+            </div>
+            <div className="grid gap-3">
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Referencia final:</span> {modalData.generatedCodeCompact}
+                </p>
+                <Button type="button" variant="outline" onClick={() => copyValue(modalData.generatedCodeCompact)}>
+                  Copiar
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Designacao PT:</span> {modalData.designationPt}
+                </p>
+                <Button type="button" variant="outline" onClick={() => copyValue(modalData.designationPt)}>
+                  Copiar
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Designacao ES:</span> {modalData.designationEs}
+                </p>
+                <Button type="button" variant="outline" onClick={() => copyValue(modalData.designationEs)}>
+                  Copiar
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Designacao EN:</span> {modalData.designationEn}
+                </p>
+                <Button type="button" variant="outline" onClick={() => copyValue(modalData.designationEn)}>
+                  Copiar
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Quantidade por caixa:</span> {modalData.unitsPerBox} ({modalData.unitsPerBoxStatus})
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => copyValue(`${modalData.unitsPerBox} (${modalData.unitsPerBoxStatus})`)}
+                >
+                  Copiar
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Multiplos:</span> {modalData.multiples} ({modalData.multiplesStatus})
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => copyValue(`${modalData.multiples} (${modalData.multiplesStatus})`)}
+                >
+                  Copiar
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+                <p className="text-sm text-slate-200">
+                  <span className="text-slate-400">Peso:</span> {modalData.weight} ({modalData.weightStatus})
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => copyValue(`${modalData.weight} (${modalData.weightStatus})`)}
+                >
+                  Copiar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -49,6 +49,9 @@ export interface GeneratorWord {
   label: string;
   referenceCode: string;
   designation: string;
+  designationPt: string;
+  designationEs: string;
+  designationEn: string;
   includeInDesignation: boolean;
   parentWordIds: string[];
 }
@@ -71,6 +74,9 @@ export interface GeneratorEdge {
 export interface GeneratorFamily {
   id: string;
   name: string;
+  namePt: string;
+  nameEs: string;
+  nameEn: string;
   description: string;
   treeVersionId: string | null;
   levels: GeneratorLevel[];
