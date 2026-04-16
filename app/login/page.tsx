@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { LoginForm } from "@/components/auth/login-form";
+import { LoginFormMain } from "@/components/auth/login-form-main";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -34,7 +34,7 @@ export default async function LoginPage() {
               `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
             </p>
           </div>
-          <LoginForm isDemo={isDemo} />
+          <LoginFormMain isDemo={isDemo} />
         </CardContent>
       </Card>
     </main>
