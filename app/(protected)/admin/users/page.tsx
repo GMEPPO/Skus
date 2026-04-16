@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createAdminUserAction, updateAdminUserAction } from "@/lib/admin-users";
+import { requireAdmin } from "@/lib/auth";
 import { getUsers } from "@/lib/data";
 
 function messageStyles(status?: string) {
@@ -16,6 +17,7 @@ export default async function AdminUsersPage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
+  await requireAdmin();
   const users = await getUsers();
 
   return (
