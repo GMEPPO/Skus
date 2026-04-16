@@ -823,6 +823,7 @@ export async function createFamilyAction(formData: FormData) {
 
   revalidatePath("/families");
   revalidatePath("/families-manage");
+  revalidatePath("/generator");
   redirect("/families-manage?status=success&message=Familia+criada+com+sucesso");
 }
 
