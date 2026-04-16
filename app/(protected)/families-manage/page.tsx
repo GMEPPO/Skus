@@ -1,4 +1,5 @@
-import { ArrowRight, GitBranchPlus, MoveRight } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, GitBranchPlus, MoveRight, Settings2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,14 @@ export default async function FamiliesManagePage({
                   ) : (
                     <span className="text-slate-500">Sem niveis publicados ainda</span>
                   )}
+                </div>
+                <div className="mt-4">
+                  <Button asChild variant="outline" className="h-10">
+                    <Link href={`/families-manage/${family.id}`} className="inline-flex items-center gap-2">
+                      <Settings2 className="h-4 w-4" />
+                      Configurar builder
+                    </Link>
+                  </Button>
                 </div>
               </div>
             ))}
