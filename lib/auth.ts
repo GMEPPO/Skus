@@ -60,6 +60,19 @@ async function ensureProfile(userId: string, email: string | null) {
   return (inserted.data as SupabaseProfileRow | null) ?? null;
 }
 
+async function getProfileByServiceRole(userId: string) {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) return null;
+
+  const result = await supabase
+    .from("skus_profiles")
+    .select("id, name, email, department, is_active, skus_roles(code)")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return (result.data as SupabaseProfileRow | null) ?? null;
+}
+
 export async function getCurrentUser(): Promise<AppUser | null> {
   if (isDemoMode()) {
     return demoCurrentUser;
@@ -87,11 +100,24 @@ export async function getCurrentUser(): Promise<AppUser | null> {
       .maybeSingle();
   }
 
-  if (!profileResult.data) {
-    return null;
+  let profile = (profileResult.data as SupabaseProfileRow | null) ?? null;
+
+  if (!profile) {
+    profile = await getProfileByServiceRole(authUser.id);
   }
 
-  const profile = profileResult.data as SupabaseProfileRow;
+  if (!profile) {
+    return {
+      id: authUser.id,
+      name:
+        (authUser.user_metadata?.name as string | undefined) ??
+        (authUser.email ? authUser.email.split("@")[0] : "utilizador"),
+      email: authUser.email ?? "",
+      department: "General",
+      isActive: true,
+      role: "viewer",
+    };
+  }
   const roleCode = extractRoleCode(profile.skus_roles);
 
   return {
