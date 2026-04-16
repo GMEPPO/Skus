@@ -13,6 +13,11 @@ export interface FieldTypeOption {
   name: string;
 }
 
+export interface FamilyOption {
+  id: string;
+  name: string;
+}
+
 export interface FamilyBuilderLevelWord {
   id: string;
   label: string;
@@ -44,8 +49,17 @@ type SupabaseWordRow = {
   id: string;
   label: string;
   reference_code: string;
-  description: string | null;
+  designation: string | null;
+  include_in_designation: boolean | null;
   skus_field_types?: SupabaseFieldTypeRelation;
+};
+
+type SupabaseWordFamilyRow = {
+  word_id: string;
+  skus_families:
+    | { id?: string; name?: string }
+    | Array<{ id?: string; name?: string }>
+    | null;
 };
 
 type SupabaseFamilyRow = {
@@ -98,9 +112,9 @@ const createWordSchema = z.object({
   label: z.string().trim().min(2),
   referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
   fieldTypeId: z.string().uuid(),
-  description: z.string().trim().optional().transform((value) => value || ""),
-  contextType: z.string().trim().optional().transform((value) => value || ""),
-  contextValue: z.string().trim().optional().transform((value) => value || ""),
+  designation: z.string().trim().min(1),
+  includeInDesignation: z.boolean(),
+  familyIds: z.array(z.string().uuid()).default([]),
 });
 
 const createFamilySchema = z.object({
@@ -149,6 +163,22 @@ export async function getFieldTypeOptions(): Promise<FieldTypeOption[]> {
   return (result.data ?? []) as FieldTypeOption[];
 }
 
+export async function getFamilyOptions(): Promise<FamilyOption[]> {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    const { getFamilies } = await import("@/lib/data");
+    return (await getFamilies()).map((family) => ({ id: family.id, name: family.name }));
+  }
+
+  const result = await supabase
+    .from("skus_families")
+    .select("id, name")
+    .neq("status", "archived")
+    .order("name", { ascending: true });
+
+  return (result.data ?? []) as FamilyOption[];
+}
+
 export async function getWordsCatalog(): Promise<WordListItem[]> {
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
@@ -158,21 +188,21 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
 
   const wordsResult = await supabase
     .from("skus_words")
-    .select("id, label, reference_code, description, skus_field_types(name)")
+    .select("id, label, reference_code, designation, include_in_designation, skus_field_types(name)")
     .order("label", { ascending: true });
 
-  const contextsResult = await supabase
-    .from("skus_word_contexts")
-    .select("word_id, context_type, context_value");
+  const familiesResult = await supabase
+    .from("skus_word_families")
+    .select("word_id, skus_families(id, name)");
 
-  const contextMap = new Map<string, string>();
-  for (const row of contextsResult.data ?? []) {
-    const label = row.context_value
-      ? `${row.context_type}: ${row.context_value}`
-      : row.context_type;
-    if (!contextMap.has(row.word_id)) {
-      contextMap.set(row.word_id, label);
-    }
+  const familyLabelsByWord = new Map<string, string[]>();
+  for (const row of (familiesResult.data ?? []) as SupabaseWordFamilyRow[]) {
+    const relation = Array.isArray(row.skus_families) ? row.skus_families[0] : row.skus_families;
+    if (!relation?.name) continue;
+
+    const items = familyLabelsByWord.get(row.word_id) ?? [];
+    items.push(String(relation.name));
+    familyLabelsByWord.set(row.word_id, items);
   }
 
   return ((wordsResult.data ?? []) as SupabaseWordRow[]).map((row) => ({
@@ -180,8 +210,9 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     label: row.label,
     referenceCode: row.reference_code,
     fieldTypeLabel: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
-    contextLabel: contextMap.get(row.id) ?? "Sem contexto",
-    description: row.description ?? "",
+    designation: row.designation ?? row.label,
+    includeInDesignation: row.include_in_designation ?? true,
+    familyLabels: familyLabelsByWord.get(row.id) ?? [],
   }));
 }
 
@@ -319,9 +350,9 @@ export async function createWordAction(formData: FormData) {
     label: formData.get("label"),
     referenceCode: formData.get("referenceCode"),
     fieldTypeId: formData.get("fieldTypeId"),
-    description: formData.get("description"),
-    contextType: formData.get("contextType"),
-    contextValue: formData.get("contextValue"),
+    designation: formData.get("designation"),
+    includeInDesignation: formData.get("includeInDesignation") === "on",
+    familyIds: formData.getAll("familyIds"),
   });
 
   if (!parsed.success) {
@@ -333,7 +364,7 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const { label, referenceCode, fieldTypeId, description, contextType, contextValue } = parsed.data;
+  const { label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds } = parsed.data;
 
   const insertResult = await supabase
     .from("skus_words")
@@ -342,7 +373,8 @@ export async function createWordAction(formData: FormData) {
       normalized_label: normalizeLabel(label),
       reference_code: referenceCode,
       default_field_type_id: fieldTypeId,
-      description: description || null,
+      designation: designation || label,
+      include_in_designation: includeInDesignation,
       is_active: true,
     })
     .select("id")
@@ -352,12 +384,13 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+criar+a+palavra");
   }
 
-  if (contextType) {
-    await supabase.from("skus_word_contexts").insert({
-      word_id: insertResult.data.id,
-      context_type: contextType,
-      context_value: contextValue || null,
-    });
+  if (familyIds.length > 0) {
+    await supabase.from("skus_word_families").insert(
+      familyIds.map((familyId) => ({
+        word_id: insertResult.data.id,
+        family_id: familyId,
+      })),
+    );
   }
 
   revalidatePath("/catalog/words");

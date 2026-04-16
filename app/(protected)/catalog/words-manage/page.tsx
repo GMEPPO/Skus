@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createWordAction, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
+import { createWordAction, getFamilyOptions, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -15,9 +15,10 @@ export default async function CatalogWordsManagePage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
-  const [words, fieldTypes] = await Promise.all([
+  const [words, fieldTypes, families] = await Promise.all([
     getWordsCatalog(),
     getFieldTypeOptions(),
+    getFamilyOptions(),
   ]);
 
   return (
@@ -25,7 +26,7 @@ export default async function CatalogWordsManagePage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Vocabulario</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Cria e gere palavras reutilizaveis, referencias e contextos a partir da interface administrativa.
+          Cria e gere palavras reutilizaveis, referencias, designacoes e associacoes por familia.
         </p>
       </div>
 
@@ -80,28 +81,44 @@ export default async function CatalogWordsManagePage({
               </select>
             </label>
             <label className="space-y-2">
-              <span className="text-sm text-slate-300">Descricao</span>
+              <span className="text-sm text-slate-300">Designacao</span>
               <input
-                name="description"
+                name="designation"
+                required
                 className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Descricao opcional"
+                placeholder="Texto que pode aparecer na designacao final"
               />
             </label>
-            <label className="space-y-2">
-              <span className="text-sm text-slate-300">Tipo de contexto</span>
+            <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 md:col-span-2 xl:col-span-1">
               <input
-                name="contextType"
-                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Ex: brand"
+                type="checkbox"
+                name="includeInDesignation"
+                defaultChecked
+                className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-amber-400 focus:ring-amber-400"
               />
+              <div>
+                <p className="text-sm font-medium text-slate-100">Incluir na designacao final</p>
+                <p className="text-xs text-slate-400">
+                  Desativa se esta palavra so deve entrar na referencia/codigo.
+                </p>
+              </div>
             </label>
-            <label className="space-y-2">
-              <span className="text-sm text-slate-300">Valor de contexto</span>
-              <input
-                name="contextValue"
-                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Ex: Guerla"
-              />
+            <label className="space-y-2 md:col-span-2 xl:col-span-3">
+              <span className="text-sm text-slate-300">Familias associadas</span>
+              <select
+                name="familyIds"
+                multiple
+                className="min-h-[10rem] w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100"
+              >
+                {families.map((family) => (
+                  <option key={family.id} value={family.id}>
+                    {family.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500">
+                Podes selecionar uma ou varias familias. Em Windows usa `Ctrl` para selecao multipla.
+              </p>
             </label>
             <div className="md:col-span-2 xl:col-span-3">
               <Button type="submit">Guardar palavra</Button>
@@ -125,11 +142,14 @@ export default async function CatalogWordsManagePage({
             >
               <div>
                 <p className="font-medium text-slate-100">{word.label}</p>
-                <p className="text-sm text-slate-400">{word.description || "Sem descricao"}</p>
+                <p className="text-sm text-slate-400">Designacao: {word.designation || "Sem designacao"}</p>
               </div>
               <Badge variant="outline">{word.referenceCode}</Badge>
               <Badge>{word.fieldTypeLabel}</Badge>
-              <div className="text-sm text-slate-400">{word.contextLabel}</div>
+              <div className="space-y-2 text-sm text-slate-400">
+                <div>{word.includeInDesignation ? "Entra na designacao" : "So entra no codigo"}</div>
+                <div>{word.familyLabels.length > 0 ? word.familyLabels.join(", ") : "Sem familias associadas"}</div>
+              </div>
             </div>
           ))}
         </CardContent>

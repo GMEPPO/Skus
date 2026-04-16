@@ -37,7 +37,11 @@ export function buildDesignation(
   selections: Record<string, string>,
 ) {
   return family.levels
-    .map((level) => level.options.find((option) => option.id === selections[level.id])?.label ?? null)
+    .map((level) => {
+      const option = level.options.find((item) => item.id === selections[level.id]);
+      if (!option || !option.includeInDesignation) return null;
+      return option.designation || option.label;
+    })
     .filter(Boolean)
     .join(" ");
 }

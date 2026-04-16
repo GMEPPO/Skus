@@ -66,6 +66,16 @@ create table if not exists public.skus_word_contexts (
   created_at timestamptz not null default now()
 );
 
+alter table public.skus_words
+  add column if not exists designation text;
+
+alter table public.skus_words
+  add column if not exists include_in_designation boolean not null default true;
+
+update public.skus_words
+set designation = coalesce(designation, label)
+where designation is null;
+
 create table if not exists public.skus_families (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -75,6 +85,13 @@ create table if not exists public.skus_families (
   active_tree_version_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.skus_word_families (
+  word_id uuid not null references public.skus_words(id) on delete cascade,
+  family_id uuid not null references public.skus_families(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (word_id, family_id)
 );
 
 create table if not exists public.skus_family_tree_versions (
@@ -173,6 +190,7 @@ alter table public.skus_profiles enable row level security;
 alter table public.skus_field_types enable row level security;
 alter table public.skus_words enable row level security;
 alter table public.skus_word_contexts enable row level security;
+alter table public.skus_word_families enable row level security;
 alter table public.skus_families enable row level security;
 alter table public.skus_family_tree_versions enable row level security;
 alter table public.skus_family_tree_levels enable row level security;
@@ -242,6 +260,13 @@ using (true);
 drop policy if exists "skus_word_contexts_select_authenticated" on public.skus_word_contexts;
 create policy "skus_word_contexts_select_authenticated"
 on public.skus_word_contexts
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_word_families_select_authenticated" on public.skus_word_families;
+create policy "skus_word_families_select_authenticated"
+on public.skus_word_families
 for select
 to authenticated
 using (true);

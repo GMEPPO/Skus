@@ -29,8 +29,8 @@ type LevelRow = {
 type LevelWordRow = {
   tree_level_id: string;
   skus_words:
-    | { id?: string; label?: string; reference_code?: string }
-    | Array<{ id?: string; label?: string; reference_code?: string }>
+    | { id?: string; label?: string; reference_code?: string; designation?: string | null; include_in_designation?: boolean | null }
+    | Array<{ id?: string; label?: string; reference_code?: string; designation?: string | null; include_in_designation?: boolean | null }>
     | null;
 };
 
@@ -71,6 +71,8 @@ function getWordRelation(row: LevelWordRow): GeneratorWord | null {
     id: String(relation.id),
     label: String(relation.label ?? ""),
     referenceCode: String(relation.reference_code ?? ""),
+    designation: String(relation.designation ?? relation.label ?? ""),
+    includeInDesignation: Boolean(relation.include_in_designation ?? true),
   };
 }
 
@@ -126,7 +128,7 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
   const levelWordsResult = levelIds.length
     ? await supabase
         .from("skus_family_tree_level_words")
-        .select("tree_level_id, skus_words(id, label, reference_code)")
+        .select("tree_level_id, skus_words(id, label, reference_code, designation, include_in_designation)")
         .in("tree_level_id", levelIds)
         .order("sort_order", { ascending: true })
     : { data: [] as Array<Record<string, unknown>> };
