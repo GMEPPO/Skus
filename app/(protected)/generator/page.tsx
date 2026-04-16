@@ -2,7 +2,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SkuGeneratorWizardMain } from "@/components/generator/sku-generator-wizard-main";
 import { getGeneratorFamilies } from "@/lib/generator-data";
 
-export default async function GeneratorPage() {
+function messageStyles(status?: string) {
+  if (status === "error") {
+    return "border-red-500/40 bg-red-500/10 text-red-100";
+  }
+  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-100";
+}
+
+export default async function GeneratorPage({
+  searchParams,
+}: {
+  searchParams?: { status?: string; message?: string };
+}) {
   const families = await getGeneratorFamilies();
 
   return (
@@ -13,6 +24,12 @@ export default async function GeneratorPage() {
           Fluxo dependente por árvore configurável, com designação em tempo real e preview do código final.
         </p>
       </div>
+
+      {searchParams?.message ? (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${messageStyles(searchParams.status)}`}>
+          {searchParams.message}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>

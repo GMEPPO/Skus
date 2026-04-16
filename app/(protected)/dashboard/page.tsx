@@ -58,6 +58,7 @@ export default async function DashboardPage() {
                 <div>
                   <p className="font-medium text-slate-100">{entry.generatedCode}</p>
                   <p className="text-sm text-slate-400">{entry.designation}</p>
+                  <p className="text-xs text-slate-500">Criado por: {entry.createdByName ?? "Sem utilizador"}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge>{entry.familyName}</Badge>

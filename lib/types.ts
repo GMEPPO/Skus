@@ -72,6 +72,7 @@ export interface GeneratorFamily {
   id: string;
   name: string;
   description: string;
+  treeVersionId: string | null;
   levels: GeneratorLevel[];
   edges: GeneratorEdge[];
 }
@@ -81,5 +82,12 @@ export interface RecentSkuGeneration {
   generatedCode: string;
   designation: string;
   familyName: string;
+  createdByName?: string;
   createdAtLabel: string;
+  unitsPerBox?: number;
+  unitsPerBoxStatus?: "real" | "estimated";
+  multiples?: number;
+  multiplesStatus?: "real" | "estimated";
+  weight?: number;
+  weightStatus?: "real" | "estimated";
 }

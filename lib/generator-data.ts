@@ -220,6 +220,7 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
       id: family.id,
       name: family.name,
       description: family.description ?? "Sem descricao",
+      treeVersionId,
       levels: treeVersionId ? levelsByTreeVersion.get(treeVersionId) ?? [] : [],
       edges: treeVersionId ? edgesByTreeVersion.get(treeVersionId) ?? [] : [],
     };

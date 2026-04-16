@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
+import { generateSkuAction } from "@/lib/sku-actions";
 import type { GeneratorFamily, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import {
   buildDesignation,
@@ -25,6 +26,12 @@ export function SkuGeneratorWizardMain({
 }) {
   const [familyId, setFamilyId] = useState(families[0]?.id ?? "");
   const [selections, setSelections] = useState<Selections>({});
+  const [unitsPerBox, setUnitsPerBox] = useState("");
+  const [unitsPerBoxStatus, setUnitsPerBoxStatus] = useState<"real" | "estimated">("estimated");
+  const [multiples, setMultiples] = useState("");
+  const [multiplesStatus, setMultiplesStatus] = useState<"real" | "estimated">("estimated");
+  const [weight, setWeight] = useState("");
+  const [weightStatus, setWeightStatus] = useState<"real" | "estimated">("estimated");
 
   const family = useMemo(
     () => families.find((item) => item.id === familyId) ?? families[0],
@@ -33,6 +40,12 @@ export function SkuGeneratorWizardMain({
 
   useEffect(() => {
     setSelections({});
+    setUnitsPerBox("");
+    setMultiples("");
+    setWeight("");
+    setUnitsPerBoxStatus("estimated");
+    setMultiplesStatus("estimated");
+    setWeightStatus("estimated");
   }, [familyId]);
 
   if (families.length === 0) {
@@ -55,6 +68,7 @@ export function SkuGeneratorWizardMain({
   const completedCount = Object.keys(selections).length;
   const hasConfiguredLevels = family.levels.length > 0;
   const hasRequiredLevels = family.levels.length === MAX_FAMILY_LEVELS;
+  const hasMeasurements = Boolean(unitsPerBox && multiples && weight);
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
     setSelections((current) => {
@@ -75,6 +89,12 @@ export function SkuGeneratorWizardMain({
   }
 
   return (
+    <form action={generateSkuAction} className="space-y-6">
+      <input type="hidden" name="familyId" value={family.id} />
+      <input type="hidden" name="treeVersionId" value={family.treeVersionId ?? ""} />
+      <input type="hidden" name="generatedCode" value={skuPreview} />
+      <input type="hidden" name="designation" value={designation} />
+      <input type="hidden" name="selectionSnapshot" value={JSON.stringify(selections)} />
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
         <div className="space-y-4">
@@ -229,6 +249,100 @@ export function SkuGeneratorWizardMain({
               )}
             </div>
           </Card>
+
+          <Card className="space-y-4 p-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Dados logísticos</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Estes campos sao obrigatorios e cada um pode ser marcado como real ou estimado.
+              </p>
+            </div>
+            <div className="grid gap-4">
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Quantidade por caixa</span>
+                  <input
+                    name="unitsPerBox"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={unitsPerBox}
+                    onChange={(event) => setUnitsPerBox(event.target.value)}
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Estado</span>
+                  <select
+                    name="unitsPerBoxStatus"
+                    value={unitsPerBoxStatus}
+                    onChange={(event) => setUnitsPerBoxStatus(event.target.value as "real" | "estimated")}
+                    className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="estimated">Estimado</option>
+                    <option value="real">Real</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Multiplos</span>
+                  <input
+                    name="multiples"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={multiples}
+                    onChange={(event) => setMultiples(event.target.value)}
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Estado</span>
+                  <select
+                    name="multiplesStatus"
+                    value={multiplesStatus}
+                    onChange={(event) => setMultiplesStatus(event.target.value as "real" | "estimated")}
+                    className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="estimated">Estimado</option>
+                    <option value="real">Real</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Peso</span>
+                  <input
+                    name="weight"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={weight}
+                    onChange={(event) => setWeight(event.target.value)}
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Estado</span>
+                  <select
+                    name="weightStatus"
+                    value={weightStatus}
+                    onChange={(event) => setWeightStatus(event.target.value as "real" | "estimated")}
+                    className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="estimated">Estimado</option>
+                    <option value="real">Real</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
 
@@ -246,11 +360,11 @@ export function SkuGeneratorWizardMain({
               </p>
             ) : null}
           </div>
-          <Button disabled={!hasConfiguredLevels || !hasRequiredLevels || completedCount !== family.levels.length || isDesignationTooLong}>
+          <Button disabled={!family.treeVersionId || !hasConfiguredLevels || !hasRequiredLevels || completedCount !== family.levels.length || isDesignationTooLong || !hasMeasurements}>
             Gerar SKU
           </Button>
         </div>
       </div>
-    </div>
+    </form>
   );
 }

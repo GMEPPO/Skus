@@ -222,8 +222,77 @@ create table if not exists public.skus_sku_generations (
   sequence_value bigint not null,
   prefix_snapshot text not null,
   selection_snapshot jsonb not null default '{}'::jsonb,
+  units_per_box numeric(12,3),
+  units_per_box_status text check (units_per_box_status in ('real', 'estimated')),
+  multiples numeric(12,3),
+  multiples_status text check (multiples_status in ('real', 'estimated')),
+  weight numeric(12,3),
+  weight_status text check (weight_status in ('real', 'estimated')),
   generated_by uuid references public.skus_profiles(id),
   created_at timestamptz not null default now()
+);
+
+alter table public.skus_sku_generations
+  add column if not exists units_per_box numeric(12,3);
+
+alter table public.skus_sku_generations
+  add column if not exists units_per_box_status text;
+
+alter table public.skus_sku_generations
+  add column if not exists multiples numeric(12,3);
+
+alter table public.skus_sku_generations
+  add column if not exists multiples_status text;
+
+alter table public.skus_sku_generations
+  add column if not exists weight numeric(12,3);
+
+alter table public.skus_sku_generations
+  add column if not exists weight_status text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'skus_sku_generations_units_per_box_status_check'
+  ) then
+    alter table public.skus_sku_generations
+      add constraint skus_sku_generations_units_per_box_status_check
+      check (units_per_box_status in ('real', 'estimated'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'skus_sku_generations_multiples_status_check'
+  ) then
+    alter table public.skus_sku_generations
+      add constraint skus_sku_generations_multiples_status_check
+      check (multiples_status in ('real', 'estimated'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'skus_sku_generations_weight_status_check'
+  ) then
+    alter table public.skus_sku_generations
+      add constraint skus_sku_generations_weight_status_check
+      check (weight_status in ('real', 'estimated'));
+  end if;
+end $$;
+
+create table if not exists public.skus_sku_generation_measurement_history (
+  id uuid primary key default gen_random_uuid(),
+  sku_generation_id uuid not null references public.skus_sku_generations(id) on delete cascade,
+  field_name text not null check (field_name in ('units_per_box', 'multiples', 'weight')),
+  old_value_numeric numeric(12,3),
+  old_value_status text check (old_value_status in ('real', 'estimated')),
+  new_value_numeric numeric(12,3),
+  new_value_status text not null check (new_value_status in ('real', 'estimated')),
+  changed_by uuid references public.skus_profiles(id),
+  changed_at timestamptz not null default now()
 );
 
 create table if not exists public.skus_admin_audit_logs (
@@ -252,6 +321,7 @@ alter table public.skus_family_tree_level_words enable row level security;
 alter table public.skus_family_tree_edges enable row level security;
 alter table public.skus_sku_sequences enable row level security;
 alter table public.skus_sku_generations enable row level security;
+alter table public.skus_sku_generation_measurement_history enable row level security;
 alter table public.skus_admin_audit_logs enable row level security;
 
 drop policy if exists "skus_profiles_select_own" on public.skus_profiles;
@@ -377,6 +447,13 @@ using (true);
 drop policy if exists "skus_sku_generations_select_authenticated" on public.skus_sku_generations;
 create policy "skus_sku_generations_select_authenticated"
 on public.skus_sku_generations
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_sku_generation_measurement_history_select_authenticated" on public.skus_sku_generation_measurement_history;
+create policy "skus_sku_generation_measurement_history_select_authenticated"
+on public.skus_sku_generation_measurement_history
 for select
 to authenticated
 using (true);

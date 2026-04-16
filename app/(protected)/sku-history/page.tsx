@@ -24,9 +24,13 @@ export default async function SkuHistoryPage() {
                 <div>
                   <p className="font-medium text-slate-100">{row.generatedCode}</p>
                   <p className="text-sm text-slate-400">{row.designation}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Caixa: {row.unitsPerBox ?? "-"} ({row.unitsPerBoxStatus ?? "-"}) • Multiplos: {row.multiples ?? "-"} (
+                    {row.multiplesStatus ?? "-"}) • Peso: {row.weight ?? "-"} ({row.weightStatus ?? "-"})
+                  </p>
                 </div>
                 <p className="text-sm text-slate-500">
-                  {row.familyName} • {row.createdAtLabel}
+                  {row.familyName} • {row.createdByName ?? "Sem utilizador"} • {row.createdAtLabel}
                 </p>
               </div>
             </div>
