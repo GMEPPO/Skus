@@ -1,6 +1,15 @@
 import type { GeneratorFamily, GeneratorWord } from "@/lib/types";
 
 export const MAX_DESIGNATION_LENGTH = 60;
+export const EMPTY_SELECTION_PREFIX = "__empty__:";
+
+export function buildEmptySelectionId(levelId: string) {
+  return `${EMPTY_SELECTION_PREFIX}${levelId}`;
+}
+
+export function isEmptySelection(value?: string) {
+  return Boolean(value && value.startsWith(EMPTY_SELECTION_PREFIX));
+}
 
 export function getAvailableOptions(
   family: GeneratorFamily,
@@ -19,6 +28,7 @@ export function getAvailableOptions(
 
   const previousSelection = selections[previousLevel.id];
   if (!previousSelection) return [];
+  if (isEmptySelection(previousSelection)) return [];
 
   const optionsWithDependencies = level.options.filter((option) => option.parentWordIds.length > 0);
   if (optionsWithDependencies.length > 0) {
@@ -46,6 +56,8 @@ export function buildDesignation(
 ) {
   const segments = family.levels
     .map((level) => {
+      const selectedValue = selections[level.id];
+      if (isEmptySelection(selectedValue)) return null;
       const option = level.options.find((item) => item.id === selections[level.id]);
       if (!option || !option.includeInDesignation) return null;
       return option.designation || option.label;
@@ -64,7 +76,11 @@ export function buildSkuPreview(
   const segments = [
     family.name.slice(0, 3).toUpperCase(),
     ...family.levels.map(
-      (level) => level.options.find((option) => option.id === selections[level.id])?.referenceCode ?? "000",
+      (level) => {
+        const selectedValue = selections[level.id];
+        if (isEmptySelection(selectedValue)) return "000";
+        return level.options.find((option) => option.id === selectedValue)?.referenceCode ?? "000";
+      },
     ),
   ];
 

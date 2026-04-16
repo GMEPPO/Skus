@@ -7,7 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
 import type { GeneratorFamily, GeneratorLevel, GeneratorWord } from "@/lib/types";
-import { buildDesignation, buildSkuPreview, getAvailableOptions, MAX_DESIGNATION_LENGTH } from "@/lib/sku";
+import {
+  buildDesignation,
+  buildEmptySelectionId,
+  buildSkuPreview,
+  getAvailableOptions,
+  isEmptySelection,
+  MAX_DESIGNATION_LENGTH,
+} from "@/lib/sku";
 
 type Selections = Record<string, string>;
 
@@ -49,7 +56,7 @@ export function SkuGeneratorWizardMain({
   const hasConfiguredLevels = family.levels.length > 0;
   const hasRequiredLevels = family.levels.length === MAX_FAMILY_LEVELS;
 
-  function handleSelection(level: GeneratorLevel, word?: GeneratorWord) {
+  function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
     setSelections((current) => {
       const next: Selections = {};
       for (const item of family.levels) {
@@ -58,7 +65,9 @@ export function SkuGeneratorWizardMain({
           if (existing) next[item.id] = existing;
         }
       }
-      if (word) {
+      if (word === null) {
+        next[level.id] = buildEmptySelectionId(level.id);
+      } else if (word) {
         next[level.id] = word.id;
       }
       return next;
@@ -93,6 +102,8 @@ export function SkuGeneratorWizardMain({
                 const previousLevel = family.levels.find((item) => item.order === level.order - 1);
                 const isBlocked = level.order > 1 && !selections[previousLevel?.id ?? ""];
                 const selectedId = selections[level.id];
+                const emptyOptionSelected = isEmptySelection(selectedId);
+                const showEmptyOption = level.order >= 3;
 
                 return (
                   <div
@@ -120,26 +131,6 @@ export function SkuGeneratorWizardMain({
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      <button
-                        type="button"
-                        disabled={isBlocked}
-                        onClick={() => handleSelection(level)}
-                        className={[
-                          "rounded-xl border px-4 py-3 text-left transition",
-                          !selectedId
-                            ? "border-amber-400 bg-amber-400/10"
-                            : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
-                          isBlocked ? "cursor-not-allowed opacity-50" : "",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-slate-100">&nbsp;</p>
-                            <p className="mt-1 text-xs text-slate-500">000</p>
-                          </div>
-                          {!selectedId ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
-                        </div>
-                      </button>
                       {options.map((option) => {
                         const isSelected = selectedId === option.id;
                         return (
@@ -166,6 +157,28 @@ export function SkuGeneratorWizardMain({
                           </button>
                         );
                       })}
+                      {showEmptyOption ? (
+                        <button
+                          type="button"
+                          disabled={isBlocked}
+                          onClick={() => handleSelection(level, null)}
+                          className={[
+                            "rounded-xl border px-4 py-3 text-left transition",
+                            emptyOptionSelected
+                              ? "border-amber-400 bg-amber-400/10"
+                              : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
+                            isBlocked ? "cursor-not-allowed opacity-50" : "",
+                          ].join(" ")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-slate-100">&nbsp;</p>
+                              <p className="mt-1 text-xs text-slate-500">000</p>
+                            </div>
+                            {emptyOptionSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
+                          </div>
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 );
