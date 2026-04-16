@@ -15,8 +15,8 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/generator", label: "Gerador SKU", icon: Workflow },
-  { href: "/families", label: "Familias", icon: Boxes },
-  { href: "/catalog/words", label: "Vocabulario", icon: Tags },
+  { href: "/families-manage", label: "Familias", icon: Boxes },
+  { href: "/catalog/words-manage", label: "Vocabulario", icon: Tags },
   { href: "/sku-history", label: "Historico", icon: BarChart3 },
   { href: "/admin/users", label: "Admin", icon: Shield, adminOnly: true },
 ];

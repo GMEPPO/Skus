@@ -88,9 +88,18 @@ create table if not exists public.skus_family_tree_versions (
   unique (family_id, version_number)
 );
 
-alter table public.skus_families
-  add constraint skus_families_active_tree_version_fk
-  foreign key (active_tree_version_id) references public.skus_family_tree_versions(id);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'skus_families_active_tree_version_fk'
+  ) then
+    alter table public.skus_families
+      add constraint skus_families_active_tree_version_fk
+      foreign key (active_tree_version_id) references public.skus_family_tree_versions(id);
+  end if;
+end $$;
 
 create table if not exists public.skus_family_tree_levels (
   id uuid primary key default gen_random_uuid(),
@@ -172,6 +181,126 @@ alter table public.skus_family_tree_edges enable row level security;
 alter table public.skus_sku_sequences enable row level security;
 alter table public.skus_sku_generations enable row level security;
 alter table public.skus_admin_audit_logs enable row level security;
+
+drop policy if exists "skus_profiles_select_own" on public.skus_profiles;
+create policy "skus_profiles_select_own"
+on public.skus_profiles
+for select
+to authenticated
+using (auth.uid() = id);
+
+drop policy if exists "skus_profiles_insert_own" on public.skus_profiles;
+create policy "skus_profiles_insert_own"
+on public.skus_profiles
+for insert
+to authenticated
+with check (auth.uid() = id);
+
+drop policy if exists "skus_profiles_update_own" on public.skus_profiles;
+create policy "skus_profiles_update_own"
+on public.skus_profiles
+for update
+to authenticated
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+drop policy if exists "skus_roles_select_authenticated" on public.skus_roles;
+create policy "skus_roles_select_authenticated"
+on public.skus_roles
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_permissions_select_authenticated" on public.skus_permissions;
+create policy "skus_permissions_select_authenticated"
+on public.skus_permissions
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_role_permissions_select_authenticated" on public.skus_role_permissions;
+create policy "skus_role_permissions_select_authenticated"
+on public.skus_role_permissions
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_field_types_select_authenticated" on public.skus_field_types;
+create policy "skus_field_types_select_authenticated"
+on public.skus_field_types
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_words_select_authenticated" on public.skus_words;
+create policy "skus_words_select_authenticated"
+on public.skus_words
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_word_contexts_select_authenticated" on public.skus_word_contexts;
+create policy "skus_word_contexts_select_authenticated"
+on public.skus_word_contexts
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_families_select_authenticated" on public.skus_families;
+create policy "skus_families_select_authenticated"
+on public.skus_families
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_family_tree_versions_select_authenticated" on public.skus_family_tree_versions;
+create policy "skus_family_tree_versions_select_authenticated"
+on public.skus_family_tree_versions
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_family_tree_levels_select_authenticated" on public.skus_family_tree_levels;
+create policy "skus_family_tree_levels_select_authenticated"
+on public.skus_family_tree_levels
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_family_tree_level_words_select_authenticated" on public.skus_family_tree_level_words;
+create policy "skus_family_tree_level_words_select_authenticated"
+on public.skus_family_tree_level_words
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_family_tree_edges_select_authenticated" on public.skus_family_tree_edges;
+create policy "skus_family_tree_edges_select_authenticated"
+on public.skus_family_tree_edges
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_sku_sequences_select_authenticated" on public.skus_sku_sequences;
+create policy "skus_sku_sequences_select_authenticated"
+on public.skus_sku_sequences
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_sku_generations_select_authenticated" on public.skus_sku_generations;
+create policy "skus_sku_generations_select_authenticated"
+on public.skus_sku_generations
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_admin_audit_logs_select_authenticated" on public.skus_admin_audit_logs;
+create policy "skus_admin_audit_logs_select_authenticated"
+on public.skus_admin_audit_logs
+for select
+to authenticated
+using (true);
 
 insert into public.skus_roles (code, name, description)
 values
