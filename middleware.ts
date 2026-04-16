@@ -2,10 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  let response = NextResponse.next({
+    request,
   });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -21,6 +19,12 @@ export async function middleware(request: NextRequest) {
         return request.cookies.get(name)?.value;
       },
       set(name: string, value: string, options: Record<string, unknown>) {
+        request.cookies.set(name, value);
+
+        response = NextResponse.next({
+          request,
+        });
+
         response.cookies.set({
           name,
           value,
@@ -28,6 +32,12 @@ export async function middleware(request: NextRequest) {
         });
       },
       remove(name: string, options: Record<string, unknown>) {
+        request.cookies.set(name, "");
+
+        response = NextResponse.next({
+          request,
+        });
+
         response.cookies.set({
           name,
           value: "",
@@ -43,7 +53,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
