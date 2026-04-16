@@ -69,6 +69,13 @@ export function SkuGeneratorWizardMain({
   const hasConfiguredLevels = family.levels.length > 0;
   const hasRequiredLevels = family.levels.length === MAX_FAMILY_LEVELS;
   const hasMeasurements = Boolean(unitsPerBox && multiples && weight);
+  const canSubmit =
+    Boolean(family.treeVersionId) &&
+    hasConfiguredLevels &&
+    hasRequiredLevels &&
+    completedCount === family.levels.length &&
+    !isDesignationTooLong &&
+    hasMeasurements;
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
     setSelections((current) => {
@@ -89,13 +96,13 @@ export function SkuGeneratorWizardMain({
   }
 
   return (
-    <form action={generateSkuAction} className="space-y-6">
-      <input type="hidden" name="familyId" value={family.id} />
-      <input type="hidden" name="treeVersionId" value={family.treeVersionId ?? ""} />
-      <input type="hidden" name="generatedCode" value={skuPreview} />
-      <input type="hidden" name="designation" value={designation} />
-      <input type="hidden" name="selectionSnapshot" value={JSON.stringify(selections)} />
     <div className="space-y-6">
+      <form action={generateSkuAction} className="space-y-6">
+        <input type="hidden" name="familyId" value={family.id} />
+        <input type="hidden" name="treeVersionId" value={family.treeVersionId ?? ""} />
+        <input type="hidden" name="generatedCode" value={skuPreview} />
+        <input type="hidden" name="designation" value={designation} />
+        <input type="hidden" name="selectionSnapshot" value={JSON.stringify(selections)} />
       <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
         <div className="space-y-4">
           <Card className="p-4">
@@ -360,11 +367,12 @@ export function SkuGeneratorWizardMain({
               </p>
             ) : null}
           </div>
-          <Button disabled={!family.treeVersionId || !hasConfiguredLevels || !hasRequiredLevels || completedCount !== family.levels.length || isDesignationTooLong || !hasMeasurements}>
+          <Button disabled={!canSubmit}>
             Gerar SKU
           </Button>
         </div>
       </div>
-    </form>
+      </form>
+    </div>
   );
 }
