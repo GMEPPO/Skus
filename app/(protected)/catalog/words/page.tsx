@@ -8,17 +8,17 @@ export default async function CatalogWordsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Vocabulário</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Vocabulario</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Catálogo mestre de palavras e referências curtas de 3 caracteres, reutilizável entre famílias.
+          Catalogo mestre de palavras, referencias curtas e designacoes reutilizaveis entre familias.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Palavras configuráveis</CardTitle>
+          <CardTitle>Palavras configuraveis</CardTitle>
           <CardDescription>
-            Cada item indica o tipo de campo principal e a referência usada na composição do SKU.
+            Cada item indica o tipo de campo principal, a referencia e a regra de designacao.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
@@ -29,11 +29,14 @@ export default async function CatalogWordsPage() {
             >
               <div>
                 <p className="font-medium text-slate-100">{word.label}</p>
-                <p className="text-sm text-slate-400">{word.description}</p>
+                <p className="text-sm text-slate-400">Designacao: {word.designation}</p>
               </div>
               <Badge variant="outline">{word.referenceCode}</Badge>
               <Badge>{word.fieldTypeLabel}</Badge>
-              <div className="text-sm text-slate-400">{word.contextLabel}</div>
+              <div className="space-y-2 text-sm text-slate-400">
+                <div>{word.includeInDesignation ? "Entra na designacao" : "So entra no codigo"}</div>
+                <div>{word.familyLabels.length > 0 ? word.familyLabels.join(", ") : "Sem familias associadas"}</div>
+              </div>
             </div>
           ))}
         </CardContent>
