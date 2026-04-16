@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SkuGeneratorWizard } from "@/components/generator/sku-generator-wizard";
-import { getGeneratorFamilies } from "@/lib/data";
+import { SkuGeneratorWizardMain } from "@/components/generator/sku-generator-wizard-main";
+import { getGeneratorFamilies } from "@/lib/generator-data";
 
 export default async function GeneratorPage() {
   const families = await getGeneratorFamilies();
@@ -23,7 +23,7 @@ export default async function GeneratorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SkuGeneratorWizard families={families} />
+          <SkuGeneratorWizardMain families={families} />
         </CardContent>
       </Card>
     </div>
