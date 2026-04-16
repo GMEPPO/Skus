@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FamilyLevelWordPicker } from "@/components/catalog/family-level-word-picker";
+import { FamiliesCreatedList } from "@/components/catalog/families-created-list";
 import { createFamilyAction, deleteFamilyAction, getFamiliesCatalog, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
@@ -149,49 +150,8 @@ export default async function FamiliesManagePage({
               Cada familia pode depois receber niveis, palavras e relacoes no builder.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {families.map((family) => (
-              <div key={family.id} className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-100">{family.name}</p>
-                    <p className="text-sm text-slate-400">{family.description || "Sem descricao"}</p>
-                  </div>
-                  <Badge variant={family.status === "active" ? "success" : "outline"}>
-                    {family.status}
-                  </Badge>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                  {family.levelLabels.length > 0 ? (
-                    family.levelLabels.map((level) => (
-                      <div
-                        key={level}
-                        className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-3 py-1"
-                      >
-                        <span>{level}</span>
-                        <ArrowRight className="h-3.5 w-3.5 text-slate-500" />
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-slate-500">Sem niveis publicados ainda</span>
-                  )}
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Button asChild variant="outline" className="h-10">
-                    <Link href={`/families-manage/${family.id}`} className="inline-flex items-center gap-2">
-                      <Settings2 className="h-4 w-4" />
-                      Configurar builder
-                    </Link>
-                  </Button>
-                  <form action={deleteFamilyAction}>
-                    <input type="hidden" name="familyId" value={family.id} />
-                    <Button type="submit" variant="outline" className="h-10 text-red-100 hover:bg-red-500/10">
-                      Eliminar familia
-                    </Button>
-                  </form>
-                </div>
-              </div>
-            ))}
+          <CardContent>
+            <FamiliesCreatedList families={families} />
           </CardContent>
         </Card>
 
