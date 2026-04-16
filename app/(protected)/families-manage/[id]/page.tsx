@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  attachWordToFamilyLevelAction,
   createFamilyDraftTreeAction,
   getFamilyBuilderDetail,
   getWordsCatalog,
@@ -146,17 +145,32 @@ export default async function FamilyBuilderDetailPage({
           <CardContent className="space-y-4">
             {family.levels.length > 0 ? (
               family.levels.map((level) => {
-                const usedWordIds = new Set(level.words.map((word) => word.id));
                 const previousLevel = family.levels.find((item) => item.order === level.order - 1);
-                const previousLevelWordIds = new Set(previousLevel?.words.map((word) => word.id) ?? []);
-                const availableWords = words.filter(
+                const previousLevelWords = previousLevel
+                  ? words.filter(
+                      (word) =>
+                        word.fieldTypeId === previousLevel.fieldTypeId &&
+                        word.familyIds.includes(family.id) &&
+                        (previousLevel.order === 1 ||
+                          word.parentWordIds.some((parentWordId) =>
+                            words
+                              .filter(
+                                (candidate) =>
+                                  candidate.fieldTypeId === family.levels.find((item) => item.order === previousLevel.order - 1)?.fieldTypeId &&
+                                  candidate.familyIds.includes(family.id),
+                              )
+                              .some((candidate) => parentWordId === candidate.id),
+                          )),
+                    )
+                  : [];
+
+                const levelWords = words.filter(
                   (word) =>
-                    !usedWordIds.has(word.id) &&
                     word.fieldTypeId === level.fieldTypeId &&
                     word.familyIds.includes(family.id) &&
-                    (level.order === 1 || word.parentWordIds.some((parentWordId) => previousLevelWordIds.has(parentWordId))),
+                    (level.order === 1 ||
+                      word.parentWordIds.some((parentWordId) => previousLevelWords.some((previousWord) => previousWord.id === parentWordId))),
                 );
-                const hasAvailableWords = availableWords.length > 0;
 
                 return (
                   <div key={level.id} className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
@@ -167,7 +181,7 @@ export default async function FamilyBuilderDetailPage({
                         <p className="text-sm text-slate-400">{level.fieldTypeName}</p>
                       </div>
                       <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
-                        {level.words.length} palavras
+                        {levelWords.length} palavras
                       </div>
                     </div>
 
@@ -187,8 +201,8 @@ export default async function FamilyBuilderDetailPage({
                     </form>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {level.words.length > 0 ? (
-                        level.words.map((word) => (
+                      {levelWords.length > 0 ? (
+                        levelWords.map((word) => (
                           <div
                             key={word.id}
                             className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-200"
@@ -202,33 +216,6 @@ export default async function FamilyBuilderDetailPage({
                         </div>
                       )}
                     </div>
-
-                    <form action={attachWordToFamilyLevelAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                      <input type="hidden" name="familyId" value={family.id} />
-                      <input type="hidden" name="treeLevelId" value={level.id} />
-                      <select
-                        name="wordId"
-                        required
-                        disabled={!hasAvailableWords}
-                        className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                      >
-                        {hasAvailableWords ? (
-                          <>
-                            <option value="">Associar palavra a este nivel</option>
-                            {availableWords.map((word) => (
-                              <option key={word.id} value={word.id}>
-                                {word.label} - {word.referenceCode} - {word.fieldTypeLabel}
-                              </option>
-                            ))}
-                          </>
-                        ) : (
-                          <option value="">Sem palavras disponiveis para este nivel</option>
-                        )}
-                      </select>
-                      <Button type="submit" variant="outline" disabled={!hasAvailableWords}>
-                        Associar palavra
-                      </Button>
-                    </form>
                   </div>
                 );
               })

@@ -22,21 +22,28 @@ type LevelRow = {
   id: string;
   tree_version_id: string;
   level_order: number;
+  field_type_id?: string;
   label_override: string | null;
   skus_field_types?: FieldTypeRelation;
 };
 
-type LevelWordRow = {
-  tree_level_id: string;
-  skus_words:
-    | { id?: string; label?: string; reference_code?: string; designation?: string | null; include_in_designation?: boolean | null }
-    | Array<{ id?: string; label?: string; reference_code?: string; designation?: string | null; include_in_designation?: boolean | null }>
-    | null;
+type WordRow = {
+  id: string;
+  label: string;
+  reference_code: string;
+  default_field_type_id: string;
+  designation?: string | null;
+  include_in_designation?: boolean | null;
 };
 
 type WordDependencyRow = {
   child_word_id: string;
   parent_word_id: string;
+};
+
+type WordFamilyRow = {
+  word_id: string;
+  family_id: string;
 };
 
 type EdgeRow = {
@@ -68,14 +75,11 @@ function getFieldTypeRelation(
   };
 }
 
-function getWordRelation(row: LevelWordRow, parentWordIds: string[]): GeneratorWord | null {
-  const relation = Array.isArray(row.skus_words) ? row.skus_words[0] : row.skus_words;
-  if (!relation?.id) return null;
-
+function getWordRelation(relation: WordRow, parentWordIds: string[]): GeneratorWord {
   return {
-    id: String(relation.id),
-    label: String(relation.label ?? ""),
-    referenceCode: String(relation.reference_code ?? ""),
+    id: relation.id,
+    label: relation.label,
+    referenceCode: relation.reference_code,
     designation: String(relation.designation ?? relation.label ?? ""),
     includeInDesignation: Boolean(relation.include_in_designation ?? true),
     parentWordIds,
@@ -123,21 +127,12 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
   const levelsResult = treeVersionIds.length
     ? await supabase
         .from("skus_family_tree_levels")
-        .select("id, tree_version_id, level_order, label_override, skus_field_types(code, name)")
+        .select("id, tree_version_id, field_type_id, level_order, label_override, skus_field_types(code, name)")
         .in("tree_version_id", treeVersionIds)
         .order("level_order", { ascending: true })
     : { data: [] as Array<Record<string, unknown>> };
 
   const levels = (levelsResult.data ?? []) as LevelRow[];
-  const levelIds = levels.map((level) => level.id);
-
-  const levelWordsResult = levelIds.length
-    ? await supabase
-        .from("skus_family_tree_level_words")
-        .select("tree_level_id, skus_words(id, label, reference_code, designation, include_in_designation)")
-        .in("tree_level_id", levelIds)
-        .order("sort_order", { ascending: true })
-    : { data: [] as Array<Record<string, unknown>> };
 
   const edgesResult = treeVersionIds.length
     ? await supabase
@@ -151,6 +146,17 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
     .from("skus_word_dependencies")
     .select("child_word_id, parent_word_id");
 
+  const [wordsResult, wordFamiliesResult] = await Promise.all([
+    supabase
+      .from("skus_words")
+      .select("id, label, reference_code, default_field_type_id, designation, include_in_designation")
+      .eq("is_active", true)
+      .order("label", { ascending: true }),
+    supabase
+      .from("skus_word_families")
+      .select("word_id, family_id"),
+  ]);
+
   const parentWordIdsByWord = new Map<string, string[]>();
   for (const row of (wordDependenciesResult.data ?? []) as WordDependencyRow[]) {
     const items = parentWordIdsByWord.get(row.child_word_id) ?? [];
@@ -158,28 +164,32 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
     parentWordIdsByWord.set(row.child_word_id, items);
   }
 
-  const wordsByLevelId = new Map<string, GeneratorWord[]>();
-  for (const row of (levelWordsResult.data ?? []) as LevelWordRow[]) {
-    const relation = Array.isArray(row.skus_words) ? row.skus_words[0] : row.skus_words;
-    const parentWordIds = relation?.id ? parentWordIdsByWord.get(String(relation.id)) ?? [] : [];
-    const word = getWordRelation(row, parentWordIds);
-    if (!word) continue;
-
-    const items = wordsByLevelId.get(row.tree_level_id) ?? [];
-    items.push(word);
-    wordsByLevelId.set(row.tree_level_id, items);
+  const familyIdsByWord = new Map<string, string[]>();
+  for (const row of (wordFamiliesResult.data ?? []) as WordFamilyRow[]) {
+    const items = familyIdsByWord.get(row.word_id) ?? [];
+    items.push(row.family_id);
+    familyIdsByWord.set(row.word_id, items);
   }
+
+  const words = (wordsResult.data ?? []) as WordRow[];
 
   const levelsByTreeVersion = new Map<string, GeneratorLevel[]>();
   for (const level of levels) {
     const fieldType = getFieldTypeRelation(level.skus_field_types, "custom", "Campo");
     const items = levelsByTreeVersion.get(level.tree_version_id) ?? [];
+    const familyId = versions.find((version) => version.id === level.tree_version_id)?.family_id;
+    const levelWords = words
+      .filter((word) => {
+        if (!familyId) return false;
+        return word.default_field_type_id === level.field_type_id && (familyIdsByWord.get(word.id) ?? []).includes(familyId);
+      })
+      .map((word) => getWordRelation(word, parentWordIdsByWord.get(word.id) ?? []));
     items.push({
       id: level.id,
       order: level.level_order,
       fieldType: fieldType.code,
       label: level.label_override || fieldType.name,
-      options: wordsByLevelId.get(level.id) ?? [],
+      options: levelWords,
     });
     levelsByTreeVersion.set(level.tree_version_id, items);
   }
