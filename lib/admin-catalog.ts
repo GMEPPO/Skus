@@ -12,6 +12,30 @@ export interface FieldTypeOption {
   name: string;
 }
 
+type SupabaseFieldTypeRelation = { name?: string | null } | Array<{ name?: string | null }> | null;
+
+type SupabaseWordRow = {
+  id: string;
+  label: string;
+  reference_code: string;
+  description: string | null;
+  skus_field_types?: SupabaseFieldTypeRelation;
+};
+
+type SupabaseFamilyRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  active_tree_version_id: string | null;
+};
+
+type SupabaseFamilyLevelRow = {
+  tree_version_id: string;
+  label_override: string | null;
+  skus_field_types?: SupabaseFieldTypeRelation;
+};
+
 const createWordSchema = z.object({
   label: z.string().trim().min(2),
   referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
@@ -30,6 +54,14 @@ const createFamilySchema = z.object({
 
 function normalizeLabel(value: string) {
   return value.trim().toLowerCase();
+}
+
+function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefined, fallback: string) {
+  if (!relation) return fallback;
+  if (Array.isArray(relation)) {
+    return relation[0]?.name ?? fallback;
+  }
+  return relation.name ?? fallback;
 }
 
 export async function getFieldTypeOptions(): Promise<FieldTypeOption[]> {
@@ -80,13 +112,11 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     }
   }
 
-  return (wordsResult.data ?? []).map((row) => ({
+  return ((wordsResult.data ?? []) as SupabaseWordRow[]).map((row) => ({
     id: row.id,
     label: row.label,
     referenceCode: row.reference_code,
-    fieldTypeLabel: Array.isArray(row.skus_field_types)
-      ? row.skus_field_types[0]?.name ?? "Sem tipo"
-      : row.skus_field_types?.name ?? "Sem tipo",
+    fieldTypeLabel: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
     contextLabel: contextMap.get(row.id) ?? "Sem contexto",
     description: row.description ?? "",
   }));
@@ -104,7 +134,7 @@ export async function getFamiliesCatalog(): Promise<FamilyListItem[]> {
     .select("id, name, description, status, active_tree_version_id")
     .order("name", { ascending: true });
 
-  const rows = familiesResult.data ?? [];
+  const rows = (familiesResult.data ?? []) as SupabaseFamilyRow[];
   const treeIds = rows
     .map((row) => row.active_tree_version_id)
     .filter((value): value is string => Boolean(value));
@@ -118,12 +148,10 @@ export async function getFamiliesCatalog(): Promise<FamilyListItem[]> {
     : { data: [] as Array<Record<string, unknown>> };
 
   const levelsMap = new Map<string, string[]>();
-  for (const row of levelsResult.data ?? []) {
+  for (const row of (levelsResult.data ?? []) as SupabaseFamilyLevelRow[]) {
     const name = row.label_override
       ? String(row.label_override)
-      : Array.isArray(row.skus_field_types)
-        ? String(row.skus_field_types[0]?.name ?? "Nivel")
-        : String((row.skus_field_types as { name?: string } | null)?.name ?? "Nivel");
+      : String(getFieldTypeRelationName(row.skus_field_types, "Nivel"));
 
     const items = levelsMap.get(String(row.tree_version_id)) ?? [];
     items.push(name);
