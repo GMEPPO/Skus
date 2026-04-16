@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
 export default function HomePage() {
-  redirect("/dashboard");
+  const isDemo = process.env.SKIP_AUTH === "true";
+  redirect(isDemo ? "/dashboard" : "/login");
 }
