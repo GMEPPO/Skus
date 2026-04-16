@@ -9,6 +9,32 @@ import type {
   WordListItem,
 } from "@/lib/types";
 
+type SupabaseRoleRelation = { code?: string | null } | Array<{ code?: string | null }> | null;
+type SupabaseProfileListRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  department: string | null;
+  is_active: boolean | null;
+  skus_roles?: SupabaseRoleRelation;
+};
+
+type SupabaseSkuHistoryRelation = { name?: string | null } | Array<{ name?: string | null }> | null;
+type SupabaseSkuHistoryRow = {
+  id: string;
+  generated_code: string | null;
+  designation: string | null;
+  created_at: string | null;
+  units_per_box: number | string | null;
+  units_per_box_status: "real" | "estimated" | null;
+  multiples: number | string | null;
+  multiples_status: "real" | "estimated" | null;
+  weight: number | string | null;
+  weight_status: "real" | "estimated" | null;
+  skus_families?: SupabaseSkuHistoryRelation;
+  skus_profiles?: SupabaseSkuHistoryRelation;
+};
+
 export const demoCurrentUser: AppUser = {
   id: "user-admin",
   name: "Miguel Vieira",
@@ -128,7 +154,7 @@ export async function getUsers(): Promise<AppUser[]> {
       .select("id, name, email, department, is_active, skus_roles(code)")
       .order("name", { ascending: true });
 
-    return (result.data ?? []).map((row) => {
+    return ((result.data ?? []) as SupabaseProfileListRow[]).map((row) => {
       const roleRelation = Array.isArray(row.skus_roles) ? row.skus_roles[0] : row.skus_roles;
       return {
         id: String(row.id),
@@ -165,7 +191,7 @@ export async function getRecentSkuGenerations(): Promise<RecentSkuGeneration[]> 
       .order("created_at", { ascending: false })
       .limit(10);
 
-    return (result.data ?? []).map((row) => {
+    return ((result.data ?? []) as SupabaseSkuHistoryRow[]).map((row) => {
       const familyRelation = Array.isArray(row.skus_families) ? row.skus_families[0] : row.skus_families;
       const profileRelation = Array.isArray(row.skus_profiles) ? row.skus_profiles[0] : row.skus_profiles;
       return {
