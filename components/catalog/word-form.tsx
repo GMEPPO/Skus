@@ -10,7 +10,9 @@ type WordFormInitialValues = {
   label: string;
   referenceCode: string;
   fieldTypeId: string;
-  designation: string;
+  designationPt: string;
+  designationEs: string;
+  designationEn: string;
   includeInDesignation: boolean;
   familyIds: string[];
   parentWordIds: string[];
@@ -135,11 +137,31 @@ export function WordForm({
       </label>
 
       <label className="space-y-2">
-        <span className="text-sm text-slate-300">Designacao</span>
+        <span className="text-sm text-slate-300">Designacao PT</span>
         <input
-          name="designation"
+          name="designationPt"
           required
-          defaultValue={initialValues.designation}
+          defaultValue={initialValues.designationPt}
+          className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+        />
+      </label>
+
+      <label className="space-y-2">
+        <span className="text-sm text-slate-300">Designacion ES</span>
+        <input
+          name="designationEs"
+          required
+          defaultValue={initialValues.designationEs}
+          className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+        />
+      </label>
+
+      <label className="space-y-2">
+        <span className="text-sm text-slate-300">Designation EN</span>
+        <input
+          name="designationEn"
+          required
+          defaultValue={initialValues.designationEn}
           className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
         />
       </label>

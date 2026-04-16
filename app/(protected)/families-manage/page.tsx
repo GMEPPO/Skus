@@ -3,7 +3,7 @@ import { ArrowRight, GitBranchPlus, MoveRight, Settings2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createFamilyAction, deleteFamilyAction, getFamiliesCatalog, getWordsCatalog } from "@/lib/admin-catalog";
+import { createFamilyAction, deleteFamilyAction, getFamiliesCatalog, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -17,10 +17,20 @@ export default async function FamiliesManagePage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
-  const [families, words] = await Promise.all([
+  const [families, words, fieldTypes] = await Promise.all([
     getFamiliesCatalog(),
     getWordsCatalog(),
+    getFieldTypeOptions(),
   ]);
+
+  const fieldTypeByCode = new Map(fieldTypes.map((fieldType) => [fieldType.code, fieldType]));
+  const levelSections = [
+    { code: "format", title: "Formato", inputName: "formatWordIds" },
+    { code: "product", title: "Produto", inputName: "productWordIds" },
+    { code: "size", title: "Tamanho", inputName: "sizeWordIds" },
+    { code: "packaging", title: "Embalagem", inputName: "packagingWordIds" },
+    { code: "extra", title: "Extra", inputName: "extraWordIds" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -40,16 +50,32 @@ export default async function FamiliesManagePage({
       <Card>
         <CardHeader>
           <CardTitle>Nova familia</CardTitle>
-          <CardDescription>
-            Nesta fase podes criar a familia base. A configuracao da arvore completa vem no passo seguinte.
-          </CardDescription>
+          <CardDescription>Crias a familia e ja defines as palavras iniciais disponiveis por nivel.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={createFamilyAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-2">
-              <span className="text-sm text-slate-300">Nome</span>
+              <span className="text-sm text-slate-300">Nome PT</span>
               <input
-                name="name"
+                name="namePt"
+                required
+                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                placeholder="Ex: Valera"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm text-slate-300">Nombre ES</span>
+              <input
+                name="nameEs"
+                required
+                className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                placeholder="Ej: Valera"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm text-slate-300">Name EN</span>
+              <input
+                name="nameEn"
                 required
                 className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                 placeholder="Ex: Valera"
@@ -84,6 +110,28 @@ export default async function FamiliesManagePage({
                 placeholder="Descricao opcional"
               />
             </label>
+            <div className="md:col-span-2 xl:col-span-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              {levelSections.map((section) => {
+                const fieldTypeId = fieldTypeByCode.get(section.code)?.id;
+                const items = words.filter((word) => word.fieldTypeId === fieldTypeId);
+                return (
+                  <label key={section.code} className="space-y-2">
+                    <span className="text-sm text-slate-300">{section.title}</span>
+                    <select
+                      name={section.inputName}
+                      multiple
+                      className="min-h-[10rem] w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100"
+                    >
+                      {items.map((word) => (
+                        <option key={word.id} value={word.id}>
+                          {word.label} - {word.referenceCode}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
             <div className="md:col-span-2 xl:col-span-4">
               <Button type="submit">Guardar familia</Button>
             </div>

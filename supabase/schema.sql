@@ -70,15 +70,39 @@ alter table public.skus_words
   add column if not exists designation text;
 
 alter table public.skus_words
+  add column if not exists designation_pt text;
+
+alter table public.skus_words
+  add column if not exists designation_es text;
+
+alter table public.skus_words
+  add column if not exists designation_en text;
+
+alter table public.skus_words
   add column if not exists include_in_designation boolean not null default true;
 
 update public.skus_words
 set designation = coalesce(designation, label)
 where designation is null;
 
+update public.skus_words
+set designation_pt = coalesce(designation_pt, designation, label)
+where designation_pt is null;
+
+update public.skus_words
+set designation_es = coalesce(designation_es, designation_pt, designation, label)
+where designation_es is null;
+
+update public.skus_words
+set designation_en = coalesce(designation_en, designation_pt, designation, label)
+where designation_en is null;
+
 create table if not exists public.skus_families (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
+  name_pt text,
+  name_es text,
+  name_en text,
   slug text not null unique,
   description text,
   status text not null default 'draft' check (status in ('draft', 'active', 'archived')),
@@ -86,6 +110,18 @@ create table if not exists public.skus_families (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+update public.skus_families
+set name_pt = coalesce(name_pt, name)
+where name_pt is null;
+
+update public.skus_families
+set name_es = coalesce(name_es, name_pt, name)
+where name_es is null;
+
+update public.skus_families
+set name_en = coalesce(name_en, name_pt, name)
+where name_en is null;
 
 create table if not exists public.skus_word_families (
   word_id uuid not null references public.skus_words(id) on delete cascade,

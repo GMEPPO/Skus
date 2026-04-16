@@ -23,6 +23,9 @@ export interface WordListItem {
   fieldTypeId: string;
   fieldTypeLabel: string;
   designation: string;
+  designationPt: string;
+  designationEs: string;
+  designationEn: string;
   includeInDesignation: boolean;
   familyIds: string[];
   familyLabels: string[];
@@ -33,6 +36,9 @@ export interface WordListItem {
 export interface FamilyListItem {
   id: string;
   name: string;
+  namePt: string;
+  nameEs: string;
+  nameEn: string;
   description: string;
   status: "draft" | "active" | "archived";
   levelLabels: string[];

@@ -61,6 +61,9 @@ type SupabaseWordRow = {
   reference_code: string;
   default_field_type_id: string;
   designation: string | null;
+  designation_pt: string | null;
+  designation_es: string | null;
+  designation_en: string | null;
   include_in_designation: boolean | null;
   skus_field_types?: SupabaseFieldTypeRelation;
 };
@@ -85,6 +88,9 @@ type SupabaseWordDependencyRow = {
 type SupabaseFamilyRow = {
   id: string;
   name: string;
+  name_pt?: string | null;
+  name_es?: string | null;
+  name_en?: string | null;
   slug?: string;
   description: string | null;
   status: string;
@@ -147,7 +153,9 @@ const createWordSchema = z.object({
   label: z.string().trim().min(2),
   referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
   fieldTypeId: z.string().uuid(),
-  designation: z.string().trim().min(1),
+  designationPt: z.string().trim().min(1),
+  designationEs: z.string().trim().min(1),
+  designationEn: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
   familyIds: z.array(z.string().uuid()).default([]),
   parentWordIds: z.array(z.string().uuid()).default([]),
@@ -158,14 +166,18 @@ const updateWordSchema = z.object({
   label: z.string().trim().min(2),
   referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
   fieldTypeId: z.string().uuid(),
-  designation: z.string().trim().min(1),
+  designationPt: z.string().trim().min(1),
+  designationEs: z.string().trim().min(1),
+  designationEn: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
   familyIds: z.array(z.string().uuid()).default([]),
   parentWordIds: z.array(z.string().uuid()).default([]),
 });
 
 const createFamilySchema = z.object({
-  name: z.string().trim().min(2),
+  namePt: z.string().trim().min(2),
+  nameEs: z.string().trim().min(2),
+  nameEn: z.string().trim().min(2),
   slug: z
     .string()
     .trim()
@@ -174,6 +186,11 @@ const createFamilySchema = z.object({
     .pipe(z.string().regex(/^[a-z0-9-]+$/)),
   description: z.string().trim().optional().transform((value) => value || ""),
   status: z.enum(["draft", "active", "archived"]),
+  formatWordIds: z.array(z.string().uuid()).default([]),
+  productWordIds: z.array(z.string().uuid()).default([]),
+  sizeWordIds: z.array(z.string().uuid()).default([]),
+  packagingWordIds: z.array(z.string().uuid()).default([]),
+  extraWordIds: z.array(z.string().uuid()).default([]),
 });
 
 function normalizeLabel(value: string) {
@@ -303,7 +320,7 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
 
   const wordsResult = await supabase
     .from("skus_words")
-    .select("id, label, reference_code, default_field_type_id, designation, include_in_designation, skus_field_types(name)")
+    .select("id, label, reference_code, default_field_type_id, designation, designation_pt, designation_es, designation_en, include_in_designation, skus_field_types(name)")
     .order("label", { ascending: true });
 
   const familiesResult = await supabase
@@ -351,7 +368,10 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     referenceCode: row.reference_code,
     fieldTypeId: row.default_field_type_id,
     fieldTypeLabel: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
-    designation: row.designation ?? row.label,
+    designation: row.designation_pt ?? row.designation ?? row.label,
+    designationPt: row.designation_pt ?? row.designation ?? row.label,
+    designationEs: row.designation_es ?? row.designation_pt ?? row.designation ?? row.label,
+    designationEn: row.designation_en ?? row.designation_pt ?? row.designation ?? row.label,
     includeInDesignation: row.include_in_designation ?? true,
     familyIds: familyIdsByWord.get(row.id) ?? [],
     familyLabels: familyLabelsByWord.get(row.id) ?? [],
@@ -381,7 +401,7 @@ export async function getFamiliesCatalog(): Promise<FamilyListItem[]> {
 
   const familiesResult = await supabase
     .from("skus_families")
-    .select("id, name, description, status, active_tree_version_id")
+    .select("id, name, name_pt, name_es, name_en, description, status, active_tree_version_id")
     .order("name", { ascending: true });
 
   const rows = (familiesResult.data ?? []) as SupabaseFamilyRow[];
@@ -411,6 +431,9 @@ export async function getFamiliesCatalog(): Promise<FamilyListItem[]> {
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
+    namePt: row.name_pt ?? row.name,
+    nameEs: row.name_es ?? row.name,
+    nameEn: row.name_en ?? row.name,
     description: row.description ?? "",
     status: row.status as FamilyListItem["status"],
     levelLabels: row.active_tree_version_id
@@ -511,7 +534,9 @@ export async function createWordAction(formData: FormData) {
     label: formData.get("label"),
     referenceCode: formData.get("referenceCode"),
     fieldTypeId: formData.get("fieldTypeId"),
-    designation: formData.get("designation"),
+    designationPt: formData.get("designationPt"),
+    designationEs: formData.get("designationEs"),
+    designationEn: formData.get("designationEn"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
     familyIds: formData.getAll("familyIds"),
     parentWordIds: formData.getAll("parentWordIds"),
@@ -526,7 +551,7 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const { label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds, parentWordIds } = parsed.data;
+  const { label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation, familyIds, parentWordIds } = parsed.data;
 
   const fieldTypeResult = await supabase
     .from("skus_field_types")
@@ -547,7 +572,10 @@ export async function createWordAction(formData: FormData) {
       normalized_label: normalizeLabel(label),
       reference_code: referenceCode,
       default_field_type_id: fieldTypeId,
-      designation: designation || label,
+      designation: designationPt || label,
+      designation_pt: designationPt,
+      designation_es: designationEs,
+      designation_en: designationEn,
       include_in_designation: includeInDesignation,
       is_active: true,
     })
@@ -642,7 +670,9 @@ export async function updateWordAction(formData: FormData) {
     label: formData.get("label"),
     referenceCode: formData.get("referenceCode"),
     fieldTypeId: formData.get("fieldTypeId"),
-    designation: formData.get("designation"),
+    designationPt: formData.get("designationPt"),
+    designationEs: formData.get("designationEs"),
+    designationEn: formData.get("designationEn"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
     familyIds: formData.getAll("familyIds"),
     parentWordIds: formData.getAll("parentWordIds"),
@@ -657,7 +687,7 @@ export async function updateWordAction(formData: FormData) {
     redirect(`/catalog/words-manage/${parsed.data.wordId}?status=error&message=Supabase+service+role+nao+configurada`);
   }
 
-  const { wordId, label, referenceCode, fieldTypeId, designation, includeInDesignation, familyIds, parentWordIds } = parsed.data;
+  const { wordId, label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation, familyIds, parentWordIds } = parsed.data;
 
   const fieldTypeResult = await supabase
     .from("skus_field_types")
@@ -678,7 +708,10 @@ export async function updateWordAction(formData: FormData) {
       normalized_label: normalizeLabel(label),
       reference_code: referenceCode,
       default_field_type_id: fieldTypeId,
-      designation,
+      designation: designationPt,
+      designation_pt: designationPt,
+      designation_es: designationEs,
+      designation_en: designationEn,
       include_in_designation: includeInDesignation,
     })
     .eq("id", wordId);
@@ -721,10 +754,17 @@ export async function createFamilyAction(formData: FormData) {
   "use server";
 
   const parsed = createFamilySchema.safeParse({
-    name: formData.get("name"),
+    namePt: formData.get("namePt"),
+    nameEs: formData.get("nameEs"),
+    nameEn: formData.get("nameEn"),
     slug: formData.get("slug"),
     description: formData.get("description"),
     status: formData.get("status"),
+    formatWordIds: formData.getAll("formatWordIds"),
+    productWordIds: formData.getAll("productWordIds"),
+    sizeWordIds: formData.getAll("sizeWordIds"),
+    packagingWordIds: formData.getAll("packagingWordIds"),
+    extraWordIds: formData.getAll("extraWordIds"),
   });
 
   if (!parsed.success) {
@@ -737,14 +777,48 @@ export async function createFamilyAction(formData: FormData) {
   }
 
   const insertResult = await supabase.from("skus_families").insert({
-    name: parsed.data.name,
+    name: parsed.data.namePt,
+    name_pt: parsed.data.namePt,
+    name_es: parsed.data.nameEs,
+    name_en: parsed.data.nameEn,
     slug: parsed.data.slug,
     description: parsed.data.description || null,
     status: parsed.data.status,
-  });
+  }).select("id").single();
 
-  if (insertResult.error) {
+  if (insertResult.error || !insertResult.data) {
     redirect("/families-manage?status=error&message=Nao+foi+possivel+criar+a+familia");
+  }
+
+  const selectedWordIds = [
+    ...parsed.data.formatWordIds,
+    ...parsed.data.productWordIds,
+    ...parsed.data.sizeWordIds,
+    ...parsed.data.packagingWordIds,
+    ...parsed.data.extraWordIds,
+  ];
+
+  if (selectedWordIds.length > 0) {
+    await supabase.from("skus_word_families").insert(
+      Array.from(new Set(selectedWordIds)).map((wordId) => ({
+        word_id: wordId,
+        family_id: insertResult.data.id,
+      })),
+    );
+  }
+
+  const draftInserted = await supabase
+    .from("skus_family_tree_versions")
+    .insert({
+      family_id: insertResult.data.id,
+      version_number: 1,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (!draftInserted.error && draftInserted.data) {
+    await ensureFixedLevelsForTreeVersion(supabase, draftInserted.data.id);
   }
 
   revalidatePath("/families");
