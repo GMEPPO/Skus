@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Boxes, GitBranchPlus, Layers3, Link2 } from "lucide-react";
+import { ArrowLeft, Boxes, GitBranchPlus, Layers3, Link2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  MAX_FAMILY_LEVELS,
   attachWordToFamilyLevelAction,
   createFamilyDraftTreeAction,
   createFamilyLevelAction,
+  deleteFamilyLevelAction,
   getFamilyBuilderDetail,
   getFieldTypeOptions,
   getWordsCatalog,
@@ -36,6 +38,8 @@ export default async function FamilyBuilderDetailPage({
   if (!family) {
     notFound();
   }
+
+  const reachedMaxLevels = family.levels.length >= MAX_FAMILY_LEVELS;
 
   return (
     <div className="space-y-6">
@@ -142,42 +146,48 @@ export default async function FamilyBuilderDetailPage({
           <CardHeader>
             <CardTitle>Adicionar nivel</CardTitle>
             <CardDescription>
-              Cada nivel representa um passo do fluxo de selecao para esta familia.
+              Cada nivel representa um passo do fluxo de selecao para esta familia. Maximo: {MAX_FAMILY_LEVELS} niveis.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={createFamilyLevelAction} className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-              <input type="hidden" name="familyId" value={family.id} />
-              <input type="hidden" name="treeVersionId" value={family.draftTreeVersionId} />
-              <label className="space-y-2">
-                <span className="text-sm text-slate-300">Tipo de campo</span>
-                <select
-                  name="fieldTypeId"
-                  required
-                  className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                >
-                  <option value="">Seleciona um tipo</option>
-                  {fieldTypes.map((fieldType) => (
-                    <option key={fieldType.id} value={fieldType.id}>
-                      {fieldType.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm text-slate-300">Etiqueta personalizada</span>
-                <input
-                  name="labelOverride"
-                  className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                  placeholder="Ex: Tipo de embalagem"
-                />
-              </label>
-              <div className="flex items-end">
-                <Button type="submit" className="w-full md:w-auto">
-                  Adicionar nivel
-                </Button>
+            {reachedMaxLevels ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                Esta familia ja atingiu o maximo de {MAX_FAMILY_LEVELS} niveis. Remove um nivel antes de criar outro.
               </div>
-            </form>
+            ) : (
+              <form action={createFamilyLevelAction} className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+                <input type="hidden" name="familyId" value={family.id} />
+                <input type="hidden" name="treeVersionId" value={family.draftTreeVersionId} />
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Tipo de campo</span>
+                  <select
+                    name="fieldTypeId"
+                    required
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="">Seleciona um tipo</option>
+                    {fieldTypes.map((fieldType) => (
+                      <option key={fieldType.id} value={fieldType.id}>
+                        {fieldType.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Etiqueta personalizada</span>
+                  <input
+                    name="labelOverride"
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                    placeholder="Ex: Tipo de embalagem"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <Button type="submit" className="w-full md:w-auto">
+                    Adicionar nivel
+                  </Button>
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -204,8 +214,18 @@ export default async function FamilyBuilderDetailPage({
                         <p className="text-lg font-medium text-slate-100">{level.label}</p>
                         <p className="text-sm text-slate-400">{level.fieldTypeName}</p>
                       </div>
-                      <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
-                        {level.words.length} palavras
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                          {level.words.length} palavras
+                        </div>
+                        <form action={deleteFamilyLevelAction}>
+                          <input type="hidden" name="familyId" value={family.id} />
+                          <input type="hidden" name="treeLevelId" value={level.id} />
+                          <Button type="submit" variant="outline" className="h-9 px-3 text-red-100 hover:bg-red-500/10">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar nivel
+                          </Button>
+                        </form>
                       </div>
                     </div>
 

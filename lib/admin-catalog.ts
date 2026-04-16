@@ -37,6 +37,8 @@ export interface FamilyBuilderDetail {
   levels: FamilyBuilderLevel[];
 }
 
+export const MAX_FAMILY_LEVELS = 6;
+
 type SupabaseFieldTypeRelation = { name?: string | null } | Array<{ name?: string | null }> | null;
 
 type SupabaseWordRow = {
@@ -86,6 +88,11 @@ const attachWordSchema = z.object({
   familyId: z.string().uuid(),
   treeLevelId: z.string().uuid(),
   wordId: z.string().uuid(),
+});
+
+const deleteLevelSchema = z.object({
+  familyId: z.string().uuid(),
+  treeLevelId: z.string().uuid(),
 });
 
 const createWordSchema = z.object({
@@ -470,6 +477,10 @@ export async function createFamilyLevelAction(formData: FormData) {
 
   const nextOrder = ((levelsResult.data ?? [])[0]?.level_order ?? 0) + 1;
 
+  if (nextOrder > MAX_FAMILY_LEVELS) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Esta+familia+so+pode+ter+ate+6+niveis`);
+  }
+
   const insertResult = await supabase.from("skus_family_tree_levels").insert({
     tree_version_id: parsed.data.treeVersionId,
     field_type_id: parsed.data.fieldTypeId,
@@ -528,4 +539,65 @@ export async function attachWordToFamilyLevelAction(formData: FormData) {
 
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
   redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Palavra+associada+ao+nivel`);
+}
+
+export async function deleteFamilyLevelAction(formData: FormData) {
+  "use server";
+
+  const parsed = deleteLevelSchema.safeParse({
+    familyId: formData.get("familyId"),
+    treeLevelId: formData.get("treeLevelId"),
+  });
+
+  if (!parsed.success) {
+    redirect(`/families-manage/${String(formData.get("familyId") ?? "")}?status=error&message=Nivel+invalido+para+remover`);
+  }
+
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
+  }
+
+  const levelResult = await supabase
+    .from("skus_family_tree_levels")
+    .select("id, tree_version_id")
+    .eq("id", parsed.data.treeLevelId)
+    .maybeSingle();
+
+  if (levelResult.error || !levelResult.data) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+encontrar+o+nivel`);
+  }
+
+  const treeVersionId = String(levelResult.data.tree_version_id);
+
+  const deleteResult = await supabase
+    .from("skus_family_tree_levels")
+    .delete()
+    .eq("id", parsed.data.treeLevelId);
+
+  if (deleteResult.error) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+remover+o+nivel`);
+  }
+
+  const remainingLevelsResult = await supabase
+    .from("skus_family_tree_levels")
+    .select("id, level_order")
+    .eq("tree_version_id", treeVersionId)
+    .order("level_order", { ascending: true });
+
+  const remainingLevels = remainingLevelsResult.data ?? [];
+  for (const [index, level] of remainingLevels.entries()) {
+    const expectedOrder = index + 1;
+    if (level.level_order !== expectedOrder) {
+      await supabase
+        .from("skus_family_tree_levels")
+        .update({ level_order: expectedOrder })
+        .eq("id", level.id);
+    }
+  }
+
+  revalidatePath(`/families-manage/${parsed.data.familyId}`);
+  revalidatePath("/families-manage");
+  revalidatePath("/generator");
+  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Nivel+removido+com+sucesso`);
 }
