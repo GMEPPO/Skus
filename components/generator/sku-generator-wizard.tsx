@@ -32,7 +32,7 @@ export function SkuGeneratorWizard({
   }
 
   const designation = buildDesignation(family, selections);
-  const skuPreview = buildSkuPreview(family, selections, 125);
+  const skuPreview = buildSkuPreview(family, selections);
   const completedCount = Object.keys(selections).length;
 
   function handleSelection(level: GeneratorLevel, word: GeneratorWord) {
