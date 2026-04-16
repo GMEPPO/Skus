@@ -4,14 +4,21 @@ import { BarChart3, Boxes, Shield, Tags, Workflow } from "lucide-react";
 import type { AppUser } from "@/lib/types";
 import { canManageUsers } from "@/lib/rbac";
 
-const navItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof BarChart3;
+  adminOnly?: boolean;
+};
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/generator", label: "Gerador SKU", icon: Workflow },
   { href: "/families", label: "Famílias", icon: Boxes },
   { href: "/catalog/words", label: "Vocabulário", icon: Tags },
   { href: "/sku-history", label: "Histórico", icon: BarChart3 },
   { href: "/admin/users", label: "Admin", icon: Shield, adminOnly: true },
-] as const;
+];
 
 export function AppShell({
   user,

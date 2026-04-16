@@ -5,8 +5,27 @@ import { canManageUsers } from "@/lib/rbac";
 import { demoCurrentUser } from "@/lib/data";
 import type { AppUser, UserRole } from "@/lib/types";
 
+type SupabaseRoleRelation = { code: string } | Array<{ code: string }> | null;
+
+type SupabaseProfileRow = {
+  id: string;
+  name: string;
+  email: string;
+  department: string | null;
+  is_active: boolean | null;
+  skus_roles?: SupabaseRoleRelation;
+};
+
 function isDemoMode() {
   return process.env.SKIP_AUTH === "true";
+}
+
+function extractRoleCode(relation: SupabaseRoleRelation | undefined): string | null {
+  if (!relation) return null;
+  if (Array.isArray(relation)) {
+    return relation[0]?.code ?? null;
+  }
+  return relation.code ?? null;
 }
 
 async function ensureProfile(userId: string, email: string | null) {
@@ -19,7 +38,7 @@ async function ensureProfile(userId: string, email: string | null) {
     .eq("id", userId)
     .maybeSingle();
 
-  if (existing.data) return existing.data;
+  if (existing.data) return existing.data as SupabaseProfileRow;
 
   const name = email ? email.split("@")[0] : "utilizador";
   const viewerRole = await supabase.from("skus_roles").select("id").eq("code", "viewer").maybeSingle();
@@ -38,7 +57,7 @@ async function ensureProfile(userId: string, email: string | null) {
     .select("id, name, email, department, is_active, skus_roles(code)")
     .single();
 
-  return inserted.data ?? null;
+  return (inserted.data as SupabaseProfileRow | null) ?? null;
 }
 
 export async function getCurrentUser(): Promise<AppUser | null> {
@@ -72,16 +91,15 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     return null;
   }
 
-  const roleCode = Array.isArray(profileResult.data.skus_roles)
-    ? profileResult.data.skus_roles[0]?.code
-    : profileResult.data.skus_roles?.code;
+  const profile = profileResult.data as SupabaseProfileRow;
+  const roleCode = extractRoleCode(profile.skus_roles);
 
   return {
-    id: profileResult.data.id,
-    name: profileResult.data.name,
-    email: profileResult.data.email,
-    department: profileResult.data.department ?? "General",
-    isActive: profileResult.data.is_active ?? true,
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    department: profile.department ?? "General",
+    isActive: profile.is_active ?? true,
     role: (roleCode ?? "viewer") as UserRole,
   };
 }
