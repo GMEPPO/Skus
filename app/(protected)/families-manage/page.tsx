@@ -3,6 +3,7 @@ import { ArrowRight, GitBranchPlus, MoveRight, Settings2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FamilyLevelWordPicker } from "@/components/catalog/family-level-word-picker";
 import { createFamilyAction, deleteFamilyAction, getFamiliesCatalog, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
@@ -112,30 +113,26 @@ export default async function FamiliesManagePage({
                 placeholder="Descricao opcional"
               />
             </label>
-            <div className="md:col-span-2 xl:col-span-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              {levelSections.map((section) => {
-                const fieldTypeId = fieldTypeByCode.get(section.code)?.id;
-                const items = words.filter((word) => word.fieldTypeId === fieldTypeId);
-                return (
-                  <label key={section.code} className="space-y-2">
-                    <span className="text-sm text-slate-300">{section.title}</span>
-                    <select
-                      name={section.inputName}
-                      multiple
-                      className="min-h-[10rem] w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100"
-                    >
-                      {items.map((word) => (
-                        <option key={word.id} value={word.id}>
-                          {word.label} - {word.referenceCode}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-slate-500">
-                      Opcional. Seleciona apenas palavras ja existentes que queiras disponibilizar nesta familia.
-                    </p>
-                  </label>
-                );
-              })}
+            <div className="md:col-span-2 xl:col-span-4">
+              <FamilyLevelWordPicker
+                sections={levelSections.map((section) => {
+                  const fieldTypeId = fieldTypeByCode.get(section.code)?.id;
+                  const items = words
+                    .filter((word) => word.fieldTypeId === fieldTypeId)
+                    .map((word) => ({
+                      id: word.id,
+                      label: word.label,
+                      referenceCode: word.referenceCode,
+                    }));
+
+                  return {
+                    code: section.code,
+                    title: section.title,
+                    inputName: section.inputName,
+                    options: items,
+                  };
+                })}
+              />
             </div>
             <div className="md:col-span-2 xl:col-span-4">
               <Button type="submit">Guardar familia</Button>
