@@ -29,6 +29,9 @@ export function toUpperAscii(value: unknown) {
 export function removeDescriptionNoise(value: unknown) {
   return cleanText(value)
     .replace(/\(\s*\d+(?:\s*\/\s*\d+)?\s*\)/g, " ")
+    .replace(/\bnova imagem\b/gi, " ")
+    .replace(/\bimagem nova\b/gi, " ")
+    .replace(/\bnew image\b/gi, " ")
     .replace(/\bREF\.?\b/gi, " ")
     .replace(/\bR\.?\b/gi, " ")
     .replace(/\s+/g, " ")

@@ -10,7 +10,7 @@ import type {
   SegmentOverrides,
   SegmentSelection,
 } from "@/lib/reference-normalizer/types";
-import { cleanText, normalizeText } from "@/lib/reference-normalizer/normalization";
+import { cleanText, normalizeText, removeDescriptionNoise } from "@/lib/reference-normalizer/normalization";
 
 function emptyOverrides(): SegmentOverrides {
   return {
@@ -83,6 +83,29 @@ function findCatalogEntry(catalog: CatalogEntry[], category: NormalizerCategory,
   return catalog.find((entry) => entry.category === category && entry.id === entryId) ?? null;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripVariantNoise(value: string) {
+  return removeDescriptionNoise(value)
+    .replace(/\bpink lily\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\-_/.,]+|[\s\-_/.,]+$/g, "")
+    .trim();
+}
+
+function hasMeaningfulVariant(value: string) {
+  const cleaned = stripVariantNoise(value);
+  const normalized = normalizeText(cleaned);
+
+  if (!normalized) return false;
+  if (normalized.length < 3) return false;
+  if (["castelbel", "pink lily", "nova imagem", "imagem nova"].includes(normalized)) return false;
+
+  return /[a-z]/i.test(cleaned);
+}
+
 function applyExtractRemainderAfterBrandOrFallback(context: RuleRuntimeContext, fallback?: Partial<Record<NormalizerLanguage, string>>) {
   const brand = context.segments.brand;
   if (!brand) return;
@@ -91,28 +114,46 @@ function applyExtractRemainderAfterBrandOrFallback(context: RuleRuntimeContext, 
   const removableSegments = [context.segments.format, context.segments.product, context.segments.size, context.segments.packaging, context.segments.extra]
     .filter(Boolean)
     .flatMap((entry) => (entry ? [entry.canonicalValue, ...entry.detectionAliases, entry.labels.pt, entry.labels.es, entry.labels.en] : []));
-  const source = cleanText(context.input.oldDesignation);
-  let remainder = source;
+  const nonBrandAliases = uniqueNormalized(removableSegments);
+  const source = stripVariantNoise(context.input.oldDesignation);
+  let candidate = source;
 
-  for (const alias of [...aliases, ...uniqueNormalized(removableSegments)]) {
-    const expression = new RegExp(alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig");
-    remainder = remainder.replace(expression, " ");
+  for (const alias of aliases) {
+    const expression = new RegExp(escapeRegExp(alias), "ig");
+    candidate = candidate.replace(expression, " ");
   }
 
-  remainder = remainder.replace(/\s+/g, " ").replace(/^[\s\-_/.,]+|[\s\-_/.,]+$/g, "").trim();
-  const value = remainder || cleanText(fallback?.pt) || "";
+  const containsExplicitNonBrandSegments = nonBrandAliases.some((alias) => {
+    if (!alias) return false;
+    return new RegExp(escapeRegExp(alias), "i").test(source);
+  });
+
+  for (const alias of nonBrandAliases) {
+    const expression = new RegExp(escapeRegExp(alias), "ig");
+    candidate = candidate.replace(expression, " ");
+  }
+
+  const variant = stripVariantNoise(candidate);
+  const fallbackPt = cleanText(fallback?.pt);
+  const fallbackEs = cleanText(fallback?.es) || fallbackPt;
+  const fallbackEn = cleanText(fallback?.en) || fallbackPt;
+  const resolvedPt = hasMeaningfulVariant(variant) ? variant : fallbackPt;
+  const resolvedEs = hasMeaningfulVariant(variant) ? variant : fallbackEs;
+  const resolvedEn = hasMeaningfulVariant(variant) ? variant : fallbackEn;
 
   context.overrides.labels.brand = {
-    pt: value || cleanText(fallback?.pt),
-    es: remainder || cleanText(fallback?.es) || value,
-    en: remainder || cleanText(fallback?.en) || value,
+    pt: resolvedPt,
+    es: resolvedEs,
+    en: resolvedEn,
   };
 
-  context.overrides.hiddenCategories.add("format");
-  context.overrides.hiddenCategories.add("product");
-  context.overrides.hiddenCategories.add("size");
-  context.overrides.hiddenCategories.add("packaging");
-  context.overrides.hiddenCategories.add("extra");
+  if (!containsExplicitNonBrandSegments) {
+    context.overrides.hiddenCategories.add("format");
+    context.overrides.hiddenCategories.add("product");
+    context.overrides.hiddenCategories.add("size");
+    context.overrides.hiddenCategories.add("packaging");
+    context.overrides.hiddenCategories.add("extra");
+  }
 }
 
 function uniqueNormalized(values: string[]) {

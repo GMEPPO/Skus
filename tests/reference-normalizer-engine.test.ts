@@ -83,6 +83,14 @@ describe("reference normalizer engine", () => {
     expect(result.designationPt).toBe("LARANJA-VERBENA");
   });
 
+  it("keeps detected segments when CASTELBEL appears inside a full description", () => {
+    const result = runCase("CASECPAMA300NICAE", "Ecopump 300ml Condicionador CASTELBEL Nova Imagem (24)");
+    expect(result.designationPt).toContain("Pink Lily");
+    expect(result.designationPt).toContain("Ecopump");
+    expect(result.designationPt).toContain("300ml");
+    expect(result.designationPt).not.toContain("Nova Imagem");
+  });
+
   it("calculates character counters from the final exportable strings", () => {
     const result = runCase("CASECOBOD030VAZ", "CASTELBEL LARANJA - VERBENA");
     expect(result.charactersPt).toBe(result.designationPt.length);
