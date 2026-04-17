@@ -197,6 +197,9 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
 }
 
 function chooseDetectedEntry(parsed: CatalogEntry | null, described: CatalogEntry | null) {
+  if (described?.usable && parsed?.usable && described.id !== parsed.id) {
+    return described;
+  }
   if (parsed?.usable) return parsed;
   if (described?.usable) return described;
   return parsed ?? described ?? null;

@@ -1,6 +1,31 @@
 import * as XLSX from "xlsx";
 import type { RowProcessResult, WorkbookSheetData } from "@/lib/reference-normalizer/types";
 
+const NORMALIZER_OUTPUT_COLUMNS = new Set([
+  "row_number",
+  "Referencia_antiga",
+  "Designacao_antiga",
+  "Referencia_nova",
+  "Designacao_nova_pt",
+  "caracteres_pt",
+  "Designacao_nova_es",
+  "caracteres_es",
+  "Designacao_nova_en",
+  "caracteres_en",
+  "status",
+  "observacoes",
+  "trace_summary_json",
+]);
+
+function sanitizeOriginalRow(originalRow: Record<string, unknown>) {
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(originalRow)) {
+    if (NORMALIZER_OUTPUT_COLUMNS.has(key)) continue;
+    next[key] = value;
+  }
+  return next;
+}
+
 export async function readWorkbookFile(file: File): Promise<WorkbookSheetData[]> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -38,7 +63,7 @@ export function downloadProcessedWorkbook(
 ) {
   const workbook = XLSX.utils.book_new();
   const exportRows = rows.map((row) => ({
-    ...(keepExtraColumns ? row.originalRow : {}),
+    ...(keepExtraColumns ? sanitizeOriginalRow(row.originalRow) : {}),
     row_number: row.rowNumber,
     Referencia_antiga: row.oldReference,
     Designacao_antiga: row.oldDesignation,

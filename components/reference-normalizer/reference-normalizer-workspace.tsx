@@ -152,7 +152,7 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
   const [selectedSheetName, setSelectedSheetName] = useState("");
   const [referenceColumn, setReferenceColumn] = useState("");
   const [designationColumn, setDesignationColumn] = useState("");
-  const [keepExtraColumns, setKeepExtraColumns] = useState(true);
+  const [keepExtraColumns, setKeepExtraColumns] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [processedRows, setProcessedRows] = useState<RowProcessResult[]>([]);

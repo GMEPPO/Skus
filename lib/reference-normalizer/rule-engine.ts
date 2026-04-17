@@ -98,9 +98,13 @@ function stripVariantNoise(value: string) {
 function hasMeaningfulVariant(value: string) {
   const cleaned = stripVariantNoise(value);
   const normalized = normalizeText(cleaned);
+  const tokenCount = cleaned.split(/\s+/).filter(Boolean).length;
 
   if (!normalized) return false;
   if (normalized.length < 3) return false;
+  if (cleaned.length > 28) return false;
+  if (tokenCount > 3) return false;
+  if (/\d/.test(cleaned)) return false;
   if (["castelbel", "pink lily", "nova imagem", "imagem nova"].includes(normalized)) return false;
 
   return /[a-z]/i.test(cleaned);

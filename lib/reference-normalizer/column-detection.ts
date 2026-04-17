@@ -2,6 +2,10 @@ import type { ColumnDetectionResult } from "@/lib/reference-normalizer/types";
 import { normalizeKey, normalizeText } from "@/lib/reference-normalizer/normalization";
 
 const REFERENCE_CANDIDATES = [
+  "Referencia",
+  "Referência",
+  "Referencia antigua",
+  "referencia",
   "Referencia_antiga",
   "Referência_antiga",
   "Referencia antiga",
@@ -12,6 +16,11 @@ const REFERENCE_CANDIDATES = [
 ];
 
 const DESIGNATION_CANDIDATES = [
+  "Designacao",
+  "Designação",
+  "Descripcion",
+  "Descrição",
+  "designacao",
   "Designacao_antiga",
   "Designação_antiga",
   "Designacao antiga",
