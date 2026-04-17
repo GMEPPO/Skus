@@ -88,6 +88,7 @@ describe("reference normalizer engine", () => {
     expect(result.designationPt).toContain("Pink Lily");
     expect(result.designationPt).toContain("Ecopump");
     expect(result.designationPt).toContain("300ml");
+    expect(result.designationPt).not.toContain("mpô");
     expect(result.designationPt).not.toContain("Nova Imagem");
   });
 

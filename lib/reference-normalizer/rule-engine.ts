@@ -115,32 +115,35 @@ function applyExtractRemainderAfterBrandOrFallback(context: RuleRuntimeContext, 
   if (!brand) return;
 
   const aliases = uniqueNormalized([brand.canonicalValue, ...brand.detectionAliases]);
-  const removableSegments = [context.segments.format, context.segments.product, context.segments.size, context.segments.packaging, context.segments.extra]
+  const humanReadableSegments = [context.segments.format, context.segments.product, context.segments.size, context.segments.packaging, context.segments.extra]
     .filter(Boolean)
-    .flatMap((entry) => (entry ? [entry.canonicalValue, ...entry.detectionAliases, entry.labels.pt, entry.labels.es, entry.labels.en] : []));
-  const nonBrandAliases = uniqueNormalized(removableSegments);
+    .flatMap((entry) => (entry ? [entry.canonicalValue, entry.labels.pt, entry.labels.es, entry.labels.en] : []));
+  const nonBrandLabels = uniqueNormalized(humanReadableSegments);
   const source = stripVariantNoise(context.input.oldDesignation);
-  let candidate = source;
+  const fallbackPt = cleanText(fallback?.pt);
+  const fallbackEs = cleanText(fallback?.es) || fallbackPt;
+  const fallbackEn = cleanText(fallback?.en) || fallbackPt;
+  const containsExplicitNonBrandSegments = nonBrandLabels.some((alias) => {
+    if (!alias) return false;
+    return new RegExp(escapeRegExp(alias), "i").test(source);
+  });
 
+  if (containsExplicitNonBrandSegments) {
+    context.overrides.labels.brand = {
+      pt: fallbackPt,
+      es: fallbackEs,
+      en: fallbackEn,
+    };
+    return;
+  }
+
+  let candidate = source;
   for (const alias of aliases) {
     const expression = new RegExp(escapeRegExp(alias), "ig");
     candidate = candidate.replace(expression, " ");
   }
 
-  const containsExplicitNonBrandSegments = nonBrandAliases.some((alias) => {
-    if (!alias) return false;
-    return new RegExp(escapeRegExp(alias), "i").test(source);
-  });
-
-  for (const alias of nonBrandAliases) {
-    const expression = new RegExp(escapeRegExp(alias), "ig");
-    candidate = candidate.replace(expression, " ");
-  }
-
   const variant = stripVariantNoise(candidate);
-  const fallbackPt = cleanText(fallback?.pt);
-  const fallbackEs = cleanText(fallback?.es) || fallbackPt;
-  const fallbackEn = cleanText(fallback?.en) || fallbackPt;
   const resolvedPt = hasMeaningfulVariant(variant) ? variant : fallbackPt;
   const resolvedEs = hasMeaningfulVariant(variant) ? variant : fallbackEs;
   const resolvedEn = hasMeaningfulVariant(variant) ? variant : fallbackEn;
@@ -151,13 +154,11 @@ function applyExtractRemainderAfterBrandOrFallback(context: RuleRuntimeContext, 
     en: resolvedEn,
   };
 
-  if (!containsExplicitNonBrandSegments) {
-    context.overrides.hiddenCategories.add("format");
-    context.overrides.hiddenCategories.add("product");
-    context.overrides.hiddenCategories.add("size");
-    context.overrides.hiddenCategories.add("packaging");
-    context.overrides.hiddenCategories.add("extra");
-  }
+  context.overrides.hiddenCategories.add("format");
+  context.overrides.hiddenCategories.add("product");
+  context.overrides.hiddenCategories.add("size");
+  context.overrides.hiddenCategories.add("packaging");
+  context.overrides.hiddenCategories.add("extra");
 }
 
 function uniqueNormalized(values: string[]) {
