@@ -220,7 +220,7 @@ const CATEGORY_LABEL_OVERRIDES: Partial<Record<string, CatalogEntry["labels"]>> 
   "brand:ALGOTHERM": { pt: "Ocean Spa", es: "Ocean Spa", en: "Ocean Spa" },
   "brand:BENAMOR - ALECRIM": { pt: "Benamor", es: "Benamor", en: "Benamor" },
   "brand:GORDISSIMO": { pt: "Benamor", es: "Benamor", en: "Benamor" },
-  "brand:LARANJA VERBENA": { pt: "LARANJA-VERBENA", es: "NARANJA-VERBENA", en: "ORANGE-VERBENA" },
+  "brand:LARANJA VERBENA": { pt: "LARANJA-VERBENA", es: "LARANJA-VERBENA", en: "LARANJA-VERBENA" },
   "product:Amaciador": { pt: "Condicionador", es: "Acondicionador", en: "Conditioner" },
   "product:Body Lotion": { pt: "Locao Corporal", es: "Locion Corporal", en: "Body Lotion" },
   "product:Champo": { pt: "Champo", es: "Champu", en: "Shampoo" },

@@ -101,8 +101,8 @@ describe("reference normalizer engine", () => {
     const result = runCase("LVEECPAMA300MLOV4", "Ecop. Condicionador 300ml CASTELBEL LARANJA-VERBENA");
     expect(result.newReference.startsWith("LVE")).toBe(true);
     expect(result.designationPt).toContain("LARANJA-VERBENA");
-    expect(result.designationEs).toContain("NARANJA-VERBENA");
-    expect(result.designationEn).toContain("ORANGE-VERBENA");
+    expect(result.designationEs).toContain("LARANJA-VERBENA");
+    expect(result.designationEn).toContain("LARANJA-VERBENA");
     expect(result.designationPt).not.toContain("Pink Lily");
   });
 
