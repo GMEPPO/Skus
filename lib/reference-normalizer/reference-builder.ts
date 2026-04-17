@@ -16,10 +16,5 @@ export function buildReferenceCode(segments: SegmentSelection, preservedTokens: 
     packaging = "VAZ";
   }
 
-  const base = `${brand}${format}${product}${size}`;
-
-  if (packaging === "000" && extra === "000") return `${base}000`;
-  if (packaging !== "000" && extra === "000") return packaging === "VAZ" ? `${base}VAZ` : `${base}${packaging}000`;
-  if (packaging === "000" && extra !== "000") return `${base}000${extra}`;
-  return `${base}${packaging}${extra}`;
+  return `${brand}${format}${product}${size}${packaging}${extra}`;
 }

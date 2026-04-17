@@ -25,6 +25,11 @@ describe("reference normalizer engine", () => {
     expect(result.newReference).toContain("VAZ");
   });
 
+  it("keeps the full 6-field reference order even when packaging and extra are empty", () => {
+    const result = runCase("ALEFRAAMA030000000", "BENAMOR - ALECRIM Frasco Amaciador 30ml");
+    expect(result.newReference).toBe("ALEFRAAMA030000000");
+  });
+
   it("hides Vazia only for garrafa formats", () => {
     const bottle = runCase("ALGECOAMA030VAZ", "ALGOTHERM Garrafa Ecofill Amaciador 30ml Vazia");
     const nonBottle = runCase("ALGFRAAMA030VAZ", "ALGOTHERM Frasco Amaciador 30ml Vazia");
