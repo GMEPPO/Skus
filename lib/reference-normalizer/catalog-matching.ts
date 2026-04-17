@@ -118,6 +118,14 @@ function findByCodeAnywhere(entries: Map<string, CatalogEntry[]>, reference: str
   return null;
 }
 
+function looksLikeFiveLiterToken(value: string) {
+  return /(?:^|[^A-Z0-9])5L(?:T)?(?:[^A-Z0-9]|$)/i.test(value) || /5000ML/i.test(value);
+}
+
+function findFiveLiterSize(index: CatalogIndex) {
+  return findByCode(index.byCode.size, "005");
+}
+
 type ParsedReferenceResult = {
   segments: SegmentSelection;
   rawCodes: Partial<Record<NormalizerCategory, string>>;
@@ -183,6 +191,14 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
     }
   }
 
+  if (!segments.size && looksLikeFiveLiterToken(rawReference)) {
+    const fiveLiterSize = findFiveLiterSize(index);
+    if (fiveLiterSize) {
+      rawCodes.size = "005";
+      segments.size = fiveLiterSize;
+    }
+  }
+
   if (tail) {
     if (tail === "VAZ") {
       rawCodes.packaging = "VAZ";
@@ -241,6 +257,7 @@ function chooseDetectedEntry(parsed: CatalogEntry | null, described: CatalogEntr
 export function detectSegments(reference: string, designation: string, catalog: CatalogEntry[]) {
   const index = buildCatalogIndex(catalog);
   const parsed = parseReferenceSegments(reference, index);
+  const normalizedDesignation = normalizeText(removeDescriptionNoise(designation));
   const described = {
     brand: findByDescription(index.byCategory.brand, designation),
     format: findByDescription(index.byCategory.format, designation),
@@ -249,6 +266,10 @@ export function detectSegments(reference: string, designation: string, catalog: 
     packaging: findByDescription(index.byCategory.packaging, designation),
     extra: findByDescription(index.byCategory.extra, designation),
   };
+
+  if (!parsed.segments.size && !described.size && looksLikeFiveLiterToken(normalizedDesignation)) {
+    described.size = findFiveLiterSize(index);
+  }
 
   return {
     segments: {

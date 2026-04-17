@@ -121,4 +121,10 @@ describe("reference normalizer engine", () => {
     expect(result.segments.size?.canonicalValue).toBe("Escova");
     expect(result.segments.extra?.canonicalValue).toBe("Escovado");
   });
+
+  it("detects 5L size as code 005 for recarga references", () => {
+    const result = runCase("CASECPRECAMA5LNEU", "Recarga 5L Amaciador CASTELBEL");
+    expect(result.segments.size?.canonicalValue).toBe("5LT");
+    expect(result.newReference).toContain("005");
+  });
 });
