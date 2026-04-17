@@ -95,6 +95,16 @@ function stripVariantNoise(value: string) {
     .trim();
 }
 
+function detectExplicitCastelbelVariant(value: string) {
+  const normalized = normalizeText(value).replace(/\s*-\s*/g, " ");
+
+  if (normalized.includes("laranja verbena")) {
+    return "LVE";
+  }
+
+  return "";
+}
+
 function hasMeaningfulVariant(value: string) {
   const cleaned = stripVariantNoise(value);
   const normalized = normalizeText(cleaned);
@@ -123,10 +133,29 @@ function applyExtractRemainderAfterBrandOrFallback(context: RuleRuntimeContext, 
   const fallbackPt = cleanText(fallback?.pt);
   const fallbackEs = cleanText(fallback?.es) || fallbackPt;
   const fallbackEn = cleanText(fallback?.en) || fallbackPt;
+  const explicitVariant = detectExplicitCastelbelVariant(source);
   const containsExplicitNonBrandSegments = nonBrandLabels.some((alias) => {
     if (!alias) return false;
     return new RegExp(escapeRegExp(alias), "i").test(source);
   });
+
+  if (explicitVariant) {
+    context.overrides.labels.brand = {
+      pt: explicitVariant,
+      es: explicitVariant,
+      en: explicitVariant,
+    };
+
+    if (!containsExplicitNonBrandSegments) {
+      context.overrides.hiddenCategories.add("format");
+      context.overrides.hiddenCategories.add("product");
+      context.overrides.hiddenCategories.add("size");
+      context.overrides.hiddenCategories.add("packaging");
+      context.overrides.hiddenCategories.add("extra");
+    }
+
+    return;
+  }
 
   if (containsExplicitNonBrandSegments) {
     context.overrides.labels.brand = {

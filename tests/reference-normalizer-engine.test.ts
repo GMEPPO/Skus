@@ -97,6 +97,12 @@ describe("reference normalizer engine", () => {
     expect(result.designationPt).not.toContain("Nova Imagem");
   });
 
+  it("uses LVE when CASTELBEL explicitly carries the LARANJA-VERBENA variant", () => {
+    const result = runCase("LVEECPAMA300MLOV4", "Ecop. Condicionador 300ml CASTELBEL LARANJA-VERBENA");
+    expect(result.designationPt).toContain("LVE");
+    expect(result.designationPt).not.toContain("Pink Lily");
+  });
+
   it("calculates character counters from the final exportable strings", () => {
     const result = runCase("CASECOBOD030VAZ", "CASTELBEL LARANJA - VERBENA");
     expect(result.charactersPt).toBe(result.designationPt.length);
