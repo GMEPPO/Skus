@@ -58,12 +58,45 @@ export function buildCatalogIndex(catalog: CatalogEntry[]): CatalogIndex {
 
 function findByDescription(categoryEntries: CatalogEntry[], description: string) {
   const normalizedDescription = normalizeText(removeDescriptionNoise(description));
+  const escapedDescription = ` ${normalizedDescription} `;
+
+  const aliasesByEntry = categoryEntries.map((entry) => ({
+    entry,
+    aliases: [entry.canonicalValue, ...entry.detectionAliases].filter(Boolean),
+  }));
+
+  function isWeakAlias(alias: string) {
+    const compact = alias.replace(/[^A-Za-z0-9.&]/g, "");
+    if (!compact) return true;
+    if (compact.length <= 3) return true;
+    if (/^[A-Z0-9.&]+$/.test(alias) && compact.length <= 4) return true;
+    return false;
+  }
+
+  function aliasMatches(alias: string) {
+    const normalizedAlias = normalizeText(alias);
+    if (!normalizedAlias) return false;
+    const escapedAlias = normalizedAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const expression = new RegExp(`(^|\\s)${escapedAlias}(\\s|$)`, "i");
+    return expression.test(escapedDescription);
+  }
+
+  const strongMatch =
+    aliasesByEntry.find(({ aliases }) =>
+      aliases
+        .filter((alias) => !isWeakAlias(alias))
+        .some((alias) => aliasMatches(alias)),
+    )?.entry ?? null;
+
+  if (strongMatch) return strongMatch;
+
   return (
-    categoryEntries.find((entry) =>
-      [entry.canonicalValue, ...entry.detectionAliases]
-        .filter(Boolean)
-        .some((alias) => normalizedDescription.includes(normalizeText(alias))),
-    ) ?? null
+    aliasesByEntry.find(({ aliases }) =>
+      aliases.some((alias) => {
+        if (isWeakAlias(alias)) return false;
+        return normalizedDescription.includes(normalizeText(alias));
+      }),
+    )?.entry ?? null
   );
 }
 
