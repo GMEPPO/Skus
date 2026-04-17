@@ -305,6 +305,58 @@ create table if not exists public.skus_admin_audit_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.skus_refnorm_catalog_entries (
+  id uuid primary key default gen_random_uuid(),
+  category text not null check (category in ('brand', 'format', 'product', 'size', 'packaging', 'extra')),
+  canonical_value text not null,
+  code text not null,
+  usable boolean not null default true,
+  enabled boolean not null default true,
+  labels_json jsonb not null default '{"pt":"","es":"","en":""}'::jsonb,
+  detection_aliases_json jsonb not null default '[]'::jsonb,
+  notes text,
+  metadata_json jsonb not null default '{}'::jsonb,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.skus_refnorm_rules (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  enabled boolean not null default true,
+  priority integer not null default 100,
+  stage text not null check (stage in ('preprocess', 'detect', 'reference', 'designation', 'validation')),
+  match_type text not null check (match_type in ('exact', 'contains', 'startsWith', 'endsWith', 'regex')),
+  match_logic text not null default 'and' check (match_logic in ('and', 'or')),
+  conditions_json jsonb not null default '[]'::jsonb,
+  actions_json jsonb not null default '[]'::jsonb,
+  notes text,
+  source text not null default 'user' check (source in ('system', 'user')),
+  created_by uuid references public.skus_profiles(id),
+  updated_by uuid references public.skus_profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.skus_refnorm_settings (
+  id uuid primary key default gen_random_uuid(),
+  char_limit_pt integer not null default 60,
+  char_limit_es integer not null default 60,
+  char_limit_en integer not null default 60,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.skus_refnorm_rule_audit (
+  id uuid primary key default gen_random_uuid(),
+  action text not null,
+  payload jsonb not null default '{}'::jsonb,
+  actor_id uuid references public.skus_profiles(id),
+  created_at timestamptz not null default now()
+);
+
 alter table public.skus_roles enable row level security;
 alter table public.skus_permissions enable row level security;
 alter table public.skus_role_permissions enable row level security;
@@ -323,6 +375,10 @@ alter table public.skus_sku_sequences enable row level security;
 alter table public.skus_sku_generations enable row level security;
 alter table public.skus_sku_generation_measurement_history enable row level security;
 alter table public.skus_admin_audit_logs enable row level security;
+alter table public.skus_refnorm_catalog_entries enable row level security;
+alter table public.skus_refnorm_rules enable row level security;
+alter table public.skus_refnorm_settings enable row level security;
+alter table public.skus_refnorm_rule_audit enable row level security;
 
 drop policy if exists "skus_profiles_select_own" on public.skus_profiles;
 create policy "skus_profiles_select_own"
@@ -461,6 +517,34 @@ using (true);
 drop policy if exists "skus_admin_audit_logs_select_authenticated" on public.skus_admin_audit_logs;
 create policy "skus_admin_audit_logs_select_authenticated"
 on public.skus_admin_audit_logs
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_refnorm_catalog_entries_select_authenticated" on public.skus_refnorm_catalog_entries;
+create policy "skus_refnorm_catalog_entries_select_authenticated"
+on public.skus_refnorm_catalog_entries
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_refnorm_rules_select_authenticated" on public.skus_refnorm_rules;
+create policy "skus_refnorm_rules_select_authenticated"
+on public.skus_refnorm_rules
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_refnorm_settings_select_authenticated" on public.skus_refnorm_settings;
+create policy "skus_refnorm_settings_select_authenticated"
+on public.skus_refnorm_settings
+for select
+to authenticated
+using (true);
+
+drop policy if exists "skus_refnorm_rule_audit_select_authenticated" on public.skus_refnorm_rule_audit;
+create policy "skus_refnorm_rule_audit_select_authenticated"
+on public.skus_refnorm_rule_audit
 for select
 to authenticated
 using (true);
