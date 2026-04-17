@@ -145,6 +145,47 @@ function mapSettingsRow(row: DbSettingsRow | null | undefined): NormalizerSettin
   };
 }
 
+function mergeCatalogWithDefaults(persisted: CatalogEntry[]) {
+  const defaults = buildDefaultCatalogEntries();
+  const merged = new Map<string, CatalogEntry>();
+
+  for (const entry of defaults) {
+    merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, entry);
+  }
+
+  for (const entry of persisted) {
+    merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, {
+      ...merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`),
+      ...entry,
+      labels: entry.labels ?? merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`)?.labels ?? { pt: "", es: "", en: "" },
+      detectionAliases:
+        entry.detectionAliases?.length > 0
+          ? entry.detectionAliases
+          : merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`)?.detectionAliases ?? [],
+    });
+  }
+
+  return Array.from(merged.values()).sort((left, right) => {
+    if (left.category !== right.category) return left.category.localeCompare(right.category);
+    return left.sortOrder - right.sortOrder;
+  });
+}
+
+function mergeRulesWithDefaults(persisted: NormalizerRule[]) {
+  const defaults = buildDefaultRules();
+  const merged = new Map<string, NormalizerRule>();
+
+  for (const rule of defaults) {
+    merged.set(rule.id, rule);
+  }
+
+  for (const rule of persisted) {
+    merged.set(rule.id, { ...merged.get(rule.id), ...rule });
+  }
+
+  return Array.from(merged.values()).sort((left, right) => left.priority - right.priority);
+}
+
 async function recordAudit(action: string, payload: Record<string, unknown>) {
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) return;
@@ -222,8 +263,8 @@ export async function getReferenceNormalizerConfig(): Promise<NormalizerConfig> 
   ]);
 
   return {
-    catalog: ((catalogResult.data ?? []) as DbCatalogRow[]).map(mapCatalogRow),
-    rules: ((rulesResult.data ?? []) as DbRuleRow[]).map(mapRuleRow),
+    catalog: mergeCatalogWithDefaults(((catalogResult.data ?? []) as DbCatalogRow[]).map(mapCatalogRow)),
+    rules: mergeRulesWithDefaults(((rulesResult.data ?? []) as DbRuleRow[]).map(mapRuleRow)),
     settings: mapSettingsRow(settingsResult.data as DbSettingsRow | null),
   };
 }

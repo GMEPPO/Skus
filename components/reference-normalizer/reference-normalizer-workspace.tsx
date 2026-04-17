@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectColumns } from "@/lib/reference-normalizer/column-detection";
+import { buildDefaultNormalizerConfig } from "@/lib/reference-normalizer/defaults";
 import { processRow } from "@/lib/reference-normalizer/row-processor";
 import type {
   CatalogEntry,
@@ -141,8 +142,11 @@ async function postJson(url: string, body: unknown) {
 }
 
 export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) {
+  const fallbackConfig = useMemo(() => buildDefaultNormalizerConfig(), []);
   const [activeTab, setActiveTab] = useState<TabId>("process");
-  const [config, setConfig] = useState(initialConfig);
+  const [config, setConfig] = useState<NormalizerConfig>(
+    initialConfig.catalog.length > 0 && initialConfig.rules.length > 0 ? initialConfig : fallbackConfig,
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<WorkbookSheetData[]>([]);
   const [selectedSheetName, setSelectedSheetName] = useState("");
@@ -162,7 +166,9 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<NormalizerCategory | "all">("all");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [ruleSearch, setRuleSearch] = useState("");
-  const [settingsDraft, setSettingsDraft] = useState(initialConfig.settings);
+  const [settingsDraft, setSettingsDraft] = useState(
+    initialConfig.catalog.length > 0 && initialConfig.rules.length > 0 ? initialConfig.settings : fallbackConfig.settings,
+  );
   const [simReference, setSimReference] = useState("");
   const [simDesignation, setSimDesignation] = useState("");
   const workerRef = useRef<Worker | null>(null);
@@ -206,11 +212,19 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
 
   useEffect(() => () => workerRef.current?.terminate(), []);
 
+  useEffect(() => {
+    void refreshConfig();
+  }, []);
+
   async function refreshConfig() {
     const response = await fetch("/api/reference-normalizer/config", { cache: "no-store" });
     const payload = (await response.json()) as NormalizerConfig;
-    setConfig(payload);
-    setSettingsDraft(payload.settings);
+    const nextConfig =
+      payload.catalog.length > 0 && payload.rules.length > 0
+        ? payload
+        : fallbackConfig;
+    setConfig(nextConfig);
+    setSettingsDraft(nextConfig.settings);
   }
 
   async function handleFile(file: File | null) {
@@ -406,6 +420,12 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
       {savingMessage ? (
         <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
           {savingMessage}
+        </div>
+      ) : null}
+
+      {config.catalog.length === 0 ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          O catalogo persistido veio vazio. A interface vai usar o catalogo mestre por defeito assim que a configuracao for carregada.
         </div>
       ) : null}
 
