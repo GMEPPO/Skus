@@ -97,10 +97,20 @@ describe("reference normalizer engine", () => {
     expect(result.designationPt).not.toContain("Nova Imagem");
   });
 
-  it("uses LVE when CASTELBEL explicitly carries the LARANJA-VERBENA variant", () => {
+  it("uses LVE in the reference and visible variant labels in designation for CASTELBEL LARANJA-VERBENA", () => {
     const result = runCase("LVEECPAMA300MLOV4", "Ecop. Condicionador 300ml CASTELBEL LARANJA-VERBENA");
-    expect(result.designationPt).toContain("LVE");
+    expect(result.newReference.startsWith("LVE")).toBe(true);
+    expect(result.designationPt).toContain("LARANJA-VERBENA");
+    expect(result.designationEs).toContain("NARANJA-VERBENA");
+    expect(result.designationEn).toContain("ORANGE-VERBENA");
     expect(result.designationPt).not.toContain("Pink Lily");
+  });
+
+  it("translates Body Lotion by language", () => {
+    const result = runCase("CASECPBOD300NICAE", "Ecopump 300ml Locao Corporal CASTELBEL");
+    expect(result.designationPt).toContain("Locao Corporal");
+    expect(result.designationEs).toContain("Locion Corporal");
+    expect(result.designationEn).toContain("Body Lotion");
   });
 
   it("calculates character counters from the final exportable strings", () => {

@@ -99,7 +99,7 @@ function detectExplicitCastelbelVariant(value: string) {
   const normalized = normalizeText(value).replace(/\s*-\s*/g, " ");
 
   if (normalized.includes("laranja verbena")) {
-    return "LVE";
+    return "LARANJA-VERBENA";
   }
 
   return "";
@@ -140,10 +140,19 @@ function applyExtractRemainderAfterBrandOrFallback(context: RuleRuntimeContext, 
   });
 
   if (explicitVariant) {
+    const variantLabels =
+      context.segments.brand?.canonicalValue === "LARANJA VERBENA"
+        ? context.segments.brand.labels
+        : {
+            pt: explicitVariant,
+            es: explicitVariant,
+            en: explicitVariant,
+          };
+
     context.overrides.labels.brand = {
-      pt: explicitVariant,
-      es: explicitVariant,
-      en: explicitVariant,
+      pt: cleanText(variantLabels.pt),
+      es: cleanText(variantLabels.es),
+      en: cleanText(variantLabels.en),
     };
 
     if (!containsExplicitNonBrandSegments) {

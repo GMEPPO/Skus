@@ -220,9 +220,16 @@ const CATEGORY_LABEL_OVERRIDES: Partial<Record<string, CatalogEntry["labels"]>> 
   "brand:ALGOTHERM": { pt: "Ocean Spa", es: "Ocean Spa", en: "Ocean Spa" },
   "brand:BENAMOR - ALECRIM": { pt: "Benamor", es: "Benamor", en: "Benamor" },
   "brand:GORDISSIMO": { pt: "Benamor", es: "Benamor", en: "Benamor" },
+  "brand:LARANJA VERBENA": { pt: "LARANJA-VERBENA", es: "NARANJA-VERBENA", en: "ORANGE-VERBENA" },
   "product:Amaciador": { pt: "Condicionador", es: "Acondicionador", en: "Conditioner" },
+  "product:Body Lotion": { pt: "Locao Corporal", es: "Locion Corporal", en: "Body Lotion" },
+  "product:Champo": { pt: "Champo", es: "Champu", en: "Shampoo" },
+  "product:Gel Banho": { pt: "Gel Banho", es: "Gel Bano", en: "Shower Gel" },
+  "product:Gel Corpo Cabelo": { pt: "Gel Corpo Cabelo", es: "Gel Cuerpo Cabello", en: "Hair Body Wash" },
   "product:Locao de Maos e Corpo": { pt: "Locao maos corpo", es: "Locion manos cuerpo", en: "Hand Body Lotion" },
   "product:Sabonete Liquido": { pt: "Sab Liquido", es: "Jabon liquido", en: "Liquid Soap" },
+  "format:Frasco": { pt: "Frasco", es: "Frasco", en: "Bottle" },
+  "format:Recarga 5L": { pt: "Recarga 5L", es: "Recarga 5L", en: "Refill 5L" },
   "packaging:VAZ": { pt: "Vazia", es: "Vacia", en: "Empty" },
 };
 

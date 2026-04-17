@@ -100,6 +100,11 @@ function findByDescription(categoryEntries: CatalogEntry[], description: string)
   );
 }
 
+function findCatalogEntryByCanonicalValue(entries: CatalogEntry[], value: string) {
+  const normalizedValue = normalizeText(value);
+  return entries.find((entry) => normalizeText(entry.canonicalValue) === normalizedValue) ?? null;
+}
+
 function findByCode(entries: Map<string, CatalogEntry[]>, code: string) {
   return entries.get(code)?.find((entry) => entry.usable) ?? entries.get(code)?.[0] ?? null;
 }
@@ -266,6 +271,10 @@ export function detectSegments(reference: string, designation: string, catalog: 
     packaging: findByDescription(index.byCategory.packaging, designation),
     extra: findByDescription(index.byCategory.extra, designation),
   };
+
+  if (normalizedDesignation.includes("castelbel") && normalizedDesignation.includes("laranja verbena")) {
+    described.brand = findCatalogEntryByCanonicalValue(index.byCategory.brand, "LARANJA VERBENA");
+  }
 
   if (!parsed.segments.size && !described.size && looksLikeFiveLiterToken(normalizedDesignation)) {
     described.size = findFiveLiterSize(index);
