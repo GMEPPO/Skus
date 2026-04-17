@@ -71,6 +71,20 @@ function findByCode(entries: Map<string, CatalogEntry[]>, code: string) {
   return entries.get(code)?.find((entry) => entry.usable) ?? entries.get(code)?.[0] ?? null;
 }
 
+function findByCodeAnywhere(entries: Map<string, CatalogEntry[]>, reference: string) {
+  const codes = Array.from(entries.keys())
+    .filter((code) => code && code !== "000")
+    .sort((left, right) => right.length - left.length);
+
+  for (const code of codes) {
+    if (!reference.includes(code)) continue;
+    const found = findByCode(entries, code);
+    if (found) return { code, entry: found };
+  }
+
+  return null;
+}
+
 type ParsedReferenceResult = {
   segments: SegmentSelection;
   rawCodes: Partial<Record<NormalizerCategory, string>>;
@@ -104,6 +118,38 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
     segments.size = findByCode(index.byCode.size, sizeCode);
   }
 
+  if (!segments.brand) {
+    const fallback = findByCodeAnywhere(index.byCode.brand, rawReference);
+    if (fallback) {
+      rawCodes.brand = fallback.code;
+      segments.brand = fallback.entry;
+    }
+  }
+
+  if (!segments.format) {
+    const fallback = findByCodeAnywhere(index.byCode.format, rawReference);
+    if (fallback) {
+      rawCodes.format = fallback.code;
+      segments.format = fallback.entry;
+    }
+  }
+
+  if (!segments.product) {
+    const fallback = findByCodeAnywhere(index.byCode.product, rawReference);
+    if (fallback) {
+      rawCodes.product = fallback.code;
+      segments.product = fallback.entry;
+    }
+  }
+
+  if (!segments.size) {
+    const fallback = findByCodeAnywhere(index.byCode.size, rawReference);
+    if (fallback) {
+      rawCodes.size = fallback.code;
+      segments.size = fallback.entry;
+    }
+  }
+
   if (tail) {
     if (tail === "VAZ") {
       rawCodes.packaging = "VAZ";
@@ -128,6 +174,22 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
         rawCodes.extra = tail;
         segments.extra = findByCode(index.byCode.extra, tail);
       }
+    }
+  }
+
+  if (!segments.packaging) {
+    const fallback = findByCodeAnywhere(index.byCode.packaging, tail || rawReference);
+    if (fallback) {
+      rawCodes.packaging = fallback.code;
+      segments.packaging = fallback.entry;
+    }
+  }
+
+  if (!segments.extra) {
+    const fallback = findByCodeAnywhere(index.byCode.extra, tail || rawReference);
+    if (fallback) {
+      rawCodes.extra = fallback.code;
+      segments.extra = fallback.entry;
     }
   }
 

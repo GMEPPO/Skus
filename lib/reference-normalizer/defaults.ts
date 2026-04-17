@@ -235,6 +235,11 @@ const CATEGORY_ALIAS_OVERRIDES: Partial<Record<string, string[]>> = {
   "product:Amaciador": ["CONDICIONADOR", "ACONDICIONADOR", "CONDITIONER"],
   "product:Locao de Maos e Corpo": ["LOCAO MAOS E CORPO", "LOCAO MAOS CORPO", "LOCION MANOS CUERPO", "HAND BODY LOTION"],
   "product:Sabonete Liquido": ["SABONETE LIQUIDO", "SAB LIQUIDO", "JABON LIQUIDO", "LIQUID SOAP"],
+  "product:Body Lotion": ["BODY LOTION", "LOCAO CORPORAL", "LOCION CORPORAL", "LOTION CORPORELLE"],
+  "product:Gel Corpo Cabelo": ["GEL CORPO E CABELO", "GEL CORPO CABELO", "HAIR BODY WASH"],
+  "product:Champo": ["CHAMPO", "CHAMPOO", "SHAMPOO", "CHAMPO CASTELBEL"],
+  "product:Gel Banho": ["GEL BANHO", "GEL DE BANHO", "GEL DOUCHE"],
+  "product:Champo/Amaciador": ["CHAMPO CONDICIONADOR", "2 EM 1", "2IN1"],
   "packaging:Plast. Rec.": ["PLAST REC", "PLAST RECICLADO", "PLASTICO RECICLADO", "PLAST REC."],
   "packaging:VAZ": ["VAZ", "VAZIA", "VACIA", "EMPTY"],
   "format:Garrafa Ecofill": ["GARRAFA ECOFILL", "ECOFILL SLIM"],
@@ -243,6 +248,7 @@ const CATEGORY_ALIAS_OVERRIDES: Partial<Record<string, string[]>> = {
   "format:Suporte Ecosource": ["SUPORTE ECOSOURCE", "SUP ECOSOURCE", "SUP NOVO"],
   "format:Tampa de Ecosource": ["TAMPA ECOSOURCE", "TAMPA DE ECOSOURCE"],
   "format:Recarga Ecosource": ["RECARGA ECOSOURCE", "ECOSOURCE RECARGA"],
+  "format:Ecopump": ["ECOPUMP", "ECO PUMP"],
 };
 
 function defaultLabels(value: string): CatalogEntry["labels"] {
