@@ -219,6 +219,8 @@ create table if not exists public.skus_sku_generations (
   tree_version_id uuid not null references public.skus_family_tree_versions(id),
   generated_code text not null unique,
   designation text not null,
+  product_image_path text,
+  product_image_url text,
   sequence_value bigint not null,
   prefix_snapshot text not null,
   selection_snapshot jsonb not null default '{}'::jsonb,
@@ -231,6 +233,12 @@ create table if not exists public.skus_sku_generations (
   generated_by uuid references public.skus_profiles(id),
   created_at timestamptz not null default now()
 );
+
+alter table public.skus_sku_generations
+  add column if not exists product_image_path text;
+
+alter table public.skus_sku_generations
+  add column if not exists product_image_url text;
 
 alter table public.skus_sku_generations
   add column if not exists units_per_box numeric(12,3);
@@ -356,6 +364,20 @@ create table if not exists public.skus_refnorm_rule_audit (
   actor_id uuid references public.skus_profiles(id),
   created_at timestamptz not null default now()
 );
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'sku-product-images',
+  'sku-product-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 alter table public.skus_roles enable row level security;
 alter table public.skus_permissions enable row level security;

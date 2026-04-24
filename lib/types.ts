@@ -87,6 +87,7 @@ export interface RecentSkuGeneration {
   id: string;
   generatedCode: string;
   designation: string;
+  productImageUrl?: string;
   familyName: string;
   createdByName?: string;
   createdAtLabel: string;

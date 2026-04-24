@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
+
+const PRODUCT_IMAGE_BUCKET = "sku-product-images";
+const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const generateSkuSchema = z.object({
   familyId: z.string().uuid(),
@@ -28,6 +33,7 @@ export type GenerateSkuActionResult =
       message: string;
       generatedCode: string;
       generatedCodeCompact: string;
+      productImageUrl?: string;
       designationPt: string;
       designationEs: string;
       designationEn: string;
@@ -39,6 +45,16 @@ export type GenerateSkuActionResult =
       weightStatus: "real" | "estimated";
     }
   | { ok: false; message: string };
+
+function getFileExtension(fileName: string, mimeType: string) {
+  const normalizedName = fileName.trim().toLowerCase();
+  if (normalizedName.endsWith(".png")) return "png";
+  if (normalizedName.endsWith(".webp")) return "webp";
+  if (normalizedName.endsWith(".jpg") || normalizedName.endsWith(".jpeg")) return "jpg";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+}
 
 export async function generateSkuAction(formData: FormData): Promise<GenerateSkuActionResult> {
   const parsed = generateSkuSchema.safeParse({
@@ -70,6 +86,34 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
   const authSupabase = createSupabaseServerClient();
   const authResult = authSupabase ? await authSupabase.auth.getUser() : null;
   const generatedBy = authResult?.data.user?.id ?? null;
+  const productImage = formData.get("productImage");
+
+  let productImagePath: string | null = null;
+  let productImageUrl: string | null = null;
+
+  if (productImage instanceof File && productImage.size > 0) {
+    if (!ALLOWED_PRODUCT_IMAGE_TYPES.has(productImage.type)) {
+      return { ok: false, message: "A imagem do produto deve ser JPG, PNG ou WEBP." };
+    }
+
+    if (productImage.size > MAX_PRODUCT_IMAGE_SIZE) {
+      return { ok: false, message: "A imagem do produto nao pode ultrapassar 5 MB." };
+    }
+
+    const extension = getFileExtension(productImage.name, productImage.type);
+    productImagePath = `${parsed.data.familyId}/${parsed.data.generatedCode}-${randomUUID()}.${extension}`;
+    const uploadResult = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(productImagePath, productImage, {
+      cacheControl: "3600",
+      contentType: productImage.type,
+      upsert: false,
+    });
+
+    if (uploadResult.error) {
+      return { ok: false, message: "Nao foi possivel carregar a imagem do produto." };
+    }
+
+    productImageUrl = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(productImagePath).data.publicUrl;
+  }
 
   const sequenceResult = await supabase
     .from("skus_sku_sequences")
@@ -93,6 +137,8 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
       tree_version_id: parsed.data.treeVersionId,
       generated_code: parsed.data.generatedCode,
       designation: parsed.data.designation,
+      product_image_path: productImagePath,
+      product_image_url: productImageUrl,
       sequence_value: sequenceValue,
       prefix_snapshot: parsed.data.generatedCode,
       selection_snapshot: JSON.parse(parsed.data.selectionSnapshot),
@@ -108,6 +154,9 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     .single();
 
   if (insertResult.error || !insertResult.data) {
+    if (productImagePath) {
+      await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([productImagePath]);
+    }
     return { ok: false, message: "Nao foi possivel guardar o SKU." };
   }
 
@@ -141,6 +190,7 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     message: "SKU guardado com sucesso.",
     generatedCode: parsed.data.generatedCode,
     generatedCodeCompact: parsed.data.generatedCode.replaceAll("-", ""),
+    productImageUrl: productImageUrl ?? undefined,
     designationPt: parsed.data.designationPt,
     designationEs: parsed.data.designationEs,
     designationEn: parsed.data.designationEn,

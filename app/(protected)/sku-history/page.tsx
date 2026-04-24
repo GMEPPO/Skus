@@ -20,7 +20,14 @@ export default async function SkuHistoryPage() {
         <CardContent className="space-y-3">
           {rows.map((row) => (
             <div key={row.id} className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                {row.productImageUrl ? (
+                  <img
+                    src={row.productImageUrl}
+                    alt={`Imagem do produto ${row.generatedCode}`}
+                    className="h-28 w-28 rounded-xl border border-slate-700 object-cover"
+                  />
+                ) : null}
                 <div>
                   <p className="font-medium text-slate-100">{row.generatedCode}</p>
                   <p className="text-sm text-slate-400">{row.designation}</p>

@@ -49,10 +49,18 @@ describe("reference normalizer engine", () => {
     expect(result.designationEn).toContain("ACB Lavender");
   });
 
-  it("collapses Benamor and Gordissimo to Benamor", () => {
+  it("keeps Gordissimo as visible designation and GOR in reference", () => {
     const result = runCase("GORFRAAMA030000", "GORDISSIMO Frasco Amaciador 30ml");
-    expect(result.designationPt).toContain("Benamor");
+    expect(result.newReference.startsWith("GOR")).toBe(true);
+    expect(result.designationPt).toContain("Gordissimo");
     expect(result.designationPt).not.toContain("GORDISSIMO");
+  });
+
+  it("keeps Alecrim as visible designation and ALE in reference", () => {
+    const result = runCase("ALEFRAAMA030000", "BENAMOR - ALECRIM Frasco Amaciador 30ml");
+    expect(result.newReference.startsWith("ALE")).toBe(true);
+    expect(result.designationPt).toContain("Alecrim");
+    expect(result.designationPt).not.toContain("BENAMOR");
   });
 
   it("translates Amaciador by language", () => {

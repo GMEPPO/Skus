@@ -24,6 +24,7 @@ type SupabaseSkuHistoryRow = {
   id: string;
   generated_code: string | null;
   designation: string | null;
+  product_image_url: string | null;
   created_at: string | null;
   units_per_box: number | string | null;
   units_per_box_status: "real" | "estimated" | null;
@@ -196,7 +197,7 @@ export async function getRecentSkuGenerations(): Promise<RecentSkuGeneration[]> 
   if (supabase) {
     const result = await supabase
       .from("skus_sku_generations")
-      .select("id, generated_code, designation, created_at, units_per_box, units_per_box_status, multiples, multiples_status, weight, weight_status, skus_families(name), skus_profiles(name)")
+      .select("id, generated_code, designation, product_image_url, created_at, units_per_box, units_per_box_status, multiples, multiples_status, weight, weight_status, skus_families(name), skus_profiles(name)")
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -207,6 +208,7 @@ export async function getRecentSkuGenerations(): Promise<RecentSkuGeneration[]> 
         id: String(row.id),
         generatedCode: String(row.generated_code ?? ""),
         designation: String(row.designation ?? ""),
+        productImageUrl: row.product_image_url ?? undefined,
         familyName: String(familyRelation?.name ?? "Sem familia"),
         createdByName: String(profileRelation?.name ?? "Sem utilizador"),
         createdAtLabel: row.created_at ? new Date(String(row.created_at)).toLocaleString("es-ES") : "",

@@ -218,8 +218,8 @@ const RAW_CATALOG: RawCatalog = {
 const CATEGORY_LABEL_OVERRIDES: Partial<Record<string, CatalogEntry["labels"]>> = {
   "brand:ACH BRITO": { pt: "ACB LAVANDA", es: "ACB LAVANDA", en: "ACB Lavender" },
   "brand:ALGOTHERM": { pt: "Ocean Spa", es: "Ocean Spa", en: "Ocean Spa" },
-  "brand:BENAMOR - ALECRIM": { pt: "Benamor", es: "Benamor", en: "Benamor" },
-  "brand:GORDISSIMO": { pt: "Benamor", es: "Benamor", en: "Benamor" },
+  "brand:BENAMOR - ALECRIM": { pt: "Alecrim", es: "Alecrim", en: "Alecrim" },
+  "brand:GORDISSIMO": { pt: "Gordissimo", es: "Gordissimo", en: "Gordissimo" },
   "brand:LARANJA VERBENA": { pt: "LARANJA-VERBENA", es: "LARANJA-VERBENA", en: "LARANJA-VERBENA" },
   "product:Amaciador": { pt: "Condicionador", es: "Acondicionador", en: "Conditioner" },
   "product:Body Lotion": { pt: "Locao Corporal", es: "Locion Corporal", en: "Body Lotion" },
@@ -360,22 +360,6 @@ export function buildDefaultRules(): NormalizerRule[] {
         { field: "oldDesignation", matchType: "contains", value: "ARCH BRITO" },
       ],
       actions: [{ type: "setLabelTranslations", category: "brand", labels: { pt: "ACB LAVANDA", es: "ACB LAVANDA", en: "ACB Lavender" } }],
-      source: "system",
-    },
-    {
-      id: "rule-benamor-collapse",
-      name: "Benamor / Gordissimo -> Benamor",
-      description: "Reduz a marca visivel a Benamor.",
-      enabled: true,
-      priority: 50,
-      stage: "designation",
-      matchType: "contains",
-      matchLogic: "or",
-      conditions: [
-        { field: "detectedBrand", matchType: "contains", value: "BENAMOR" },
-        { field: "detectedBrand", matchType: "contains", value: "GORDISSIMO" },
-      ],
-      actions: [{ type: "setLabelTranslations", category: "brand", labels: { pt: "Benamor", es: "Benamor", en: "Benamor" } }],
       source: "system",
     },
     {
