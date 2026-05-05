@@ -213,7 +213,10 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
     const familyId = versions.find((version) => version.id === level.tree_version_id)?.family_id;
     const attachedLevelWords = (levelWordsByLevel.get(level.id) ?? [])
       .map((levelWord) => wordById.get(levelWord.word_id))
-      .filter((word): word is WordRow => Boolean(word) && word.default_field_type_id === level.field_type_id);
+      .filter((word): word is WordRow => {
+        if (!word) return false;
+        return word.default_field_type_id === level.field_type_id;
+      });
     const fallbackLevelWords = words.filter((word) => {
       if (!familyId) return false;
       return word.default_field_type_id === level.field_type_id && (familyIdsByWord.get(word.id) ?? []).includes(familyId);
