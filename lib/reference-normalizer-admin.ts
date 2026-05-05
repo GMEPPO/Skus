@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buildDefaultCatalogEntries, buildDefaultNormalizerConfig, buildDefaultRules, DEFAULT_NORMALIZER_SETTINGS } from "@/lib/reference-normalizer/defaults";
 import type { CatalogEntry, NormalizerConfig, NormalizerRule, NormalizerSettings } from "@/lib/reference-normalizer/types";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
+import { uniqueStrings } from "@/lib/reference-normalizer/normalization";
 
 const labelsSchema = z.object({
   pt: z.string(),
@@ -103,6 +104,34 @@ type DbSettingsRow = {
   char_limit_en: number;
 };
 
+type SkuFamilyRow = {
+  id: string;
+  name: string;
+  name_pt: string | null;
+  name_es: string | null;
+  name_en: string | null;
+  reference_code: string | null;
+  status: string;
+};
+
+type FieldTypeRelation = { code?: string | null } | Array<{ code?: string | null }> | null;
+
+type SkuWordRow = {
+  id: string;
+  label: string;
+  reference_code: string | null;
+  designation: string | null;
+  designation_pt: string | null;
+  designation_es: string | null;
+  designation_en: string | null;
+  is_active: boolean;
+  skus_field_types?: FieldTypeRelation;
+};
+
+type SkuWordCategory = Exclude<CatalogEntry["category"], "brand">;
+
+const SKU_WORD_CATEGORIES: SkuWordCategory[] = ["format", "product", "size", "packaging", "extra"];
+
 function mapCatalogRow(row: DbCatalogRow): CatalogEntry {
   return {
     id: row.id,
@@ -145,12 +174,131 @@ function mapSettingsRow(row: DbSettingsRow | null | undefined): NormalizerSettin
   };
 }
 
-function mergeCatalogWithDefaults(persisted: CatalogEntry[]) {
+function getFieldTypeCode(relation: FieldTypeRelation | undefined) {
+  if (!relation) return null;
+  if (Array.isArray(relation)) return relation[0]?.code ?? null;
+  return relation.code ?? null;
+}
+
+function buildLabels(pt: string, es?: string | null, en?: string | null): CatalogEntry["labels"] {
+  return {
+    pt,
+    es: es || pt,
+    en: en || pt,
+  };
+}
+
+function toCatalogCode(value: string | null | undefined) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function isSkuWordCategory(value: string | null): value is SkuWordCategory {
+  return SKU_WORD_CATEGORIES.includes(value as SkuWordCategory);
+}
+
+async function buildSkuCatalogEntries(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+): Promise<CatalogEntry[]> {
+  const [familiesResult, wordsResult] = await Promise.all([
+    supabase
+      .from("skus_families")
+      .select("id, name, name_pt, name_es, name_en, reference_code, status")
+      .neq("status", "archived")
+      .order("name", { ascending: true }),
+    supabase
+      .from("skus_words")
+      .select("id, label, reference_code, designation, designation_pt, designation_es, designation_en, is_active, skus_field_types(code)")
+      .eq("is_active", true)
+      .order("label", { ascending: true }),
+  ]);
+
+  const catalog: CatalogEntry[] = [];
+
+  for (const [index, family] of ((familiesResult.data ?? []) as SkuFamilyRow[]).entries()) {
+    const code = toCatalogCode(family.reference_code);
+    const canonicalValue = family.name_pt || family.name || code;
+    if (!code || !canonicalValue) continue;
+
+    catalog.push({
+      id: `sku-family-${family.id}`,
+      category: "brand",
+      canonicalValue,
+      code,
+      usable: true,
+      enabled: true,
+      labels: buildLabels(canonicalValue, family.name_es, family.name_en),
+      detectionAliases: uniqueStrings([
+        code,
+        family.name,
+        family.name_pt ?? "",
+        family.name_es ?? "",
+        family.name_en ?? "",
+      ]),
+      notes: "Sincronizado automaticamente desde skus_families.",
+      metadata: { source: "skus_families", familyId: family.id, status: family.status },
+      sortOrder: -60000 + index,
+    });
+  }
+
+  const categorySortOffset: Record<SkuWordCategory, number> = {
+    format: -50000,
+    product: -40000,
+    size: -30000,
+    packaging: -20000,
+    extra: -10000,
+  };
+
+  for (const [index, word] of ((wordsResult.data ?? []) as SkuWordRow[]).entries()) {
+    const category = getFieldTypeCode(word.skus_field_types);
+    if (!isSkuWordCategory(category)) continue;
+
+    const code = toCatalogCode(word.reference_code);
+    const canonicalValue = word.designation_pt || word.designation || word.label || code;
+    if (!code || !canonicalValue) continue;
+
+    catalog.push({
+      id: `sku-word-${word.id}`,
+      category,
+      canonicalValue,
+      code,
+      usable: true,
+      enabled: true,
+      labels: buildLabels(canonicalValue, word.designation_es, word.designation_en),
+      detectionAliases: uniqueStrings([
+        code,
+        word.label,
+        word.designation ?? "",
+        word.designation_pt ?? "",
+        word.designation_es ?? "",
+        word.designation_en ?? "",
+      ]),
+      notes: "Sincronizado automaticamente desde skus_words.",
+      metadata: { source: "skus_words", wordId: word.id },
+      sortOrder: categorySortOffset[category] + index,
+    });
+  }
+
+  return catalog;
+}
+
+function mergeCatalogWithDefaults(persisted: CatalogEntry[], synced: CatalogEntry[] = []) {
   const defaults = buildDefaultCatalogEntries();
   const merged = new Map<string, CatalogEntry>();
 
   for (const entry of defaults) {
     merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, entry);
+  }
+
+  for (const entry of synced) {
+    merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, {
+      ...merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`),
+      ...entry,
+      labels: entry.labels ?? merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`)?.labels ?? { pt: "", es: "", en: "" },
+      detectionAliases:
+        entry.detectionAliases?.length > 0
+          ? entry.detectionAliases
+          : merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`)?.detectionAliases ?? [],
+    });
   }
 
   for (const entry of persisted) {
@@ -261,9 +409,10 @@ export async function getReferenceNormalizerConfig(): Promise<NormalizerConfig> 
     supabase.from("skus_refnorm_rules").select("*").order("priority"),
     supabase.from("skus_refnorm_settings").select("*").limit(1).maybeSingle(),
   ]);
+  const skuCatalog = await buildSkuCatalogEntries(supabase);
 
   return {
-    catalog: mergeCatalogWithDefaults(((catalogResult.data ?? []) as DbCatalogRow[]).map(mapCatalogRow)),
+    catalog: mergeCatalogWithDefaults(((catalogResult.data ?? []) as DbCatalogRow[]).map(mapCatalogRow), skuCatalog),
     rules: mergeRulesWithDefaults(((rulesResult.data ?? []) as DbRuleRow[]).map(mapRuleRow)),
     settings: mapSettingsRow(settingsResult.data as DbSettingsRow | null),
   };
