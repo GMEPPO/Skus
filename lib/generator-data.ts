@@ -53,6 +53,12 @@ type WordFamilyRow = {
   family_id: string;
 };
 
+type LevelWordRow = {
+  tree_level_id: string;
+  word_id: string;
+  sort_order: number;
+};
+
 type EdgeRow = {
   from_level_id: string;
   from_word_id: string;
@@ -154,6 +160,14 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
         .eq("is_active", true)
     : { data: [] as Array<Record<string, unknown>> };
 
+  const levelWordsResult = levels.length
+    ? await supabase
+        .from("skus_family_tree_level_words")
+        .select("tree_level_id, word_id, sort_order")
+        .in("tree_level_id", levels.map((level) => level.id))
+        .order("sort_order", { ascending: true })
+    : { data: [] as Array<Record<string, unknown>> };
+
   const wordDependenciesResult = await supabase
     .from("skus_word_dependencies")
     .select("child_word_id, parent_word_id");
@@ -184,18 +198,30 @@ export async function getGeneratorFamilies(): Promise<GeneratorFamily[]> {
   }
 
   const words = (wordsResult.data ?? []) as WordRow[];
+  const wordById = new Map(words.map((word) => [word.id, word]));
+  const levelWordsByLevel = new Map<string, LevelWordRow[]>();
+  for (const row of (levelWordsResult.data ?? []) as LevelWordRow[]) {
+    const items = levelWordsByLevel.get(row.tree_level_id) ?? [];
+    items.push(row);
+    levelWordsByLevel.set(row.tree_level_id, items);
+  }
 
   const levelsByTreeVersion = new Map<string, GeneratorLevel[]>();
   for (const level of levels) {
     const fieldType = getFieldTypeRelation(level.skus_field_types, "custom", "Campo");
     const items = levelsByTreeVersion.get(level.tree_version_id) ?? [];
     const familyId = versions.find((version) => version.id === level.tree_version_id)?.family_id;
-    const levelWords = words
-      .filter((word) => {
-        if (!familyId) return false;
-        return word.default_field_type_id === level.field_type_id && (familyIdsByWord.get(word.id) ?? []).includes(familyId);
-      })
-      .map((word) => getWordRelation(word, parentWordIdsByWord.get(word.id) ?? []));
+    const attachedLevelWords = (levelWordsByLevel.get(level.id) ?? [])
+      .map((levelWord) => wordById.get(levelWord.word_id))
+      .filter((word): word is WordRow => Boolean(word) && word.default_field_type_id === level.field_type_id);
+    const fallbackLevelWords = words.filter((word) => {
+      if (!familyId) return false;
+      return word.default_field_type_id === level.field_type_id && (familyIdsByWord.get(word.id) ?? []).includes(familyId);
+    });
+    const levelWordRows = Array.from(
+      new Map([...attachedLevelWords, ...fallbackLevelWords].map((word) => [word.id, word])).values(),
+    );
+    const levelWords = levelWordRows.map((word) => getWordRelation(word, parentWordIdsByWord.get(word.id) ?? []));
     items.push({
       id: level.id,
       order: level.level_order,

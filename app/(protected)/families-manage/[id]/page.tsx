@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  attachWordToFamilyLevelAction,
   createFamilyDraftTreeAction,
   getFamilyBuilderDetail,
   getWordsCatalog,
@@ -145,31 +146,10 @@ export default async function FamilyBuilderDetailPage({
           <CardContent className="space-y-4">
             {family.levels.length > 0 ? (
               family.levels.map((level) => {
-                const previousLevel = family.levels.find((item) => item.order === level.order - 1);
-                const previousLevelWords = previousLevel
-                  ? words.filter(
-                      (word) =>
-                        word.fieldTypeId === previousLevel.fieldTypeId &&
-                        word.familyIds.includes(family.id) &&
-                        (previousLevel.order === 1 ||
-                          word.parentWordIds.some((parentWordId) =>
-                            words
-                              .filter(
-                                (candidate) =>
-                                  candidate.fieldTypeId === family.levels.find((item) => item.order === previousLevel.order - 1)?.fieldTypeId &&
-                                  candidate.familyIds.includes(family.id),
-                              )
-                              .some((candidate) => parentWordId === candidate.id),
-                          )),
-                    )
-                  : [];
-
-                const levelWords = words.filter(
-                  (word) =>
-                    word.fieldTypeId === level.fieldTypeId &&
-                    word.familyIds.includes(family.id) &&
-                    (level.order === 1 ||
-                      word.parentWordIds.some((parentWordId) => previousLevelWords.some((previousWord) => previousWord.id === parentWordId))),
+                const levelWords = level.words;
+                const attachedWordIds = new Set(levelWords.map((word) => word.id));
+                const availableWords = words.filter(
+                  (word) => word.fieldTypeId === level.fieldTypeId && !attachedWordIds.has(word.id),
                 );
 
                 return (
@@ -199,6 +179,31 @@ export default async function FamilyBuilderDetailPage({
                         Guardar etiqueta
                       </Button>
                     </form>
+
+                    {family.draftTreeVersionId ? (
+                      <form action={attachWordToFamilyLevelAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                        <input type="hidden" name="familyId" value={family.id} />
+                        <input type="hidden" name="treeLevelId" value={level.id} />
+                        <select
+                          name="wordId"
+                          required
+                          className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>
+                            {availableWords.length > 0 ? "Adicionar palavra a este nivel" : "Todas as palavras deste tipo ja estao no nivel"}
+                          </option>
+                          {availableWords.map((word) => (
+                            <option key={word.id} value={word.id}>
+                              {word.label} - {word.referenceCode}
+                            </option>
+                          ))}
+                        </select>
+                        <Button type="submit" variant="outline" disabled={availableWords.length === 0}>
+                          Adicionar palavra
+                        </Button>
+                      </form>
+                    ) : null}
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       {levelWords.length > 0 ? (

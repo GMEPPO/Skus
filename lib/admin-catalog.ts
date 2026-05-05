@@ -266,6 +266,112 @@ async function ensureFixedLevelsForTreeVersion(
   }
 }
 
+async function copyTreeVersionIntoDraft(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  sourceTreeVersionId: string | null,
+  draftTreeVersionId: string,
+  options: { overwriteExistingWords?: boolean } = {},
+) {
+  if (!sourceTreeVersionId || sourceTreeVersionId === draftTreeVersionId) return;
+
+  const draftLevelIdsResult = await supabase
+    .from("skus_family_tree_levels")
+    .select("id")
+    .eq("tree_version_id", draftTreeVersionId);
+
+  const draftLevelIds = (draftLevelIdsResult.data ?? []).map((level) => String(level.id));
+  if (draftLevelIds.length === 0) return;
+
+  const existingWordsResult = await supabase
+    .from("skus_family_tree_level_words")
+    .select("id", { count: "exact", head: true })
+    .in("tree_level_id", draftLevelIds);
+
+  if (!options.overwriteExistingWords && (existingWordsResult.count ?? 0) > 0) {
+    return;
+  }
+
+  const [sourceLevelsResult, draftLevelsResult] = await Promise.all([
+    supabase
+      .from("skus_family_tree_levels")
+      .select("id, field_type_id, level_order, label_override, is_required, designation_included")
+      .eq("tree_version_id", sourceTreeVersionId)
+      .order("level_order", { ascending: true }),
+    supabase
+      .from("skus_family_tree_levels")
+      .select("id, field_type_id, level_order")
+      .eq("tree_version_id", draftTreeVersionId)
+      .order("level_order", { ascending: true }),
+  ]);
+
+  const sourceLevels = sourceLevelsResult.data ?? [];
+  const draftLevels = draftLevelsResult.data ?? [];
+  const draftLevelByOrder = new Map(draftLevels.map((level) => [Number(level.level_order), level]));
+  const draftLevelIdBySourceLevelId = new Map<string, string>();
+
+  for (const sourceLevel of sourceLevels) {
+    const draftLevel = draftLevelByOrder.get(Number(sourceLevel.level_order));
+    if (!draftLevel?.id) continue;
+
+    draftLevelIdBySourceLevelId.set(String(sourceLevel.id), String(draftLevel.id));
+    await supabase
+      .from("skus_family_tree_levels")
+      .update({
+        field_type_id: sourceLevel.field_type_id,
+        label_override: sourceLevel.label_override,
+        is_required: sourceLevel.is_required,
+        designation_included: sourceLevel.designation_included,
+      })
+      .eq("id", String(draftLevel.id));
+  }
+
+  const mappedDraftLevelIds = Array.from(draftLevelIdBySourceLevelId.values());
+  if (mappedDraftLevelIds.length > 0) {
+    await supabase.from("skus_family_tree_level_words").delete().in("tree_level_id", mappedDraftLevelIds);
+    await supabase.from("skus_family_tree_edges").delete().eq("tree_version_id", draftTreeVersionId);
+  }
+
+  const sourceLevelIds = Array.from(draftLevelIdBySourceLevelId.keys());
+  const sourceWordsResult = sourceLevelIds.length
+    ? await supabase
+        .from("skus_family_tree_level_words")
+        .select("tree_level_id, word_id, sort_order")
+        .in("tree_level_id", sourceLevelIds)
+    : { data: [] as Array<Record<string, unknown>> };
+
+  const wordRows = (sourceWordsResult.data ?? [])
+    .map((row) => ({
+      tree_level_id: draftLevelIdBySourceLevelId.get(String(row.tree_level_id)),
+      word_id: row.word_id,
+      sort_order: row.sort_order,
+    }))
+    .filter((row) => row.tree_level_id && row.word_id);
+
+  if (wordRows.length > 0) {
+    await supabase.from("skus_family_tree_level_words").insert(wordRows);
+  }
+
+  const sourceEdgesResult = await supabase
+    .from("skus_family_tree_edges")
+    .select("from_level_id, from_word_id, to_level_id, to_word_id, is_active")
+    .eq("tree_version_id", sourceTreeVersionId);
+
+  const edgeRows = (sourceEdgesResult.data ?? [])
+    .map((row) => ({
+      tree_version_id: draftTreeVersionId,
+      from_level_id: draftLevelIdBySourceLevelId.get(String(row.from_level_id)),
+      from_word_id: row.from_word_id,
+      to_level_id: draftLevelIdBySourceLevelId.get(String(row.to_level_id)),
+      to_word_id: row.to_word_id,
+      is_active: row.is_active ?? true,
+    }))
+    .filter((row) => row.from_level_id && row.from_word_id && row.to_level_id && row.to_word_id);
+
+  if (edgeRows.length > 0) {
+    await supabase.from("skus_family_tree_edges").insert(edgeRows);
+  }
+}
+
 function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefined, fallback: string) {
   if (!relation) return fallback;
   if (Array.isArray(relation)) {
@@ -466,6 +572,7 @@ export async function getFamilyBuilderDetail(familyId: string): Promise<FamilyBu
 
   if (draftTree) {
     await ensureFixedLevelsForTreeVersion(supabase, draftTree.id);
+    await copyTreeVersionIntoDraft(supabase, family.active_tree_version_id ?? null, draftTree.id);
   }
 
   const levelsResult = draftTree
@@ -845,12 +952,21 @@ export async function createFamilyDraftTreeAction(formData: FormData) {
 
   const versionsResult = await supabase
     .from("skus_family_tree_versions")
-    .select("version_number, status")
+    .select("id, version_number, status")
     .eq("family_id", parsed.data.familyId)
     .order("version_number", { ascending: false });
 
+  const familyResult = await supabase
+    .from("skus_families")
+    .select("active_tree_version_id")
+    .eq("id", parsed.data.familyId)
+    .maybeSingle();
+
+  const sourceTreeVersionId = String(familyResult.data?.active_tree_version_id ?? "") || null;
   const existingDraft = (versionsResult.data ?? []).find((item) => item.status === "draft");
   if (existingDraft) {
+    await ensureFixedLevelsForTreeVersion(supabase, String(existingDraft.id));
+    await copyTreeVersionIntoDraft(supabase, sourceTreeVersionId, String(existingDraft.id));
     redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Ja+existe+um+draft+aberto`);
   }
 
@@ -870,6 +986,7 @@ export async function createFamilyDraftTreeAction(formData: FormData) {
   }
 
   await ensureFixedLevelsForTreeVersion(supabase, inserted.data.id);
+  await copyTreeVersionIntoDraft(supabase, sourceTreeVersionId, inserted.data.id, { overwriteExistingWords: true });
 
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
   redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Draft+criado+com+sucesso`);
@@ -1046,7 +1163,18 @@ export async function attachWordToFamilyLevelAction(formData: FormData) {
     redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+ligar+a+palavra+ao+nivel`);
   }
 
+  await supabase
+    .from("skus_word_families")
+    .upsert(
+      {
+        word_id: parsed.data.wordId,
+        family_id: parsed.data.familyId,
+      },
+      { onConflict: "word_id,family_id" },
+    );
+
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
+  revalidatePath("/generator");
   redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Palavra+associada+ao+nivel`);
 }
 

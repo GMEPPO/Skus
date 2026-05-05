@@ -31,11 +31,6 @@ export function getAvailableOptions(
   if (!previousSelection) return [];
   if (isEmptySelection(previousSelection)) return [];
 
-  const optionsWithDependencies = level.options.filter((option) => option.parentWordIds.length > 0);
-  if (optionsWithDependencies.length > 0) {
-    return level.options.filter((option) => option.parentWordIds.includes(previousSelection));
-  }
-
   const levelEdges = family.edges.filter(
     (edge) => edge.fromLevelId === previousLevel.id && edge.toLevelId === level.id,
   );
