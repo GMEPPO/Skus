@@ -8,6 +8,57 @@ type CatalogIndex = {
 
 const ORDERED_CATEGORIES: NormalizerCategory[] = ["brand", "format", "product", "size", "packaging", "extra"];
 
+const LEGACY_CODE_MAP: Partial<Record<NormalizerCategory, Record<string, string>>> = {
+  format: {
+    AAA: "SOL",
+    ECO: "ECO",
+    ECP: "ECP",
+    FRA: "FRA",
+    REC: "REC",
+    ECS: "ECS",
+    BIS: "BIS",
+    STI: "STI",
+    VEL: "VEL",
+  },
+  product: {
+    ALL: "SAB",
+    AMA: "CON",
+    BOD: "BOD",
+    CHA: "CHA",
+    CHC: "CHC",
+    GBD: "GBD",
+    GCC: "GCC",
+    SAB: "SAB",
+    SAI: "SAI",
+  },
+  size: {
+    "20GR": "020",
+    "25GR": "025",
+    "30GR": "030",
+    "30ML": "030",
+    "40GR": "040",
+    "40ML": "040",
+    "50ML": "050",
+    "60ML": "060",
+    "80ML": "080",
+    "100GR": "100",
+    "300ML": "300",
+    "375ML": "375",
+    "400ML": "400",
+    "500ML": "500",
+  },
+  packaging: {
+    CAE: "CXA",
+    CXA: "CXA",
+    PPL: "PPL",
+    SGC: "SGC",
+    VAZ: "VAZ",
+    VAZIA: "VAZ",
+    POU: "POU",
+    PLR: "PLR",
+  },
+};
+
 function emptySegments(): SegmentSelection {
   return {
     brand: null,
@@ -123,6 +174,34 @@ function findByCodeAnywhere(entries: Map<string, CatalogEntry[]>, reference: str
   return null;
 }
 
+function findByLegacyCode(
+  category: NormalizerCategory,
+  entries: Map<string, CatalogEntry[]>,
+  legacyCode: string,
+) {
+  const mappedCode = LEGACY_CODE_MAP[category]?.[legacyCode];
+  if (!mappedCode) return null;
+  return findByCode(entries, mappedCode);
+}
+
+function findByLegacyCodeAnywhere(
+  category: NormalizerCategory,
+  entries: Map<string, CatalogEntry[]>,
+  reference: string,
+) {
+  const legacyCodes = Object.keys(LEGACY_CODE_MAP[category] ?? {})
+    .filter((code) => code && code !== "000")
+    .sort((left, right) => right.length - left.length);
+
+  for (const legacyCode of legacyCodes) {
+    if (!reference.includes(legacyCode)) continue;
+    const found = findByLegacyCode(category, entries, legacyCode);
+    if (found) return { code: legacyCode, entry: found };
+  }
+
+  return null;
+}
+
 function looksLikeFiveLiterToken(value: string) {
   return /(?:^|[^A-Z0-9])5L(?:T)?(?:[^A-Z0-9]|$)/i.test(value) || /5000ML/i.test(value);
 }
@@ -153,15 +232,15 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
   }
   if (formatCode) {
     rawCodes.format = formatCode;
-    segments.format = findByCode(index.byCode.format, formatCode);
+    segments.format = findByCode(index.byCode.format, formatCode) ?? findByLegacyCode("format", index.byCode.format, formatCode);
   }
   if (productCode) {
     rawCodes.product = productCode;
-    segments.product = findByCode(index.byCode.product, productCode);
+    segments.product = findByCode(index.byCode.product, productCode) ?? findByLegacyCode("product", index.byCode.product, productCode);
   }
   if (sizeCode) {
     rawCodes.size = sizeCode;
-    segments.size = findByCode(index.byCode.size, sizeCode);
+    segments.size = findByCode(index.byCode.size, sizeCode) ?? findByLegacyCode("size", index.byCode.size, sizeCode);
   }
 
   if (!segments.brand) {
@@ -196,6 +275,14 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
     }
   }
 
+  if (!segments.size) {
+    const fallback = findByLegacyCodeAnywhere("size", index.byCode.size, rawReference);
+    if (fallback) {
+      rawCodes.size = fallback.code;
+      segments.size = fallback.entry;
+    }
+  }
+
   if (!segments.size && looksLikeFiveLiterToken(rawReference)) {
     const fiveLiterSize = findFiveLiterSize(index);
     if (fiveLiterSize) {
@@ -219,7 +306,7 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
 
       if (packagingCode) {
         rawCodes.packaging = packagingCode;
-        segments.packaging = findByCode(index.byCode.packaging, packagingCode);
+        segments.packaging = findByCode(index.byCode.packaging, packagingCode) ?? findByLegacyCode("packaging", index.byCode.packaging, packagingCode);
       }
       if (extraCode) {
         rawCodes.extra = extraCode;
@@ -233,6 +320,14 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
 
   if (!segments.packaging) {
     const fallback = findByCodeAnywhere(index.byCode.packaging, tail || rawReference);
+    if (fallback) {
+      rawCodes.packaging = fallback.code;
+      segments.packaging = fallback.entry;
+    }
+  }
+
+  if (!segments.packaging) {
+    const fallback = findByLegacyCodeAnywhere("packaging", index.byCode.packaging, tail || rawReference);
     if (fallback) {
       rawCodes.packaging = fallback.code;
       segments.packaging = fallback.entry;

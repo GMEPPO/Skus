@@ -5,7 +5,7 @@ import { z } from "zod";
 import { buildDefaultCatalogEntries, buildDefaultNormalizerConfig, buildDefaultRules, DEFAULT_NORMALIZER_SETTINGS } from "@/lib/reference-normalizer/defaults";
 import type { CatalogEntry, NormalizerConfig, NormalizerRule, NormalizerSettings } from "@/lib/reference-normalizer/types";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
-import { uniqueStrings } from "@/lib/reference-normalizer/normalization";
+import { normalizeText, uniqueStrings } from "@/lib/reference-normalizer/normalization";
 
 const labelsSchema = z.object({
   pt: z.string(),
@@ -196,6 +196,67 @@ function isSkuWordCategory(value: string | null): value is SkuWordCategory {
   return SKU_WORD_CATEGORIES.includes(value as SkuWordCategory);
 }
 
+function getLegacyAliases(category: CatalogEntry["category"], code: string, canonicalValue: string) {
+  const key = `${normalizeText(category)}:${normalizeText(code)}:${normalizeText(canonicalValue)}`;
+  const aliases: Record<string, string[]> = {
+    "brand:acb:achb lavanda": ["ACH BRITO", "ARCH BRITO", "ACH BRITO LAVANDA", "ARCH BRITO LAVANDA"],
+    "brand:alg:alg ocean spa": ["ALGOTHERM", "ALGOTHERM O SPA", "ALGOTHERM O. SPA", "ALGOTHERM OCEAN SPA", "OCEAN SPA"],
+    "brand:ase:an semonin": ["ANNE SEMONIN", "AN SEMONIN"],
+    "brand:ale:ben alecrim": ["BENAMOR ALECRIM", "BENAMOR - ALECRIM"],
+    "brand:gor:ben gordissimo": ["GORDISSIMO", "BENAMOR GORDISSIMO"],
+    "brand:cas:cas pink lily": ["CASTELBEL", "CASTELBEL PINK LILY", "PINK LILY"],
+    "brand:lve:cas laranja ver": ["CASTELBEL LARANJA VERBENA", "LARANJA VERBENA", "LARANJA-VERBENA"],
+    "brand:cbo:cdp bois olivie": ["COMPAGNIE DE PROVENCE BOIS D'OLIVIER", "CDP BOIS OLIVIER", "BOIS D OLIVIER"],
+    "brand:cmb:cdp mint basil": ["COMPAGNIE DE PROVENCE MINT BASIL", "CDP MINT BASIL"],
+    "brand:cmo:cereria black orc": ["CERERIA MOLLA BLACK ORCHID", "BLACK ORCHID"],
+    "brand:cmr:cereria bulg rose": ["CERERIA MOLLA BULGARIAN ROSE", "BULGARIAN ROSE"],
+    "brand:cqm:c mondes": ["CINQ MONDES"],
+    "brand:fci:edpfm indelebil": ["FREDERIC MALLE INDELEBILE", "EDPFM INDELEBILE", "INDELEBILE"],
+    "brand:frm:edpfm magnolia": ["FREDERIC MALLE MAGNOLIA", "EDPFM MAGNOLIA"],
+    "brand:g&b:pc gold blue": ["GOLD&BLUE", "GOLD BLUE"],
+    "brand:plf:pc plum flower": ["PLUM FLOWER"],
+    "brand:rub:pc ruby red": ["RUBY RED"],
+    "brand:swh:scand white": ["SCANDINAVIAN WHITE"],
+
+    "format:bis:bisnaga": ["Bisnaga"],
+    "format:eco:ecofill": ["ECOFILL"],
+    "format:eco:garrafa ecofill": ["Garrafa ECOFILL", "Garrafa ECOFILL ALUMINIO", "Garrafa ECOFILL ALUM"],
+    "format:eco:rec ecofill": ["Recarga ECOFILL", "Rec ECOFILL"],
+    "format:ecp:ecopump": ["Ecopump", "Eco pump"],
+    "format:fra:frasco": ["Frasco"],
+    "format:rec:rec 5l": ["Recarga 5L", "Recarga 5l", "Rec 5L", "5L", "5LT"],
+    "format:ecs:rec ecosource": ["Recarga Ecosource", "Rec Ecosource", "Ecosource"],
+    "format:sol:solido": ["Solido", "Sólido"],
+    "format:sti:stick": ["Stick"],
+    "format:vel:vela": ["Vela"],
+
+    "product:con:condicionador": ["Amaciador", "Condicionador", "Conditioner"],
+    "product:bod:body lotion": ["Body Lotion", "Loção Corpo", "Locao Corpo", "Body"],
+    "product:cha:champo": ["Champo", "Champô", "Shampoo"],
+    "product:chc:champo/cond": ["Champo/Cond", "Champô/Cond", "Champo Condicionador", "Champô Condicionador", "2 em 1", "2in1"],
+    "product:gbd:gel banho": ["Gel Banho", "Gel de Banho", "Shower Gel"],
+    "product:gcc:gel corp cabelo": ["Gel Corpo Cabelo", "Gel Corpo e Cabelo", "Gel Corp Cabelo", "Hair Body Wash"],
+    "product:gbd:gel maos corpo": ["Gel Mãos Corpo", "Gel Maos Corpo", "Gel Mãos e Corpo", "Gel Maos e Corpo"],
+    "product:lmc:locao mao corpo": ["Loção Mão Corpo", "Locao Mao Corpo", "Loção Mãos Corpo", "Locao Maos Corpo", "Loção Mãos e Corpo", "Locao Maos e Corpo", "Loção de Mãos e Corpo", "Locao de Maos e Corpo"],
+    "product:sab:sabonete": ["Sabonete", "Sabonete Solido", "Sabonete Sólido"],
+    "product:sab:sab liquido": ["Sab Líquido", "Sab Liquido", "Sabonete Líquido", "Sabonete Liquido", "Liquid Soap"],
+    "product:sai:sais de banho": ["Sais de Banho", "Sais banho"],
+    "product:lma:locao mao": ["Loção Mão", "Locao Mao", "Loção de Mãos", "Locao de Maos"],
+
+    "packaging:cxa:caixa": ["Caixa", "Cx Cartão", "Caixa de Cartão", "Cartao", "Cartão", "CAE"],
+    "packaging:ppl:papel": ["Papel"],
+    "packaging:sgc:sugar cane": ["Sugar Cane", "Cana de Açúcar", "Cana de Acucar"],
+    "packaging:vaz:vaz": ["VAZ", "Vazia", "Vacio", "Vacia", "Empty"],
+    "packaging:pou:bolsa": ["Bolsa", "Pouch"],
+    "packaging:plr:plast. rec.": ["Plast. Rec.", "Plast Rec", "Plástico Reciclado", "Plastico Reciclado", "PLÁST. RECICLADO"],
+
+    "extra:cls:classico": ["Classico", "Clássico", "Classic"],
+    "extra:slm:slim": ["Slim"],
+  };
+
+  return aliases[key] ?? [];
+}
+
 async function buildSkuCatalogEntries(
   supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
 ): Promise<CatalogEntry[]> {
@@ -233,6 +294,7 @@ async function buildSkuCatalogEntries(
         family.name_pt ?? "",
         family.name_es ?? "",
         family.name_en ?? "",
+        ...getLegacyAliases("brand", code, canonicalValue),
       ]),
       notes: "Sincronizado automaticamente desde skus_families.",
       metadata: { source: "skus_families", familyId: family.id, status: family.status },
@@ -271,6 +333,7 @@ async function buildSkuCatalogEntries(
         word.designation_pt ?? "",
         word.designation_es ?? "",
         word.designation_en ?? "",
+        ...getLegacyAliases(category, code, canonicalValue),
       ]),
       notes: "Sincronizado automaticamente desde skus_words.",
       metadata: { source: "skus_words", wordId: word.id },
@@ -284,9 +347,12 @@ async function buildSkuCatalogEntries(
 function mergeCatalogWithDefaults(persisted: CatalogEntry[], synced: CatalogEntry[] = []) {
   const defaults = buildDefaultCatalogEntries();
   const merged = new Map<string, CatalogEntry>();
+  const defaultIds = new Set(defaults.map((entry) => entry.id));
 
-  for (const entry of defaults) {
-    merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, entry);
+  if (synced.length === 0) {
+    for (const entry of defaults) {
+      merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, entry);
+    }
   }
 
   for (const entry of synced) {
@@ -302,6 +368,7 @@ function mergeCatalogWithDefaults(persisted: CatalogEntry[], synced: CatalogEntr
   }
 
   for (const entry of persisted) {
+    if (synced.length > 0 && defaultIds.has(entry.id)) continue;
     merged.set(`${entry.category}:${entry.code}:${entry.canonicalValue}`, {
       ...merged.get(`${entry.category}:${entry.code}:${entry.canonicalValue}`),
       ...entry,
