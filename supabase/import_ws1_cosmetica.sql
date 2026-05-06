@@ -151,6 +151,7 @@ values
   ('extra', 'V02', 'V02', 70),
   ('format', 'REC', 'Rec 5L', 80),
   ('product', 'LMC', 'Loção Mão Corpo', 80),
+  ('size', '005', '5L', 75),
   ('size', '020', '20gr', 80),
   ('extra', 'V03', 'V03', 80),
   ('format', 'ECO', 'Rec Ecofill', 90),

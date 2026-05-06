@@ -32,6 +32,9 @@ const LEGACY_CODE_MAP: Partial<Record<NormalizerCategory, Record<string, string>
     SAI: "SAI",
   },
   size: {
+    "5L": "005",
+    "5LT": "005",
+    "005L": "005",
     "20GR": "020",
     "25GR": "025",
     "30GR": "030",
@@ -58,6 +61,18 @@ const LEGACY_CODE_MAP: Partial<Record<NormalizerCategory, Record<string, string>
     PLR: "PLR",
   },
 };
+
+const BRAND_ALIAS_CODE_MAP: Array<{ aliases: string[]; code: string }> = [
+  { code: "ACB", aliases: ["ach brito", "arch brito", "achb lavanda"] },
+  { code: "ALG", aliases: ["algotherm", "ocean spa", "alg ocean spa"] },
+  { code: "ASE", aliases: ["anne semonin", "an semonin", "anne semonim", "an semonim"] },
+  { code: "ALE", aliases: ["benamor alecrim", "ben amor alecrim", "ben alecrim"] },
+  { code: "GOR", aliases: ["gordissimo", "benamor gordissimo", "ben gordissimo"] },
+  { code: "CAS", aliases: ["castelbel", "pink lily"] },
+  { code: "LVE", aliases: ["laranja verbena", "laranja-verbena"] },
+  { code: "CQM", aliases: ["cinq mondes"] },
+  { code: "SWH", aliases: ["scandinavian white"] },
+];
 
 function emptySegments(): SegmentSelection {
   return {
@@ -160,6 +175,20 @@ function findByCode(entries: Map<string, CatalogEntry[]>, code: string) {
   return entries.get(code)?.find((entry) => entry.usable) ?? entries.get(code)?.[0] ?? null;
 }
 
+function findBrandByAlias(index: CatalogIndex, description: string) {
+  const normalizedDescription = ` ${normalizeText(description).replace(/[-_/.,;:]+/g, " ")} `;
+
+  for (const item of BRAND_ALIAS_CODE_MAP) {
+    const matches = item.aliases.some((alias) => normalizedDescription.includes(` ${normalizeText(alias)} `));
+    if (!matches) continue;
+
+    const found = findByCode(index.byCode.brand, item.code);
+    if (found) return found;
+  }
+
+  return null;
+}
+
 function findByCodeAnywhere(entries: Map<string, CatalogEntry[]>, reference: string) {
   const codes = Array.from(entries.keys())
     .filter((code) => code && code !== "000")
@@ -167,6 +196,21 @@ function findByCodeAnywhere(entries: Map<string, CatalogEntry[]>, reference: str
 
   for (const code of codes) {
     if (!reference.includes(code)) continue;
+    const found = findByCode(entries, code);
+    if (found) return { code, entry: found };
+  }
+
+  return null;
+}
+
+function findSizeByCodeAnywhere(entries: Map<string, CatalogEntry[]>, reference: string) {
+  const codes = Array.from(entries.keys())
+    .filter((code) => code && code !== "000")
+    .sort((left, right) => right.length - left.length);
+
+  for (const code of codes) {
+    const expression = new RegExp(`(^|\\D)${code}(\\D|$)`);
+    if (!expression.test(reference)) continue;
     const found = findByCode(entries, code);
     if (found) return { code, entry: found };
   }
@@ -268,7 +312,7 @@ function parseReferenceSegments(reference: string, index: CatalogIndex): ParsedR
   }
 
   if (!segments.size) {
-    const fallback = findByCodeAnywhere(index.byCode.size, rawReference);
+    const fallback = findSizeByCodeAnywhere(index.byCode.size, rawReference);
     if (fallback) {
       rawCodes.size = fallback.code;
       segments.size = fallback.entry;
@@ -366,6 +410,10 @@ export function detectSegments(reference: string, designation: string, catalog: 
     packaging: findByDescription(index.byCategory.packaging, designation),
     extra: findByDescription(index.byCategory.extra, designation),
   };
+
+  if (!described.brand) {
+    described.brand = findBrandByAlias(index, designation);
+  }
 
   if (normalizedDesignation.includes("castelbel") && normalizedDesignation.includes("laranja verbena")) {
     described.brand = findCatalogEntryByCanonicalValue(index.byCategory.brand, "LARANJA VERBENA");

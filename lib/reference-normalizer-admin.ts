@@ -181,10 +181,11 @@ function getFieldTypeCode(relation: FieldTypeRelation | undefined) {
 }
 
 function buildLabels(pt: string, es?: string | null, en?: string | null): CatalogEntry["labels"] {
+  const translated = getDefaultTranslations(pt);
   return {
     pt,
-    es: es || pt,
-    en: en || pt,
+    es: es && es !== pt ? es : translated.es,
+    en: en && en !== pt ? en : translated.en,
   };
 }
 
@@ -194,6 +195,77 @@ function toCatalogCode(value: string | null | undefined) {
 
 function isSkuWordCategory(value: string | null): value is SkuWordCategory {
   return SKU_WORD_CATEGORIES.includes(value as SkuWordCategory);
+}
+
+function getDefaultTranslations(value: string) {
+  const normalized = normalizeText(value);
+  const translations: Record<string, { es: string; en: string }> = {
+    "achb lavanda": { es: "ACHB Lavanda", en: "ACHB Lavender" },
+    "rs algae": { es: "RS Algae", en: "RS Algae" },
+    "alg ocean spa": { es: "ALG Ocean Spa", en: "ALG Ocean Spa" },
+    "an semonin": { es: "AN Semonin", en: "AN Semonin" },
+    "at colog pomelo": { es: "AT Colog Pomelo", en: "AT Colog Grapefruit" },
+    "ben alecrim": { es: "BEN Alecrim", en: "BEN Rosemary" },
+    "ben gordissimo": { es: "BEN Gordissimo", en: "BEN Gordissimo" },
+    "cas pink lily": { es: "CAS Pink Lily", en: "CAS Pink Lily" },
+    "cas laranja ver": { es: "CAS Naranja Verbena", en: "CAS Orange Verbena" },
+    "cereria black orc": { es: "Cereria Black Orchid", en: "Cereria Black Orchid" },
+    "cereria bulg rose": { es: "Cereria Bulgarian Rose", en: "Cereria Bulgarian Rose" },
+    "cdp bois olivie": { es: "CDP Madera de Olivo", en: "CDP Olive Wood" },
+    "cdp mint basil": { es: "CDP Menta Albahaca", en: "CDP Mint Basil" },
+    "edpfm indelebil": { es: "EDPFM Indelebile", en: "EDPFM Indelible" },
+    "edpfm magnolia": { es: "EDPFM Magnolia", en: "EDPFM Magnolia" },
+    "pc gold blue": { es: "PC Gold Blue", en: "PC Gold Blue" },
+    "pc plum flower": { es: "PC Flor de Ciruelo", en: "PC Plum Flower" },
+    "pc ruby red": { es: "PC Ruby Red", en: "PC Ruby Red" },
+    "scand white": { es: "Scandinavian White", en: "Scandinavian White" },
+    "white tea": { es: "Te Blanco", en: "White Tea" },
+
+    "bisnaga": { es: "Tubo", en: "Tube" },
+    "ecofill": { es: "ECOFILL", en: "ECOFILL" },
+    "ecopump": { es: "Ecopump", en: "Ecopump" },
+    "frasco": { es: "Frasco", en: "Bottle" },
+    "garrafa ecofill": { es: "Botella Ecofill", en: "Ecofill Bottle" },
+    "ghost": { es: "Ghost", en: "Ghost" },
+    "manhattan": { es: "Manhattan", en: "Manhattan" },
+    "rec 5l": { es: "Rec 5L", en: "5L Refill" },
+    "rec ecofill": { es: "Rec Ecofill", en: "Ecofill Refill" },
+    "rec ecosource": { es: "Rec Ecosource", en: "Ecosource Refill" },
+    "solido": { es: "Solido", en: "Solid" },
+    "stick": { es: "Stick", en: "Stick" },
+    "vela": { es: "Vela", en: "Candle" },
+
+    "condicionador": { es: "Acondicionador", en: "Conditioner" },
+    "body lotion": { es: "Locion Corporal", en: "Body Lotion" },
+    "champo": { es: "Champu", en: "Shampoo" },
+    "champo/cond": { es: "Champu/Acond.", en: "Shampoo/Cond." },
+    "gel banho": { es: "Gel de Bano", en: "Shower Gel" },
+    "gel corp cabelo": { es: "Gel Cuerpo Cabello", en: "Hair Body Wash" },
+    "gel maos corpo": { es: "Gel Manos Cuerpo", en: "Hand Body Wash" },
+    "locao mao corpo": { es: "Locion Manos Cuerpo", en: "Hand Body Lotion" },
+    "sabonete": { es: "Jabon", en: "Soap" },
+    "sab liquido": { es: "Jabon Liquido", en: "Liquid Soap" },
+    "sais de banho": { es: "Sales de Bano", en: "Bath Salts" },
+    "locao mao": { es: "Locion Manos", en: "Hand Lotion" },
+
+    "5l": { es: "5L", en: "5L" },
+    "20gr": { es: "20gr", en: "20g" },
+    "25gr": { es: "25gr", en: "25g" },
+    "30gr": { es: "30gr", en: "30g" },
+    "40gr": { es: "40gr", en: "40g" },
+    "100gr": { es: "100gr", en: "100g" },
+
+    "caixa": { es: "Caja", en: "Box" },
+    "papel": { es: "Papel", en: "Paper" },
+    "sugar cane": { es: "Cana de Azucar", en: "Sugar Cane" },
+    "vaz": { es: "Vacio", en: "Empty" },
+    "bolsa": { es: "Bolsa", en: "Pouch" },
+    "plast. rec.": { es: "Plast. Rec.", en: "Rec. Plast." },
+
+    "classico": { es: "Clasico", en: "Classic" },
+  };
+
+  return translations[normalized] ?? { es: value, en: value };
 }
 
 function getLegacyAliases(category: CatalogEntry["category"], code: string, canonicalValue: string) {
@@ -242,6 +314,21 @@ function getLegacyAliases(category: CatalogEntry["category"], code: string, cano
     "product:sab:sab liquido": ["Sab Líquido", "Sab Liquido", "Sabonete Líquido", "Sabonete Liquido", "Liquid Soap"],
     "product:sai:sais de banho": ["Sais de Banho", "Sais banho"],
     "product:lma:locao mao": ["Loção Mão", "Locao Mao", "Loção de Mãos", "Locao de Maos"],
+
+    "size:020:20gr": ["20 gr", "20g", "20 g"],
+    "size:025:25gr": ["25 gr", "25g", "25 g"],
+    "size:030:30ml": ["30 ml"],
+    "size:030:30gr": ["30 gr", "30g", "30 g"],
+    "size:040:40gr": ["40 gr", "40g", "40 g"],
+    "size:040:40ml": ["40 ml"],
+    "size:050:50ml": ["50 ml"],
+    "size:060:60ml": ["60 ml"],
+    "size:080:80ml": ["80 ml"],
+    "size:100:100gr": ["100 gr", "100g", "100 g"],
+    "size:300:300ml": ["300 ml"],
+    "size:375:375ml": ["375 ml"],
+    "size:400:400ml": ["400 ml"],
+    "size:500:500ml": ["500 ml"],
 
     "packaging:cxa:caixa": ["Caixa", "Cx Cartão", "Caixa de Cartão", "Cartao", "Cartão", "CAE"],
     "packaging:ppl:papel": ["Papel"],
