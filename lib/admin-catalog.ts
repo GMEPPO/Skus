@@ -151,7 +151,7 @@ const deleteWordSchema = z.object({
 
 const createWordSchema = z.object({
   label: z.string().trim().min(2),
-  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
+  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9&.]{2,3}$/),
   fieldTypeId: z.string().uuid(),
   designationPt: z.string().trim().min(1),
   designationEs: z.string().trim().min(1),
@@ -164,7 +164,7 @@ const createWordSchema = z.object({
 const updateWordSchema = z.object({
   wordId: z.string().uuid(),
   label: z.string().trim().min(2),
-  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/),
+  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9&.]{2,3}$/),
   fieldTypeId: z.string().uuid(),
   designationPt: z.string().trim().min(1),
   designationEs: z.string().trim().min(1),
@@ -370,6 +370,98 @@ async function copyTreeVersionIntoDraft(
   if (edgeRows.length > 0) {
     await supabase.from("skus_family_tree_edges").insert(edgeRows);
   }
+}
+
+async function attachWordToFamilyTrees(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  params: { wordId: string; fieldTypeId: string; familyIds: string[] },
+) {
+  const familyIds = Array.from(new Set(params.familyIds.filter(Boolean)));
+  if (familyIds.length === 0) return;
+
+  await supabase.from("skus_word_families").upsert(
+    familyIds.map((familyId) => ({
+      word_id: params.wordId,
+      family_id: familyId,
+    })),
+    { onConflict: "word_id,family_id" },
+  );
+
+  const [familiesResult, versionsResult] = await Promise.all([
+    supabase
+      .from("skus_families")
+      .select("id, active_tree_version_id")
+      .in("id", familyIds),
+    supabase
+      .from("skus_family_tree_versions")
+      .select("id, family_id, status, version_number")
+      .in("family_id", familyIds)
+      .in("status", ["published", "draft"]),
+  ]);
+
+  const families = (familiesResult.data ?? []) as Array<{ id: string; active_tree_version_id: string | null }>;
+  const versions = (versionsResult.data ?? []) as SupabaseTreeVersionRow[];
+  const versionsByFamilyId = new Map<string, SupabaseTreeVersionRow[]>();
+
+  for (const version of versions) {
+    const familyVersions = versionsByFamilyId.get(version.family_id) ?? [];
+    familyVersions.push(version);
+    versionsByFamilyId.set(version.family_id, familyVersions);
+  }
+
+  const targetTreeVersionIds = new Set<string>();
+  for (const family of families) {
+    const familyVersions = versionsByFamilyId.get(family.id) ?? [];
+    for (const draftVersion of familyVersions.filter((version) => version.status === "draft")) {
+      targetTreeVersionIds.add(draftVersion.id);
+    }
+
+    if (family.active_tree_version_id) {
+      targetTreeVersionIds.add(family.active_tree_version_id);
+      continue;
+    }
+
+    const latestPublished = familyVersions
+      .filter((version) => version.status === "published")
+      .sort((a, b) => Number(b.version_number ?? 0) - Number(a.version_number ?? 0))[0];
+    if (latestPublished) {
+      targetTreeVersionIds.add(latestPublished.id);
+    }
+  }
+
+  const treeVersionIds = Array.from(targetTreeVersionIds);
+  if (treeVersionIds.length === 0) return;
+
+  for (const treeVersionId of treeVersionIds) {
+    await ensureFixedLevelsForTreeVersion(supabase, treeVersionId);
+  }
+
+  const levelsResult = await supabase
+    .from("skus_family_tree_levels")
+    .select("id, tree_version_id, field_type_id")
+    .in("tree_version_id", treeVersionIds)
+    .eq("field_type_id", params.fieldTypeId);
+
+  const levels = (levelsResult.data ?? []) as Array<{ id: string; tree_version_id: string; field_type_id: string }>;
+  for (const level of levels) {
+    const existingResult = await supabase
+      .from("skus_family_tree_level_words")
+      .select("sort_order")
+      .eq("tree_level_id", level.id)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+
+    const nextSortOrder = ((existingResult.data ?? [])[0]?.sort_order ?? 0) + 1;
+    await supabase.from("skus_family_tree_level_words").upsert(
+      {
+        tree_level_id: level.id,
+        word_id: params.wordId,
+        sort_order: nextSortOrder,
+      },
+      { onConflict: "tree_level_id,word_id" },
+    );
+  }
+
 }
 
 function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefined, fallback: string) {
@@ -694,12 +786,11 @@ export async function createWordAction(formData: FormData) {
   }
 
   if (familyIds.length > 0) {
-    await supabase.from("skus_word_families").insert(
-      familyIds.map((familyId) => ({
-        word_id: insertResult.data.id,
-        family_id: familyId,
-      })),
-    );
+    await attachWordToFamilyTrees(supabase, {
+      wordId: insertResult.data.id,
+      fieldTypeId,
+      familyIds,
+    });
   }
 
   if (parentWordIds.length > 0) {
@@ -715,6 +806,7 @@ export async function createWordAction(formData: FormData) {
   revalidatePath("/catalog/words-manage");
   revalidatePath("/families");
   revalidatePath("/families-manage");
+  revalidatePath("/generator");
   redirect("/catalog/words-manage?status=success&message=Palavra+criada+com+sucesso");
 }
 
@@ -829,14 +921,14 @@ export async function updateWordAction(formData: FormData) {
 
   await supabase.from("skus_word_families").delete().eq("word_id", wordId);
   await supabase.from("skus_word_dependencies").delete().eq("child_word_id", wordId);
+  await supabase.from("skus_family_tree_level_words").delete().eq("word_id", wordId);
 
   if (familyIds.length > 0) {
-    await supabase.from("skus_word_families").insert(
-      familyIds.map((familyId) => ({
-        word_id: wordId,
-        family_id: familyId,
-      })),
-    );
+    await attachWordToFamilyTrees(supabase, {
+      wordId,
+      fieldTypeId,
+      familyIds,
+    });
   }
 
   if (parentWordIds.length > 0) {
@@ -1142,36 +1234,21 @@ export async function attachWordToFamilyLevelAction(formData: FormData) {
     redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
   }
 
-  const existingResult = await supabase
-    .from("skus_family_tree_level_words")
-    .select("sort_order")
-    .eq("tree_level_id", parsed.data.treeLevelId)
-    .order("sort_order", { ascending: false })
-    .limit(1);
+  const levelResult = await supabase
+    .from("skus_family_tree_levels")
+    .select("field_type_id")
+    .eq("id", parsed.data.treeLevelId)
+    .maybeSingle();
 
-  const nextSortOrder = ((existingResult.data ?? [])[0]?.sort_order ?? 0) + 1;
-
-  const insertResult = await supabase
-    .from("skus_family_tree_level_words")
-    .insert({
-      tree_level_id: parsed.data.treeLevelId,
-      word_id: parsed.data.wordId,
-      sort_order: nextSortOrder,
-    });
-
-  if (insertResult.error) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+ligar+a+palavra+ao+nivel`);
+  if (levelResult.error || !levelResult.data?.field_type_id) {
+    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+encontrar+o+nivel`);
   }
 
-  await supabase
-    .from("skus_word_families")
-    .upsert(
-      {
-        word_id: parsed.data.wordId,
-        family_id: parsed.data.familyId,
-      },
-      { onConflict: "word_id,family_id" },
-    );
+  await attachWordToFamilyTrees(supabase, {
+    wordId: parsed.data.wordId,
+    fieldTypeId: String(levelResult.data.field_type_id),
+    familyIds: [parsed.data.familyId],
+  });
 
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
   revalidatePath("/generator");
