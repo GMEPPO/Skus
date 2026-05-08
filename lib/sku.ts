@@ -43,7 +43,10 @@ export function getAvailableOptions(
     levelEdges.filter((edge) => edge.fromWordId === previousSelection).map((edge) => edge.toWordId),
   );
 
-  return level.options.filter((option) => allowedIds.has(option.id));
+  return level.options.filter((option) => {
+    if (allowedIds.has(option.id)) return true;
+    return option.parentWordIds.includes(previousSelection);
+  });
 }
 
 export function buildDesignation(

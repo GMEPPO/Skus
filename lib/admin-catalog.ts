@@ -374,9 +374,10 @@ async function copyTreeVersionIntoDraft(
 
 async function attachWordToFamilyTrees(
   supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  params: { wordId: string; fieldTypeId: string; familyIds: string[] },
+  params: { wordId: string; fieldTypeId: string; familyIds: string[]; parentWordIds?: string[] },
 ) {
   const familyIds = Array.from(new Set(params.familyIds.filter(Boolean)));
+  const parentWordIds = Array.from(new Set((params.parentWordIds ?? []).filter(Boolean)));
   if (familyIds.length === 0) return;
 
   await supabase.from("skus_word_families").upsert(
@@ -438,12 +439,18 @@ async function attachWordToFamilyTrees(
 
   const levelsResult = await supabase
     .from("skus_family_tree_levels")
-    .select("id, tree_version_id, field_type_id")
-    .in("tree_version_id", treeVersionIds)
-    .eq("field_type_id", params.fieldTypeId);
+    .select("id, tree_version_id, field_type_id, level_order")
+    .in("tree_version_id", treeVersionIds);
 
-  const levels = (levelsResult.data ?? []) as Array<{ id: string; tree_version_id: string; field_type_id: string }>;
-  for (const level of levels) {
+  const levels = (levelsResult.data ?? []) as Array<{
+    id: string;
+    tree_version_id: string;
+    field_type_id: string;
+    level_order: number;
+  }>;
+  const childLevels = levels.filter((level) => level.field_type_id === params.fieldTypeId);
+
+  for (const level of childLevels) {
     const existingResult = await supabase
       .from("skus_family_tree_level_words")
       .select("sort_order")
@@ -462,6 +469,31 @@ async function attachWordToFamilyTrees(
     );
   }
 
+  if (parentWordIds.length > 0) {
+    const edgeRows = childLevels.flatMap((childLevel) => {
+      const parentLevel = levels.find(
+        (level) =>
+          level.tree_version_id === childLevel.tree_version_id &&
+          Number(level.level_order) === Number(childLevel.level_order) - 1,
+      );
+      if (!parentLevel) return [];
+
+      return parentWordIds.map((parentWordId) => ({
+        tree_version_id: childLevel.tree_version_id,
+        from_level_id: parentLevel.id,
+        from_word_id: parentWordId,
+        to_level_id: childLevel.id,
+        to_word_id: params.wordId,
+        is_active: true,
+      }));
+    });
+
+    if (edgeRows.length > 0) {
+      await supabase.from("skus_family_tree_edges").upsert(edgeRows, {
+        onConflict: "tree_version_id,from_level_id,from_word_id,to_level_id,to_word_id",
+      });
+    }
+  }
 }
 
 function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefined, fallback: string) {
@@ -790,6 +822,7 @@ export async function createWordAction(formData: FormData) {
       wordId: insertResult.data.id,
       fieldTypeId,
       familyIds,
+      parentWordIds,
     });
   }
 
@@ -921,6 +954,7 @@ export async function updateWordAction(formData: FormData) {
 
   await supabase.from("skus_word_families").delete().eq("word_id", wordId);
   await supabase.from("skus_word_dependencies").delete().eq("child_word_id", wordId);
+  await supabase.from("skus_family_tree_edges").delete().eq("to_word_id", wordId);
   await supabase.from("skus_family_tree_level_words").delete().eq("word_id", wordId);
 
   if (familyIds.length > 0) {
@@ -928,6 +962,7 @@ export async function updateWordAction(formData: FormData) {
       wordId,
       fieldTypeId,
       familyIds,
+      parentWordIds,
     });
   }
 
@@ -1244,10 +1279,16 @@ export async function attachWordToFamilyLevelAction(formData: FormData) {
     redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+encontrar+o+nivel`);
   }
 
+  const dependenciesResult = await supabase
+    .from("skus_word_dependencies")
+    .select("parent_word_id")
+    .eq("child_word_id", parsed.data.wordId);
+
   await attachWordToFamilyTrees(supabase, {
     wordId: parsed.data.wordId,
     fieldTypeId: String(levelResult.data.field_type_id),
     familyIds: [parsed.data.familyId],
+    parentWordIds: (dependenciesResult.data ?? []).map((row) => String(row.parent_word_id)),
   });
 
   revalidatePath(`/families-manage/${parsed.data.familyId}`);
