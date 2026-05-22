@@ -158,6 +158,8 @@ export async function getFamilies(): Promise<
     name: string;
     description: string;
     status: "draft" | "active" | "archived";
+    levelLabels: string[];
+    flowLabels: string[];
   }>
 > {
   return [];
