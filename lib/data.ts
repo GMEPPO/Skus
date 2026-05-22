@@ -145,6 +145,17 @@ export async function getWords(): Promise<WordListItem[]> {
   return words;
 }
 
+export async function getFamilies(): Promise<
+  Array<{
+    id: string;
+    name: string;
+    description: string;
+    status: "draft" | "active" | "archived";
+  }>
+> {
+  return [];
+}
+
 export async function getGeneratorCatalog(): Promise<GeneratorCatalog> {
   return generatorCatalog;
 }

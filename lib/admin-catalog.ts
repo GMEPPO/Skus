@@ -14,6 +14,55 @@ export interface FieldTypeOption {
   name: string;
 }
 
+export interface FamilyOption {
+  id: string;
+  name: string;
+}
+
+export interface WordDependencyOption {
+  id: string;
+  label: string;
+  referenceCode: string;
+  fieldTypeId: string;
+  fieldTypeLabel: string;
+  familyIds: string[];
+}
+
+export interface FamilyBuilderDetail {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  status: string;
+  draftTreeVersionId: string | null;
+  publishedTreeVersionId: string | null;
+  levels: Array<{
+    id: string;
+    order: number;
+    label: string;
+    fieldTypeId: string;
+    fieldTypeName: string;
+    words: Array<{
+      id: string;
+      label: string;
+      referenceCode: string;
+    }>;
+  }>;
+}
+
+export interface FamilyCatalogItem {
+  id: string;
+  name: string;
+  namePt: string;
+  nameEs: string;
+  nameEn: string;
+  slug: string;
+  description: string;
+  status: "draft" | "active" | "archived";
+  activeTreeVersionId: string | null;
+  flowLabels: string[];
+}
+
 type FieldTypeRow = FieldTypeOption & {
   sort_order?: number | null;
 };
@@ -257,4 +306,57 @@ export async function deleteWordAction(formData: FormData) {
 
   revalidateCatalog();
   redirect("/catalog/words-manage?status=success&message=Palavra+eliminada+com+sucesso");
+}
+
+// Compatibilidad para despliegues que todavia compilen rutas antiguas de familias.
+// El producto actual no usa familias/arboles; estas funciones redirigen a Biblioteca.
+export async function getFamilyOptions(): Promise<FamilyOption[]> {
+  return [];
+}
+
+export async function getWordDependencyOptions(): Promise<WordDependencyOption[]> {
+  return [];
+}
+
+export async function getFamiliesCatalog(): Promise<FamilyCatalogItem[]> {
+  return [];
+}
+
+export async function getFamilyBuilderDetail(): Promise<FamilyBuilderDetail | null> {
+  return null;
+}
+
+export async function createFamilyAction() {
+  "use server";
+  redirect("/catalog/words-manage");
+}
+
+export async function deleteFamilyAction() {
+  "use server";
+  redirect("/catalog/words-manage");
+}
+
+export async function createFamilyDraftTreeAction() {
+  "use server";
+  redirect("/catalog/words-manage");
+}
+
+export async function updateFamilyLevelLabelAction() {
+  "use server";
+  redirect("/catalog/words-manage");
+}
+
+export async function createFamilyLevelAction() {
+  "use server";
+  redirect("/catalog/words-manage");
+}
+
+export async function attachWordToFamilyLevelAction() {
+  "use server";
+  redirect("/catalog/words-manage");
+}
+
+export async function deleteFamilyLevelAction() {
+  "use server";
+  redirect("/catalog/words-manage");
 }
