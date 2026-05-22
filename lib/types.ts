@@ -10,7 +10,7 @@ export interface AppUser {
 }
 
 export interface DashboardSummary {
-  activeFamilies: number;
+  activeBrands: number;
   words: number;
   generatedSkus: number;
   activeUsers: number;
@@ -27,21 +27,6 @@ export interface WordListItem {
   designationEs: string;
   designationEn: string;
   includeInDesignation: boolean;
-  familyIds: string[];
-  familyLabels: string[];
-  parentWordIds: string[];
-  parentWordLabels: string[];
-}
-
-export interface FamilyListItem {
-  id: string;
-  name: string;
-  namePt: string;
-  nameEs: string;
-  nameEn: string;
-  description: string;
-  status: "draft" | "active" | "archived";
-  levelLabels: string[];
 }
 
 export interface GeneratorWord {
@@ -53,7 +38,6 @@ export interface GeneratorWord {
   designationEs: string;
   designationEn: string;
   includeInDesignation: boolean;
-  parentWordIds: string[];
 }
 
 export interface GeneratorLevel {
@@ -64,23 +48,8 @@ export interface GeneratorLevel {
   options: GeneratorWord[];
 }
 
-export interface GeneratorEdge {
-  fromLevelId: string;
-  fromWordId: string;
-  toLevelId: string;
-  toWordId: string;
-}
-
-export interface GeneratorFamily {
-  id: string;
-  name: string;
-  namePt: string;
-  nameEs: string;
-  nameEn: string;
-  description: string;
-  treeVersionId: string | null;
+export interface GeneratorCatalog {
   levels: GeneratorLevel[];
-  edges: GeneratorEdge[];
 }
 
 export interface RecentSkuGeneration {
@@ -88,7 +57,6 @@ export interface RecentSkuGeneration {
   generatedCode: string;
   designation: string;
   productImageUrl?: string;
-  familyName: string;
   createdByName?: string;
   createdAtLabel: string;
   unitsPerBox?: number;

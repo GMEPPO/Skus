@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, ShieldCheck, Tags } from "lucide-react";
+import { BarChart3, ShieldCheck, Tags } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardSummary, getRecentSkuGenerations } from "@/lib/data";
@@ -8,8 +8,8 @@ export default async function DashboardPage() {
   const recent = await getRecentSkuGenerations();
 
   const items = [
-    { label: "Famílias ativas", value: summary.activeFamilies, icon: Boxes },
-    { label: "Palavras no catálogo", value: summary.words, icon: Tags },
+    { label: "Marcas ativas", value: summary.activeBrands, icon: Tags },
+    { label: "Palavras no catalogo", value: summary.words, icon: Tags },
     { label: "SKUs gerados", value: summary.generatedSkus, icon: BarChart3 },
     { label: "Utilizadores ativos", value: summary.activeUsers, icon: ShieldCheck },
   ];
@@ -19,8 +19,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Dashboard</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-400">
-          Vista geral da nova plataforma `Skus Administrator`, já organizada para administração,
-          configuração das árvores e geração de códigos sequenciais.
+          Vista geral da biblioteca global de seis niveis e dos SKUs gerados.
         </p>
       </div>
 
@@ -46,45 +45,49 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle>Atividade recente</CardTitle>
             <CardDescription>
-              Últimos códigos gerados com snapshot da designação e família usada.
+              Ultimos codigos gerados com snapshot da designacao e dados logisticos.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recent.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex flex-col gap-2 rounded-xl border border-slate-700 bg-slate-900/50 p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <p className="font-medium text-slate-100">{entry.generatedCode}</p>
-                  <p className="text-sm text-slate-400">{entry.designation}</p>
-                  <p className="text-xs text-slate-500">Criado por: {entry.createdByName ?? "Sem utilizador"}</p>
+            {recent.length > 0 ? (
+              recent.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex flex-col gap-2 rounded-xl border border-slate-700 bg-slate-900/50 p-4 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-slate-100">{entry.generatedCode}</p>
+                    <p className="text-sm text-slate-400">{entry.designation}</p>
+                    <p className="text-xs text-slate-500">Criado por: {entry.createdByName ?? "Sem utilizador"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">Global</Badge>
+                    <span className="text-xs text-slate-500">{entry.createdAtLabel}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge>{entry.familyName}</Badge>
-                  <span className="text-xs text-slate-500">{entry.createdAtLabel}</span>
-                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/30 p-4 text-sm text-slate-500">
+                Sem SKUs gerados ainda.
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Estado do MVP</CardTitle>
-            <CardDescription>
-              Estrutura inicial pronta para crescer sem rebentar a modelação.
-            </CardDescription>
+            <CardTitle>Modelo atual</CardTitle>
+            <CardDescription>Biblioteca global sem familias, arvores ou dependencias.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-slate-300">
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-              Shell protegida, navegação administrativa e base visual alinhadas com a plataforma existente.
+              O primeiro nivel e a marca/familia; depois entram formato, produto, tamanho, embalagem e extra.
             </div>
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-              Gerador com fluxo dependente e barra de designação em tempo real já implementados em modo demo.
+              Todas as palavras ativas aparecem no gerador dentro do seu nivel, com busca independente.
             </div>
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-              Persistência Supabase e ações administrativas já estão modeladas no schema, prontas para ligação.
+              O historico antigo deve ser resetado ao executar o novo SQL de migracao.
             </div>
           </CardContent>
         </Card>

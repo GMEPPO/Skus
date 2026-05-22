@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BarChart3, Boxes, Shield, Tags, Workflow, FileSearch } from "lucide-react";
+import { BarChart3, Shield, Tags, Workflow } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import type { AppUser } from "@/lib/types";
 import { canManageUsers } from "@/lib/rbac";
@@ -15,8 +15,6 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/generator", label: "Gerador SKU", icon: Workflow },
-  { href: "/reference-normalizer", label: "Normalizador", icon: FileSearch },
-  { href: "/families-manage", label: "Familias", icon: Boxes },
   { href: "/catalog/words-manage", label: "Biblioteca", icon: Tags },
   { href: "/sku-history", label: "Historico", icon: BarChart3 },
   { href: "/admin/users", label: "Admin", icon: Shield, adminOnly: true },
@@ -42,7 +40,7 @@ export function AppShellMain({
         <div className="container mx-auto flex min-h-16 flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.28em] text-amber-300">Skus Administrator</p>
-            <p className="text-sm text-slate-400">Administracao de utilizadores, biblioteca e arvores SKU</p>
+            <p className="text-sm text-slate-400">Administracao de utilizadores, biblioteca global e gerador SKU</p>
           </div>
 
           <nav className="flex flex-wrap items-center gap-2">

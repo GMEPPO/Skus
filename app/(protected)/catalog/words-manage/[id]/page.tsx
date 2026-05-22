@@ -4,9 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { WordForm } from "@/components/catalog/word-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  getFamilyOptions,
   getFieldTypeOptions,
-  getWordDependencyOptions,
   getWordsCatalog,
   updateWordAction,
 } from "@/lib/admin-catalog";
@@ -25,11 +23,9 @@ export default async function EditWordPage({
   params: { id: string };
   searchParams?: { status?: string; message?: string };
 }) {
-  const [words, fieldTypes, families, dependencyOptions] = await Promise.all([
+  const [words, fieldTypes] = await Promise.all([
     getWordsCatalog(),
     getFieldTypeOptions(),
-    getFamilyOptions(),
-    getWordDependencyOptions(),
   ]);
 
   const word = words.find((item) => item.id === params.id);
@@ -49,7 +45,7 @@ export default async function EditWordPage({
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Editar palavra</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Atualiza dados da palavra, tipo de campo e familias onde ela pode ser usada.
+          Atualiza o nivel, referencia e designacoes usadas pelo gerador global.
         </p>
       </div>
 
@@ -62,7 +58,7 @@ export default async function EditWordPage({
       <Card>
         <CardHeader>
           <CardTitle>{word.label}</CardTitle>
-          <CardDescription>Qualquer alteracao sera aplicada ao builder e ao gerador de SKU.</CardDescription>
+          <CardDescription>Qualquer alteracao aparece no gerador depois de guardar.</CardDescription>
         </CardHeader>
         <CardContent>
           <WordForm
@@ -70,8 +66,6 @@ export default async function EditWordPage({
             submitLabel="Guardar alteracoes"
             cancelHref="/catalog/words-manage"
             fieldTypes={fieldTypes}
-            families={families}
-            dependencyOptions={dependencyOptions.filter((option) => option.id !== word.id)}
             initialValues={{
               wordId: word.id,
               label: word.label,
@@ -81,8 +75,6 @@ export default async function EditWordPage({
               designationEs: word.designationEs,
               designationEn: word.designationEn,
               includeInDesignation: word.includeInDesignation,
-              familyIds: word.familyIds,
-              parentWordIds: word.parentWordIds,
             }}
           />
         </CardContent>

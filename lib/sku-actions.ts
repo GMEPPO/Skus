@@ -11,8 +11,6 @@ const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const generateSkuSchema = z.object({
-  familyId: z.string().uuid(),
-  treeVersionId: z.string().uuid(),
   generatedCode: z.string().trim().min(3),
   designation: z.string().trim().min(1),
   designationPt: z.string().trim().min(1),
@@ -58,8 +56,6 @@ function getFileExtension(fileName: string, mimeType: string) {
 
 export async function generateSkuAction(formData: FormData): Promise<GenerateSkuActionResult> {
   const parsed = generateSkuSchema.safeParse({
-    familyId: formData.get("familyId"),
-    treeVersionId: formData.get("treeVersionId"),
     generatedCode: formData.get("generatedCode"),
     designation: formData.get("designation"),
     designationPt: formData.get("designationPt"),
@@ -101,7 +97,7 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     }
 
     const extension = getFileExtension(productImage.name, productImage.type);
-    productImagePath = `${parsed.data.familyId}/${parsed.data.generatedCode}-${randomUUID()}.${extension}`;
+    productImagePath = `global/${parsed.data.generatedCode}-${randomUUID()}.${extension}`;
     const uploadResult = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(productImagePath, productImage, {
       cacheControl: "3600",
       contentType: productImage.type,
@@ -119,11 +115,10 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     .from("skus_sku_sequences")
     .upsert(
       {
-        family_id: parsed.data.familyId,
         prefix_key: parsed.data.generatedCode,
         last_value: 1,
       },
-      { onConflict: "family_id,prefix_key" },
+      { onConflict: "prefix_key" },
     )
     .select("last_value")
     .single();
@@ -133,10 +128,11 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
   const insertResult = await supabase
     .from("skus_sku_generations")
     .insert({
-      family_id: parsed.data.familyId,
-      tree_version_id: parsed.data.treeVersionId,
       generated_code: parsed.data.generatedCode,
       designation: parsed.data.designation,
+      designation_pt: parsed.data.designationPt,
+      designation_es: parsed.data.designationEs,
+      designation_en: parsed.data.designationEn,
       product_image_path: productImagePath,
       product_image_url: productImageUrl,
       sequence_value: sequenceValue,

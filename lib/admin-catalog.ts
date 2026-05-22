@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { MAX_FAMILY_LEVELS } from "@/lib/family-builder";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
-import type { FamilyListItem, WordListItem } from "@/lib/types";
+import type { WordListItem } from "@/lib/types";
+
+const GLOBAL_LEVEL_CODES = ["brand", "format", "product", "size", "packaging", "extra"] as const;
 
 export interface FieldTypeOption {
   id: string;
@@ -13,49 +14,16 @@ export interface FieldTypeOption {
   name: string;
 }
 
-export interface FamilyOption {
-  id: string;
-  name: string;
-}
+type FieldTypeRow = FieldTypeOption & {
+  sort_order?: number | null;
+};
 
-export interface FamilyBuilderLevelWord {
-  id: string;
-  label: string;
-  referenceCode: string;
-}
+type FieldTypeRelation =
+  | { id?: string | null; code?: string | null; name?: string | null }
+  | Array<{ id?: string | null; code?: string | null; name?: string | null }>
+  | null;
 
-export interface WordDependencyOption {
-  id: string;
-  label: string;
-  referenceCode: string;
-  fieldTypeId: string;
-  fieldTypeLabel: string;
-  familyIds: string[];
-}
-
-export interface FamilyBuilderLevel {
-  id: string;
-  order: number;
-  label: string;
-  fieldTypeId: string;
-  fieldTypeName: string;
-  words: FamilyBuilderLevelWord[];
-}
-
-export interface FamilyBuilderDetail {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  status: string;
-  draftTreeVersionId: string | null;
-  publishedTreeVersionId: string | null;
-  levels: FamilyBuilderLevel[];
-}
-
-type SupabaseFieldTypeRelation = { name?: string | null } | Array<{ name?: string | null }> | null;
-
-type SupabaseWordRow = {
+type WordRow = {
   id: string;
   label: string;
   reference_code: string;
@@ -65,480 +33,83 @@ type SupabaseWordRow = {
   designation_es: string | null;
   designation_en: string | null;
   include_in_designation: boolean | null;
-  skus_field_types?: SupabaseFieldTypeRelation;
+  skus_field_types?: FieldTypeRelation;
 };
-
-type SupabaseWordFamilyRow = {
-  word_id: string;
-  skus_families:
-    | { id?: string; name?: string }
-    | Array<{ id?: string; name?: string }>
-    | null;
-};
-
-type SupabaseWordDependencyRow = {
-  child_word_id: string;
-  parent_word_id: string;
-  parent_word?:
-    | { id?: string; label?: string; reference_code?: string }
-    | Array<{ id?: string; label?: string; reference_code?: string }>
-    | null;
-};
-
-type SupabaseFamilyRow = {
-  id: string;
-  name: string;
-  name_pt?: string | null;
-  name_es?: string | null;
-  name_en?: string | null;
-  slug?: string;
-  description: string | null;
-  status: string;
-  active_tree_version_id: string | null;
-};
-
-type SupabaseFamilyLevelRow = {
-  id?: string;
-  tree_version_id: string;
-  field_type_id?: string;
-  level_order?: number;
-  label_override: string | null;
-  skus_field_types?: SupabaseFieldTypeRelation;
-};
-
-type SupabaseTreeVersionRow = {
-  id: string;
-  family_id: string;
-  status: string;
-  version_number: number;
-};
-
-const createDraftTreeSchema = z.object({
-  familyId: z.string().uuid(),
-});
-
-const deleteFamilySchema = z.object({
-  familyId: z.string().uuid(),
-});
-
-const createLevelSchema = z.object({
-  familyId: z.string().uuid(),
-  treeVersionId: z.string().uuid(),
-  fieldTypeId: z.string().uuid(),
-  labelOverride: z.string().trim().optional().transform((value) => value || ""),
-});
-
-const attachWordSchema = z.object({
-  familyId: z.string().uuid(),
-  treeLevelId: z.string().uuid(),
-  wordId: z.string().uuid(),
-});
-
-const deleteLevelSchema = z.object({
-  familyId: z.string().uuid(),
-  treeLevelId: z.string().uuid(),
-});
-
-const updateLevelLabelSchema = z.object({
-  familyId: z.string().uuid(),
-  treeLevelId: z.string().uuid(),
-  labelOverride: z.string().trim().optional().transform((value) => value || ""),
-});
 
 const deleteWordSchema = z.object({
   wordId: z.string().uuid(),
 });
 
 const createWordSchema = z.object({
-  label: z.string().trim().min(2),
-  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9&.]{2,3}$/),
+  label: z.string().trim().min(1),
+  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9&.]{1,3}$/),
   fieldTypeId: z.string().uuid(),
   designationPt: z.string().trim().min(1),
   designationEs: z.string().trim().min(1),
   designationEn: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
-  familyIds: z.array(z.string().uuid()).default([]),
-  parentWordIds: z.array(z.string().uuid()).default([]),
 });
 
-const updateWordSchema = z.object({
+const updateWordSchema = createWordSchema.extend({
   wordId: z.string().uuid(),
-  label: z.string().trim().min(2),
-  referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9&.]{2,3}$/),
-  fieldTypeId: z.string().uuid(),
-  designationPt: z.string().trim().min(1),
-  designationEs: z.string().trim().min(1),
-  designationEn: z.string().trim().min(1),
-  includeInDesignation: z.boolean(),
-  familyIds: z.array(z.string().uuid()).default([]),
-  parentWordIds: z.array(z.string().uuid()).default([]),
-});
-
-const createFamilySchema = z.object({
-  namePt: z.string().trim().min(2),
-  nameEs: z.string().trim().min(2),
-  nameEn: z.string().trim().min(2),
-  slug: z
-    .string()
-    .trim()
-    .min(2)
-    .transform((value) => value.toLowerCase())
-    .pipe(z.string().regex(/^[a-z0-9-]+$/)),
-  description: z.string().trim().optional().transform((value) => value || ""),
-  status: z.enum(["draft", "active", "archived"]),
-  formatWordIds: z.array(z.string().uuid()).default([]),
-  productWordIds: z.array(z.string().uuid()).default([]),
-  sizeWordIds: z.array(z.string().uuid()).default([]),
-  packagingWordIds: z.array(z.string().uuid()).default([]),
-  extraWordIds: z.array(z.string().uuid()).default([]),
 });
 
 function normalizeLabel(value: string) {
   return value.trim().toLowerCase();
 }
 
-const FIXED_LEVEL_SEQUENCE = ["format", "product", "size", "packaging", "extra"] as const;
-const PARENT_FIELD_TYPE_BY_CODE: Partial<Record<(typeof FIXED_LEVEL_SEQUENCE)[number], string>> = {
-  product: "format",
-  size: "product",
-  packaging: "size",
-  extra: "packaging",
-};
-
-function getManagedFieldTypeOptions(options: FieldTypeOption[]) {
-  return options.filter((option) => FIXED_LEVEL_SEQUENCE.includes(option.code as (typeof FIXED_LEVEL_SEQUENCE)[number]));
+function getFieldTypeRelation(relation: FieldTypeRelation | undefined) {
+  if (!relation) return null;
+  return Array.isArray(relation) ? relation[0] ?? null : relation;
 }
 
-function getRequiredParentFieldTypeCode(fieldTypeCode: string) {
-  return PARENT_FIELD_TYPE_BY_CODE[fieldTypeCode as keyof typeof PARENT_FIELD_TYPE_BY_CODE] ?? null;
+function getFallbackFieldTypes(): FieldTypeOption[] {
+  return [
+    { id: "00000000-0000-0000-0000-000000000001", code: "brand", name: "Familia/Marca" },
+    { id: "00000000-0000-0000-0000-000000000002", code: "format", name: "Formato" },
+    { id: "00000000-0000-0000-0000-000000000003", code: "product", name: "Produto" },
+    { id: "00000000-0000-0000-0000-000000000004", code: "size", name: "Tamanho/Gramaje" },
+    { id: "00000000-0000-0000-0000-000000000005", code: "packaging", name: "Embalagem" },
+    { id: "00000000-0000-0000-0000-000000000006", code: "extra", name: "Extra" },
+  ];
 }
 
-async function ensureFixedLevelsForTreeVersion(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  treeVersionId: string,
-) {
-  const [fieldTypesResult, levelsResult] = await Promise.all([
-    supabase
-      .from("skus_field_types")
-      .select("id, code, name")
-      .in("code", [...FIXED_LEVEL_SEQUENCE]),
-    supabase
-      .from("skus_family_tree_levels")
-      .select("id, tree_version_id, field_type_id, level_order, label_override, skus_field_types(name)")
-      .eq("tree_version_id", treeVersionId)
-      .order("level_order", { ascending: true }),
-  ]);
-
-  const fieldTypes = getManagedFieldTypeOptions((fieldTypesResult.data ?? []) as FieldTypeOption[]);
-  const fieldTypeByCode = new Map(fieldTypes.map((fieldType) => [fieldType.code, fieldType]));
-  const existingLevels = (levelsResult.data ?? []) as SupabaseFamilyLevelRow[];
-  const existingLevelByFieldTypeId = new Map(
-    existingLevels
-      .filter((level) => level.field_type_id)
-      .map((level) => [String(level.field_type_id), level]),
-  );
-
-  for (const [index, code] of FIXED_LEVEL_SEQUENCE.entries()) {
-    const fieldType = fieldTypeByCode.get(code);
-    if (!fieldType) continue;
-
-    const existingLevel = existingLevelByFieldTypeId.get(fieldType.id);
-    const expectedOrder = index + 1;
-
-    if (!existingLevel) {
-      await supabase.from("skus_family_tree_levels").insert({
-        tree_version_id: treeVersionId,
-        field_type_id: fieldType.id,
-        level_order: expectedOrder,
-        label_override: null,
-        is_required: true,
-        designation_included: true,
-      });
-      continue;
-    }
-
-    if (Number(existingLevel.level_order ?? 0) !== expectedOrder) {
-      await supabase
-        .from("skus_family_tree_levels")
-        .update({ level_order: expectedOrder })
-        .eq("id", String(existingLevel.id));
-    }
-  }
+function sortFieldTypes(rows: FieldTypeRow[]) {
+  return rows
+    .filter((row) => GLOBAL_LEVEL_CODES.includes(row.code as (typeof GLOBAL_LEVEL_CODES)[number]))
+    .sort((left, right) => GLOBAL_LEVEL_CODES.indexOf(left.code as (typeof GLOBAL_LEVEL_CODES)[number]) - GLOBAL_LEVEL_CODES.indexOf(right.code as (typeof GLOBAL_LEVEL_CODES)[number]));
 }
 
-async function copyTreeVersionIntoDraft(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  sourceTreeVersionId: string | null,
-  draftTreeVersionId: string,
-  options: { overwriteExistingWords?: boolean } = {},
-) {
-  if (!sourceTreeVersionId || sourceTreeVersionId === draftTreeVersionId) return;
+function mapWord(row: WordRow): WordListItem {
+  const relation = getFieldTypeRelation(row.skus_field_types);
+  const designationPt = String(row.designation_pt ?? row.designation ?? row.label ?? "");
 
-  const draftLevelIdsResult = await supabase
-    .from("skus_family_tree_levels")
-    .select("id")
-    .eq("tree_version_id", draftTreeVersionId);
-
-  const draftLevelIds = (draftLevelIdsResult.data ?? []).map((level) => String(level.id));
-  if (draftLevelIds.length === 0) return;
-
-  const existingWordsResult = await supabase
-    .from("skus_family_tree_level_words")
-    .select("id", { count: "exact", head: true })
-    .in("tree_level_id", draftLevelIds);
-
-  if (!options.overwriteExistingWords && (existingWordsResult.count ?? 0) > 0) {
-    return;
-  }
-
-  const [sourceLevelsResult, draftLevelsResult] = await Promise.all([
-    supabase
-      .from("skus_family_tree_levels")
-      .select("id, field_type_id, level_order, label_override, is_required, designation_included")
-      .eq("tree_version_id", sourceTreeVersionId)
-      .order("level_order", { ascending: true }),
-    supabase
-      .from("skus_family_tree_levels")
-      .select("id, field_type_id, level_order")
-      .eq("tree_version_id", draftTreeVersionId)
-      .order("level_order", { ascending: true }),
-  ]);
-
-  const sourceLevels = sourceLevelsResult.data ?? [];
-  const draftLevels = draftLevelsResult.data ?? [];
-  const draftLevelByOrder = new Map(draftLevels.map((level) => [Number(level.level_order), level]));
-  const draftLevelIdBySourceLevelId = new Map<string, string>();
-
-  for (const sourceLevel of sourceLevels) {
-    const draftLevel = draftLevelByOrder.get(Number(sourceLevel.level_order));
-    if (!draftLevel?.id) continue;
-
-    draftLevelIdBySourceLevelId.set(String(sourceLevel.id), String(draftLevel.id));
-    await supabase
-      .from("skus_family_tree_levels")
-      .update({
-        field_type_id: sourceLevel.field_type_id,
-        label_override: sourceLevel.label_override,
-        is_required: sourceLevel.is_required,
-        designation_included: sourceLevel.designation_included,
-      })
-      .eq("id", String(draftLevel.id));
-  }
-
-  const mappedDraftLevelIds = Array.from(draftLevelIdBySourceLevelId.values());
-  if (mappedDraftLevelIds.length > 0) {
-    await supabase.from("skus_family_tree_level_words").delete().in("tree_level_id", mappedDraftLevelIds);
-    await supabase.from("skus_family_tree_edges").delete().eq("tree_version_id", draftTreeVersionId);
-  }
-
-  const sourceLevelIds = Array.from(draftLevelIdBySourceLevelId.keys());
-  const sourceWordsResult = sourceLevelIds.length
-    ? await supabase
-        .from("skus_family_tree_level_words")
-        .select("tree_level_id, word_id, sort_order")
-        .in("tree_level_id", sourceLevelIds)
-    : { data: [] as Array<Record<string, unknown>> };
-
-  const wordRows = (sourceWordsResult.data ?? [])
-    .map((row) => ({
-      tree_level_id: draftLevelIdBySourceLevelId.get(String(row.tree_level_id)),
-      word_id: row.word_id,
-      sort_order: row.sort_order,
-    }))
-    .filter((row) => row.tree_level_id && row.word_id);
-
-  if (wordRows.length > 0) {
-    await supabase.from("skus_family_tree_level_words").insert(wordRows);
-  }
-
-  const sourceEdgesResult = await supabase
-    .from("skus_family_tree_edges")
-    .select("from_level_id, from_word_id, to_level_id, to_word_id, is_active")
-    .eq("tree_version_id", sourceTreeVersionId);
-
-  const edgeRows = (sourceEdgesResult.data ?? [])
-    .map((row) => ({
-      tree_version_id: draftTreeVersionId,
-      from_level_id: draftLevelIdBySourceLevelId.get(String(row.from_level_id)),
-      from_word_id: row.from_word_id,
-      to_level_id: draftLevelIdBySourceLevelId.get(String(row.to_level_id)),
-      to_word_id: row.to_word_id,
-      is_active: row.is_active ?? true,
-    }))
-    .filter((row) => row.from_level_id && row.from_word_id && row.to_level_id && row.to_word_id);
-
-  if (edgeRows.length > 0) {
-    await supabase.from("skus_family_tree_edges").insert(edgeRows);
-  }
-}
-
-async function attachWordToFamilyTrees(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  params: { wordId: string; fieldTypeId: string; familyIds: string[]; parentWordIds?: string[] },
-) {
-  const familyIds = Array.from(new Set(params.familyIds.filter(Boolean)));
-  const parentWordIds = Array.from(new Set((params.parentWordIds ?? []).filter(Boolean)));
-  if (familyIds.length === 0) return;
-
-  await supabase.from("skus_word_families").upsert(
-    familyIds.map((familyId) => ({
-      word_id: params.wordId,
-      family_id: familyId,
-    })),
-    { onConflict: "word_id,family_id" },
-  );
-
-  const [familiesResult, versionsResult] = await Promise.all([
-    supabase
-      .from("skus_families")
-      .select("id, active_tree_version_id")
-      .in("id", familyIds),
-    supabase
-      .from("skus_family_tree_versions")
-      .select("id, family_id, status, version_number")
-      .in("family_id", familyIds)
-      .in("status", ["published", "draft"]),
-  ]);
-
-  const families = (familiesResult.data ?? []) as Array<{ id: string; active_tree_version_id: string | null }>;
-  const versions = (versionsResult.data ?? []) as SupabaseTreeVersionRow[];
-  const versionsByFamilyId = new Map<string, SupabaseTreeVersionRow[]>();
-
-  for (const version of versions) {
-    const familyVersions = versionsByFamilyId.get(version.family_id) ?? [];
-    familyVersions.push(version);
-    versionsByFamilyId.set(version.family_id, familyVersions);
-  }
-
-  const targetTreeVersionIds = new Set<string>();
-  for (const family of families) {
-    const familyVersions = versionsByFamilyId.get(family.id) ?? [];
-    for (const draftVersion of familyVersions.filter((version) => version.status === "draft")) {
-      targetTreeVersionIds.add(draftVersion.id);
-    }
-
-    if (family.active_tree_version_id) {
-      targetTreeVersionIds.add(family.active_tree_version_id);
-      continue;
-    }
-
-    const latestPublished = familyVersions
-      .filter((version) => version.status === "published")
-      .sort((a, b) => Number(b.version_number ?? 0) - Number(a.version_number ?? 0))[0];
-    if (latestPublished) {
-      targetTreeVersionIds.add(latestPublished.id);
-    }
-  }
-
-  const treeVersionIds = Array.from(targetTreeVersionIds);
-  if (treeVersionIds.length === 0) return;
-
-  for (const treeVersionId of treeVersionIds) {
-    await ensureFixedLevelsForTreeVersion(supabase, treeVersionId);
-  }
-
-  const levelsResult = await supabase
-    .from("skus_family_tree_levels")
-    .select("id, tree_version_id, field_type_id, level_order")
-    .in("tree_version_id", treeVersionIds);
-
-  const levels = (levelsResult.data ?? []) as Array<{
-    id: string;
-    tree_version_id: string;
-    field_type_id: string;
-    level_order: number;
-  }>;
-  const childLevels = levels.filter((level) => level.field_type_id === params.fieldTypeId);
-
-  for (const level of childLevels) {
-    const existingResult = await supabase
-      .from("skus_family_tree_level_words")
-      .select("sort_order")
-      .eq("tree_level_id", level.id)
-      .order("sort_order", { ascending: false })
-      .limit(1);
-
-    const nextSortOrder = ((existingResult.data ?? [])[0]?.sort_order ?? 0) + 1;
-    await supabase.from("skus_family_tree_level_words").upsert(
-      {
-        tree_level_id: level.id,
-        word_id: params.wordId,
-        sort_order: nextSortOrder,
-      },
-      { onConflict: "tree_level_id,word_id" },
-    );
-  }
-
-  if (parentWordIds.length > 0) {
-    const edgeRows = childLevels.flatMap((childLevel) => {
-      const parentLevel = levels.find(
-        (level) =>
-          level.tree_version_id === childLevel.tree_version_id &&
-          Number(level.level_order) === Number(childLevel.level_order) - 1,
-      );
-      if (!parentLevel) return [];
-
-      return parentWordIds.map((parentWordId) => ({
-        tree_version_id: childLevel.tree_version_id,
-        from_level_id: parentLevel.id,
-        from_word_id: parentWordId,
-        to_level_id: childLevel.id,
-        to_word_id: params.wordId,
-        is_active: true,
-      }));
-    });
-
-    if (edgeRows.length > 0) {
-      await supabase.from("skus_family_tree_edges").upsert(edgeRows, {
-        onConflict: "tree_version_id,from_level_id,from_word_id,to_level_id,to_word_id",
-      });
-    }
-  }
-}
-
-function getFieldTypeRelationName(relation: SupabaseFieldTypeRelation | undefined, fallback: string) {
-  if (!relation) return fallback;
-  if (Array.isArray(relation)) {
-    return relation[0]?.name ?? fallback;
-  }
-  return relation.name ?? fallback;
+  return {
+    id: String(row.id),
+    label: String(row.label ?? ""),
+    referenceCode: String(row.reference_code ?? ""),
+    fieldTypeId: String(row.default_field_type_id ?? relation?.id ?? ""),
+    fieldTypeLabel: String(relation?.name ?? ""),
+    designation: designationPt,
+    designationPt,
+    designationEs: String(row.designation_es ?? row.designation ?? row.label ?? ""),
+    designationEn: String(row.designation_en ?? row.designation ?? row.label ?? ""),
+    includeInDesignation: Boolean(row.include_in_designation ?? true),
+  };
 }
 
 export async function getFieldTypeOptions(): Promise<FieldTypeOption[]> {
   const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    return getManagedFieldTypeOptions([
-      { id: "00000000-0000-0000-0000-000000000002", code: "format", name: "Formato" },
-      { id: "00000000-0000-0000-0000-000000000003", code: "product", name: "Produto" },
-      { id: "00000000-0000-0000-0000-000000000004", code: "size", name: "Tamanho" },
-      { id: "00000000-0000-0000-0000-000000000005", code: "packaging", name: "Embalagem" },
-      { id: "00000000-0000-0000-0000-000000000006", code: "extra", name: "Extra" },
-    ]);
-  }
+  if (!supabase) return getFallbackFieldTypes();
 
   const result = await supabase
     .from("skus_field_types")
-    .select("id, code, name")
+    .select("id, code, name, sort_order")
+    .in("code", [...GLOBAL_LEVEL_CODES])
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  return getManagedFieldTypeOptions((result.data ?? []) as FieldTypeOption[]);
-}
-
-export async function getFamilyOptions(): Promise<FamilyOption[]> {
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    const { getFamilies } = await import("@/lib/data");
-    return (await getFamilies()).map((family) => ({ id: family.id, name: family.name }));
-  }
-
-  const result = await supabase
-    .from("skus_families")
-    .select("id, name")
-    .neq("status", "archived")
-    .order("name", { ascending: true });
-
-  return (result.data ?? []) as FamilyOption[];
+  return sortFieldTypes((result.data ?? []) as FieldTypeRow[]);
 }
 
 export async function getWordsCatalog(): Promise<WordListItem[]> {
@@ -550,212 +121,25 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
 
   const wordsResult = await supabase
     .from("skus_words")
-    .select("id, label, reference_code, default_field_type_id, designation, designation_pt, designation_es, designation_en, include_in_designation, skus_field_types(name)")
+    .select("id, label, reference_code, default_field_type_id, designation, designation_pt, designation_es, designation_en, include_in_designation, skus_field_types(id, code, name)")
     .order("label", { ascending: true });
 
-  const familiesResult = await supabase
-    .from("skus_word_families")
-    .select("word_id, skus_families(id, name)");
+  const words = ((wordsResult.data ?? []) as WordRow[]).map(mapWord);
+  const fieldTypes = await getFieldTypeOptions();
+  const levelOrder = new Map(fieldTypes.map((fieldType, index) => [fieldType.id, index]));
 
-  const dependenciesResult = await supabase
-    .from("skus_word_dependencies")
-    .select("child_word_id, parent_word_id, parent_word:parent_word_id(id, label, reference_code)");
-
-  const familyLabelsByWord = new Map<string, string[]>();
-  const familyIdsByWord = new Map<string, string[]>();
-  for (const row of (familiesResult.data ?? []) as SupabaseWordFamilyRow[]) {
-    const relation = Array.isArray(row.skus_families) ? row.skus_families[0] : row.skus_families;
-    if (!relation?.id || !relation?.name) continue;
-
-    const labelItems = familyLabelsByWord.get(row.word_id) ?? [];
-    labelItems.push(String(relation.name));
-    familyLabelsByWord.set(row.word_id, labelItems);
-
-    const idItems = familyIdsByWord.get(row.word_id) ?? [];
-    idItems.push(String(relation.id));
-    familyIdsByWord.set(row.word_id, idItems);
-  }
-
-  const parentWordIdsByWord = new Map<string, string[]>();
-  const parentWordLabelsByWord = new Map<string, string[]>();
-  for (const row of (dependenciesResult.data ?? []) as SupabaseWordDependencyRow[]) {
-    const relation = Array.isArray(row.parent_word) ? row.parent_word[0] : row.parent_word;
-
-    const parentIds = parentWordIdsByWord.get(row.child_word_id) ?? [];
-    parentIds.push(row.parent_word_id);
-    parentWordIdsByWord.set(row.child_word_id, parentIds);
-
-    if (relation?.label) {
-      const parentLabels = parentWordLabelsByWord.get(row.child_word_id) ?? [];
-      parentLabels.push(`${String(relation.label)} - ${String(relation.reference_code ?? "")}`);
-      parentWordLabelsByWord.set(row.child_word_id, parentLabels);
-    }
-  }
-
-  return ((wordsResult.data ?? []) as SupabaseWordRow[]).map((row) => ({
-    id: row.id,
-    label: row.label,
-    referenceCode: row.reference_code,
-    fieldTypeId: row.default_field_type_id,
-    fieldTypeLabel: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
-    designation: row.designation_pt ?? row.designation ?? row.label,
-    designationPt: row.designation_pt ?? row.designation ?? row.label,
-    designationEs: row.designation_es ?? row.designation_pt ?? row.designation ?? row.label,
-    designationEn: row.designation_en ?? row.designation_pt ?? row.designation ?? row.label,
-    includeInDesignation: row.include_in_designation ?? true,
-    familyIds: familyIdsByWord.get(row.id) ?? [],
-    familyLabels: familyLabelsByWord.get(row.id) ?? [],
-    parentWordIds: parentWordIdsByWord.get(row.id) ?? [],
-    parentWordLabels: parentWordLabelsByWord.get(row.id) ?? [],
-  }));
+  return words.sort((left, right) => {
+    const levelDiff = (levelOrder.get(left.fieldTypeId) ?? 99) - (levelOrder.get(right.fieldTypeId) ?? 99);
+    if (levelDiff !== 0) return levelDiff;
+    return left.label.localeCompare(right.label);
+  });
 }
 
-export async function getWordDependencyOptions(): Promise<WordDependencyOption[]> {
-  const words = await getWordsCatalog();
-  return words.map((word) => ({
-    id: word.id,
-    label: word.label,
-    referenceCode: word.referenceCode,
-    fieldTypeId: word.fieldTypeId,
-    fieldTypeLabel: word.fieldTypeLabel,
-    familyIds: word.familyIds,
-  }));
-}
-
-export async function getFamiliesCatalog(): Promise<FamilyListItem[]> {
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    const { getFamilies } = await import("@/lib/data");
-    return getFamilies();
-  }
-
-  const familiesResult = await supabase
-    .from("skus_families")
-    .select("id, name, name_pt, name_es, name_en, description, status, active_tree_version_id")
-    .order("name", { ascending: true });
-
-  const rows = (familiesResult.data ?? []) as SupabaseFamilyRow[];
-  const treeIds = rows
-    .map((row) => row.active_tree_version_id)
-    .filter((value): value is string => Boolean(value));
-
-  const levelsResult = treeIds.length
-    ? await supabase
-        .from("skus_family_tree_levels")
-        .select("tree_version_id, level_order, label_override, skus_field_types(name)")
-        .in("tree_version_id", treeIds)
-        .order("level_order", { ascending: true })
-    : { data: [] as Array<Record<string, unknown>> };
-
-  const levelsMap = new Map<string, string[]>();
-  for (const row of (levelsResult.data ?? []) as SupabaseFamilyLevelRow[]) {
-    const name = row.label_override
-      ? String(row.label_override)
-      : String(getFieldTypeRelationName(row.skus_field_types, "Nivel"));
-
-    const items = levelsMap.get(String(row.tree_version_id)) ?? [];
-    items.push(name);
-    levelsMap.set(String(row.tree_version_id), items);
-  }
-
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    namePt: row.name_pt ?? row.name,
-    nameEs: row.name_es ?? row.name,
-    nameEn: row.name_en ?? row.name,
-    description: row.description ?? "",
-    status: row.status as FamilyListItem["status"],
-    levelLabels: row.active_tree_version_id
-      ? levelsMap.get(row.active_tree_version_id) ?? []
-      : [],
-  }));
-}
-
-export async function getFamilyBuilderDetail(familyId: string): Promise<FamilyBuilderDetail | null> {
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) return null;
-
-  const familyResult = await supabase
-    .from("skus_families")
-    .select("id, name, slug, description, status, active_tree_version_id")
-    .eq("id", familyId)
-    .maybeSingle();
-
-  const family = familyResult.data as SupabaseFamilyRow | null;
-  if (!family) return null;
-
-  const versionsResult = await supabase
-    .from("skus_family_tree_versions")
-    .select("id, family_id, status, version_number")
-    .eq("family_id", familyId)
-    .order("version_number", { ascending: false });
-
-  const versions = (versionsResult.data ?? []) as SupabaseTreeVersionRow[];
-  const draftTree = versions.find((item) => item.status === "draft") ?? null;
-
-  if (draftTree) {
-    await ensureFixedLevelsForTreeVersion(supabase, draftTree.id);
-    await copyTreeVersionIntoDraft(supabase, family.active_tree_version_id ?? null, draftTree.id);
-  }
-
-  const levelsResult = draftTree
-    ? await supabase
-        .from("skus_family_tree_levels")
-        .select("id, tree_version_id, field_type_id, level_order, label_override, skus_field_types(name)")
-        .eq("tree_version_id", draftTree.id)
-        .order("level_order", { ascending: true })
-    : { data: [] as Array<Record<string, unknown>> };
-
-  const levels = (levelsResult.data ?? []) as SupabaseFamilyLevelRow[];
-  const levelIds = levels
-    .map((row) => row.id)
-    .filter((value): value is string => Boolean(value));
-
-  const levelWordsResult = levelIds.length
-    ? await supabase
-        .from("skus_family_tree_level_words")
-        .select("tree_level_id, skus_words(id, label, reference_code)")
-        .in("tree_level_id", levelIds)
-        .order("sort_order", { ascending: true })
-    : { data: [] as Array<Record<string, unknown>> };
-
-  const wordsByLevel = new Map<string, FamilyBuilderLevelWord[]>();
-  for (const row of levelWordsResult.data ?? []) {
-    const relation = row.skus_words as
-      | { id?: string; label?: string; reference_code?: string }
-      | Array<{ id?: string; label?: string; reference_code?: string }>
-      | null;
-
-    const word = Array.isArray(relation) ? relation[0] : relation;
-    if (!word?.id) continue;
-
-    const items = wordsByLevel.get(String(row.tree_level_id)) ?? [];
-    items.push({
-      id: String(word.id),
-      label: String(word.label ?? ""),
-      referenceCode: String(word.reference_code ?? ""),
-    });
-    wordsByLevel.set(String(row.tree_level_id), items);
-  }
-
-  return {
-    id: family.id,
-    name: family.name,
-    slug: String(family.slug ?? ""),
-    description: family.description ?? "",
-    status: family.status,
-    draftTreeVersionId: draftTree?.id ?? null,
-    publishedTreeVersionId: family.active_tree_version_id ?? null,
-    levels: levels.map((row) => ({
-      id: String(row.id),
-      order: Number(row.level_order ?? 0),
-      label: row.label_override || getFieldTypeRelationName(row.skus_field_types, "Nivel"),
-      fieldTypeId: String(row.field_type_id ?? ""),
-      fieldTypeName: getFieldTypeRelationName(row.skus_field_types, "Sem tipo"),
-      words: wordsByLevel.get(String(row.id)) ?? [],
-    })),
-  };
+function revalidateCatalog() {
+  revalidatePath("/catalog/words");
+  revalidatePath("/catalog/words-manage");
+  revalidatePath("/generator");
+  revalidatePath("/dashboard");
 }
 
 export async function createWordAction(formData: FormData) {
@@ -769,8 +153,6 @@ export async function createWordAction(formData: FormData) {
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
-    familyIds: formData.getAll("familyIds"),
-    parentWordIds: formData.getAll("parentWordIds"),
   });
 
   if (!parsed.success) {
@@ -782,116 +164,26 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const { label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation, familyIds, parentWordIds } = parsed.data;
+  const { label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation } = parsed.data;
+  const insertResult = await supabase.from("skus_words").insert({
+    label,
+    normalized_label: normalizeLabel(label),
+    reference_code: referenceCode,
+    default_field_type_id: fieldTypeId,
+    designation: designationPt,
+    designation_pt: designationPt,
+    designation_es: designationEs,
+    designation_en: designationEn,
+    include_in_designation: includeInDesignation,
+    is_active: true,
+  });
 
-  const fieldTypeResult = await supabase
-    .from("skus_field_types")
-    .select("code")
-    .eq("id", fieldTypeId)
-    .maybeSingle();
-
-  const fieldTypeCode = String(fieldTypeResult.data?.code ?? "");
-  const requiredParentFieldTypeCode = getRequiredParentFieldTypeCode(fieldTypeCode);
-  if (requiredParentFieldTypeCode && parentWordIds.length === 0) {
-    redirect("/catalog/words-manage?status=error&message=Esta+palavra+precisa+de+associacao+ao+nivel+anterior");
-  }
-
-  const insertResult = await supabase
-    .from("skus_words")
-    .insert({
-      label,
-      normalized_label: normalizeLabel(label),
-      reference_code: referenceCode,
-      default_field_type_id: fieldTypeId,
-      designation: designationPt || label,
-      designation_pt: designationPt,
-      designation_es: designationEs,
-      designation_en: designationEn,
-      include_in_designation: includeInDesignation,
-      is_active: true,
-    })
-    .select("id")
-    .single();
-
-  if (insertResult.error || !insertResult.data) {
+  if (insertResult.error) {
     redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+criar+a+palavra");
   }
 
-  if (familyIds.length > 0) {
-    await attachWordToFamilyTrees(supabase, {
-      wordId: insertResult.data.id,
-      fieldTypeId,
-      familyIds,
-      parentWordIds,
-    });
-  }
-
-  if (parentWordIds.length > 0) {
-    await supabase.from("skus_word_dependencies").insert(
-      parentWordIds.map((parentWordId) => ({
-        child_word_id: insertResult.data.id,
-        parent_word_id: parentWordId,
-      })),
-    );
-  }
-
-  revalidatePath("/catalog/words");
-  revalidatePath("/catalog/words-manage");
-  revalidatePath("/families");
-  revalidatePath("/families-manage");
-  revalidatePath("/generator");
+  revalidateCatalog();
   redirect("/catalog/words-manage?status=success&message=Palavra+criada+com+sucesso");
-}
-
-export async function deleteWordAction(formData: FormData) {
-  "use server";
-
-  const parsed = deleteWordSchema.safeParse({
-    wordId: formData.get("wordId"),
-  });
-
-  if (!parsed.success) {
-    redirect("/catalog/words-manage?status=error&message=Palavra+invalida+para+eliminar");
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
-  }
-
-  const levelUsageResult = await supabase
-    .from("skus_family_tree_level_words")
-    .select("id", { count: "exact", head: true })
-    .eq("word_id", parsed.data.wordId);
-
-  if ((levelUsageResult.count ?? 0) > 0) {
-    redirect("/catalog/words-manage?status=error&message=Palavra+em+uso+no+builder+nao+pode+ser+eliminada");
-  }
-
-  const dependencyUsageResult = await supabase
-    .from("skus_word_dependencies")
-    .select("child_word_id", { count: "exact", head: true })
-    .eq("parent_word_id", parsed.data.wordId);
-
-  if ((dependencyUsageResult.count ?? 0) > 0) {
-    redirect("/catalog/words-manage?status=error&message=Palavra+em+uso+como+dependencia+nao+pode+ser+eliminada");
-  }
-
-  const deleteResult = await supabase
-    .from("skus_words")
-    .delete()
-    .eq("id", parsed.data.wordId);
-
-  if (deleteResult.error) {
-    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+eliminar+a+palavra");
-  }
-
-  revalidatePath("/catalog/words");
-  revalidatePath("/catalog/words-manage");
-  revalidatePath("/families");
-  revalidatePath("/families-manage");
-  revalidatePath("/generator");
-  redirect("/catalog/words-manage?status=success&message=Palavra+eliminada+com+sucesso");
 }
 
 export async function updateWordAction(formData: FormData) {
@@ -906,8 +198,6 @@ export async function updateWordAction(formData: FormData) {
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
-    familyIds: formData.getAll("familyIds"),
-    parentWordIds: formData.getAll("parentWordIds"),
   });
 
   if (!parsed.success) {
@@ -919,20 +209,7 @@ export async function updateWordAction(formData: FormData) {
     redirect(`/catalog/words-manage/${parsed.data.wordId}?status=error&message=Supabase+service+role+nao+configurada`);
   }
 
-  const { wordId, label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation, familyIds, parentWordIds } = parsed.data;
-
-  const fieldTypeResult = await supabase
-    .from("skus_field_types")
-    .select("code")
-    .eq("id", fieldTypeId)
-    .maybeSingle();
-
-  const fieldTypeCode = String(fieldTypeResult.data?.code ?? "");
-  const requiredParentFieldTypeCode = getRequiredParentFieldTypeCode(fieldTypeCode);
-  if (requiredParentFieldTypeCode && parentWordIds.length === 0) {
-    redirect(`/catalog/words-manage/${wordId}?status=error&message=Esta+palavra+precisa+de+associacao+ao+nivel+anterior`);
-  }
-
+  const { wordId, label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation } = parsed.data;
   const updateResult = await supabase
     .from("skus_words")
     .update({
@@ -952,407 +229,32 @@ export async function updateWordAction(formData: FormData) {
     redirect(`/catalog/words-manage/${wordId}?status=error&message=Nao+foi+possivel+editar+a+palavra`);
   }
 
-  await supabase.from("skus_word_families").delete().eq("word_id", wordId);
-  await supabase.from("skus_word_dependencies").delete().eq("child_word_id", wordId);
-  await supabase.from("skus_family_tree_edges").delete().eq("to_word_id", wordId);
-  await supabase.from("skus_family_tree_level_words").delete().eq("word_id", wordId);
-
-  if (familyIds.length > 0) {
-    await attachWordToFamilyTrees(supabase, {
-      wordId,
-      fieldTypeId,
-      familyIds,
-      parentWordIds,
-    });
-  }
-
-  if (parentWordIds.length > 0) {
-    await supabase.from("skus_word_dependencies").insert(
-      parentWordIds.map((parentWordId) => ({
-        child_word_id: wordId,
-        parent_word_id: parentWordId,
-      })),
-    );
-  }
-
-  revalidatePath("/catalog/words");
-  revalidatePath("/catalog/words-manage");
+  revalidateCatalog();
   revalidatePath(`/catalog/words-manage/${wordId}`);
-  revalidatePath("/families");
-  revalidatePath("/families-manage");
-  revalidatePath("/generator");
   redirect("/catalog/words-manage?status=success&message=Palavra+editada+com+sucesso");
 }
 
-export async function createFamilyAction(formData: FormData) {
+export async function deleteWordAction(formData: FormData) {
   "use server";
 
-  const parsed = createFamilySchema.safeParse({
-    namePt: formData.get("namePt"),
-    nameEs: formData.get("nameEs"),
-    nameEn: formData.get("nameEn"),
-    slug: formData.get("slug"),
-    description: formData.get("description"),
-    status: formData.get("status"),
-    formatWordIds: formData.getAll("formatWordIds"),
-    productWordIds: formData.getAll("productWordIds"),
-    sizeWordIds: formData.getAll("sizeWordIds"),
-    packagingWordIds: formData.getAll("packagingWordIds"),
-    extraWordIds: formData.getAll("extraWordIds"),
-  });
-
-  if (!parsed.success) {
-    redirect("/families-manage?status=error&message=Dados+invalidos+na+nova+familia");
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect("/families-manage?status=error&message=Supabase+service+role+nao+configurada");
-  }
-
-  const insertResult = await supabase.from("skus_families").insert({
-    name: parsed.data.namePt,
-    name_pt: parsed.data.namePt,
-    name_es: parsed.data.nameEs,
-    name_en: parsed.data.nameEn,
-    slug: parsed.data.slug,
-    description: parsed.data.description || null,
-    status: parsed.data.status,
-  }).select("id").single();
-
-  if (insertResult.error || !insertResult.data) {
-    redirect("/families-manage?status=error&message=Nao+foi+possivel+criar+a+familia");
-  }
-
-  const selectedWordIds = [
-    ...parsed.data.formatWordIds,
-    ...parsed.data.productWordIds,
-    ...parsed.data.sizeWordIds,
-    ...parsed.data.packagingWordIds,
-    ...parsed.data.extraWordIds,
-  ];
-
-  if (selectedWordIds.length > 0) {
-    await supabase.from("skus_word_families").insert(
-      Array.from(new Set(selectedWordIds)).map((wordId) => ({
-        word_id: wordId,
-        family_id: insertResult.data.id,
-      })),
-    );
-  }
-
-  const draftInserted = await supabase
-    .from("skus_family_tree_versions")
-    .insert({
-      family_id: insertResult.data.id,
-      version_number: 1,
-      status: "draft",
-    })
-    .select("id")
-    .single();
-
-  if (!draftInserted.error && draftInserted.data) {
-    await ensureFixedLevelsForTreeVersion(supabase, draftInserted.data.id);
-  }
-
-  revalidatePath("/families");
-  revalidatePath("/families-manage");
-  revalidatePath("/generator");
-  redirect("/families-manage?status=success&message=Familia+criada+com+sucesso");
-}
-
-export async function createFamilyDraftTreeAction(formData: FormData) {
-  "use server";
-
-  const parsed = createDraftTreeSchema.safeParse({
-    familyId: formData.get("familyId"),
-  });
-
-  if (!parsed.success) {
-    redirect("/families-manage?status=error&message=Familia+invalida+para+novo+draft");
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect("/families-manage?status=error&message=Supabase+service+role+nao+configurada");
-  }
-
-  const versionsResult = await supabase
-    .from("skus_family_tree_versions")
-    .select("id, version_number, status")
-    .eq("family_id", parsed.data.familyId)
-    .order("version_number", { ascending: false });
-
-  const familyResult = await supabase
-    .from("skus_families")
-    .select("active_tree_version_id")
-    .eq("id", parsed.data.familyId)
-    .maybeSingle();
-
-  const sourceTreeVersionId = String(familyResult.data?.active_tree_version_id ?? "") || null;
-  const existingDraft = (versionsResult.data ?? []).find((item) => item.status === "draft");
-  if (existingDraft) {
-    await ensureFixedLevelsForTreeVersion(supabase, String(existingDraft.id));
-    await copyTreeVersionIntoDraft(supabase, sourceTreeVersionId, String(existingDraft.id));
-    redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Ja+existe+um+draft+aberto`);
-  }
-
-  const nextVersion = ((versionsResult.data ?? [])[0]?.version_number ?? 0) + 1;
-  const inserted = await supabase
-    .from("skus_family_tree_versions")
-    .insert({
-      family_id: parsed.data.familyId,
-      version_number: nextVersion,
-      status: "draft",
-    })
-    .select("id")
-    .single();
-
-  if (inserted.error) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+criar+o+draft`);
-  }
-
-  await ensureFixedLevelsForTreeVersion(supabase, inserted.data.id);
-  await copyTreeVersionIntoDraft(supabase, sourceTreeVersionId, inserted.data.id, { overwriteExistingWords: true });
-
-  revalidatePath(`/families-manage/${parsed.data.familyId}`);
-  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Draft+criado+com+sucesso`);
-}
-
-export async function updateFamilyLevelLabelAction(formData: FormData) {
-  "use server";
-
-  const parsed = updateLevelLabelSchema.safeParse({
-    familyId: formData.get("familyId"),
-    treeLevelId: formData.get("treeLevelId"),
-    labelOverride: formData.get("labelOverride"),
-  });
-
-  if (!parsed.success) {
-    redirect(`/families-manage/${String(formData.get("familyId") ?? "")}?status=error&message=Etiqueta+invalida`);
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
-  }
-
-  const updateResult = await supabase
-    .from("skus_family_tree_levels")
-    .update({ label_override: parsed.data.labelOverride || null })
-    .eq("id", parsed.data.treeLevelId);
-
-  if (updateResult.error) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+guardar+a+etiqueta`);
-  }
-
-  revalidatePath(`/families-manage/${parsed.data.familyId}`);
-  revalidatePath("/generator");
-  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Etiqueta+atualizada+com+sucesso`);
-}
-
-export async function deleteFamilyAction(formData: FormData) {
-  "use server";
-
-  const parsed = deleteFamilySchema.safeParse({
-    familyId: formData.get("familyId"),
-  });
-
-  if (!parsed.success) {
-    redirect("/families-manage?status=error&message=Familia+invalida+para+eliminar");
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect("/families-manage?status=error&message=Supabase+service+role+nao+configurada");
-  }
-
-  const generationsResult = await supabase
-    .from("skus_sku_generations")
-    .select("id", { count: "exact", head: true })
-    .eq("family_id", parsed.data.familyId);
-
-  if ((generationsResult.count ?? 0) > 0) {
-    redirect("/families-manage?status=error&message=Familia+com+historico+de+SKUs+nao+pode+ser+eliminada");
-  }
-
-  const deleteResult = await supabase
-    .from("skus_families")
-    .delete()
-    .eq("id", parsed.data.familyId);
-
-  if (deleteResult.error) {
-    redirect("/families-manage?status=error&message=Nao+foi+possivel+eliminar+a+familia");
-  }
-
-  revalidatePath("/families");
-  revalidatePath("/families-manage");
-  revalidatePath("/generator");
-  redirect("/families-manage?status=success&message=Familia+eliminada+com+sucesso");
-}
-
-export async function createFamilyLevelAction(formData: FormData) {
-  "use server";
-
-  const parsed = createLevelSchema.safeParse({
-    familyId: formData.get("familyId"),
-    treeVersionId: formData.get("treeVersionId"),
-    fieldTypeId: formData.get("fieldTypeId"),
-    labelOverride: formData.get("labelOverride"),
-  });
-
-  if (!parsed.success) {
-    redirect(`/families-manage/${String(formData.get("familyId") ?? "")}?status=error&message=Dados+invalidos+no+nivel`);
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
-  }
-
-  const levelsResult = await supabase
-    .from("skus_family_tree_levels")
-    .select("level_order")
-    .eq("tree_version_id", parsed.data.treeVersionId)
-    .order("level_order", { ascending: false })
-    .limit(1);
-
-  const nextOrder = ((levelsResult.data ?? [])[0]?.level_order ?? 0) + 1;
-
-  if (nextOrder > MAX_FAMILY_LEVELS) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Esta+familia+so+pode+ter+ate+5+niveis`);
-  }
-
-  const fieldTypeResult = await supabase
-    .from("skus_field_types")
-    .select("code")
-    .eq("id", parsed.data.fieldTypeId)
-    .maybeSingle();
-
-  const expectedFieldTypeCode = FIXED_LEVEL_SEQUENCE[nextOrder - 1];
-  if (String(fieldTypeResult.data?.code ?? "") !== expectedFieldTypeCode) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Os+niveis+devem+seguir+a+ordem+fixa+Formato+Produto+Tamanho+Embalagem+Extra`);
-  }
-
-  const insertResult = await supabase.from("skus_family_tree_levels").insert({
-    tree_version_id: parsed.data.treeVersionId,
-    field_type_id: parsed.data.fieldTypeId,
-    level_order: nextOrder,
-    label_override: parsed.data.labelOverride || null,
-    is_required: true,
-    designation_included: true,
-  });
-
-  if (insertResult.error) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+criar+o+nivel`);
-  }
-
-  revalidatePath(`/families-manage/${parsed.data.familyId}`);
-  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Nivel+adicionado+com+sucesso`);
-}
-
-export async function attachWordToFamilyLevelAction(formData: FormData) {
-  "use server";
-
-  const parsed = attachWordSchema.safeParse({
-    familyId: formData.get("familyId"),
-    treeLevelId: formData.get("treeLevelId"),
+  const parsed = deleteWordSchema.safeParse({
     wordId: formData.get("wordId"),
   });
 
   if (!parsed.success) {
-    redirect(`/families-manage/${String(formData.get("familyId") ?? "")}?status=error&message=Dados+invalidos+na+associacao`);
+    redirect("/catalog/words-manage?status=error&message=Palavra+invalida+para+eliminar");
   }
 
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
+    redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const levelResult = await supabase
-    .from("skus_family_tree_levels")
-    .select("field_type_id")
-    .eq("id", parsed.data.treeLevelId)
-    .maybeSingle();
-
-  if (levelResult.error || !levelResult.data?.field_type_id) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+encontrar+o+nivel`);
-  }
-
-  const dependenciesResult = await supabase
-    .from("skus_word_dependencies")
-    .select("parent_word_id")
-    .eq("child_word_id", parsed.data.wordId);
-
-  await attachWordToFamilyTrees(supabase, {
-    wordId: parsed.data.wordId,
-    fieldTypeId: String(levelResult.data.field_type_id),
-    familyIds: [parsed.data.familyId],
-    parentWordIds: (dependenciesResult.data ?? []).map((row) => String(row.parent_word_id)),
-  });
-
-  revalidatePath(`/families-manage/${parsed.data.familyId}`);
-  revalidatePath("/generator");
-  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Palavra+associada+ao+nivel`);
-}
-
-export async function deleteFamilyLevelAction(formData: FormData) {
-  "use server";
-
-  const parsed = deleteLevelSchema.safeParse({
-    familyId: formData.get("familyId"),
-    treeLevelId: formData.get("treeLevelId"),
-  });
-
-  if (!parsed.success) {
-    redirect(`/families-manage/${String(formData.get("familyId") ?? "")}?status=error&message=Nivel+invalido+para+remover`);
-  }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Supabase+service+role+nao+configurada`);
-  }
-
-  const levelResult = await supabase
-    .from("skus_family_tree_levels")
-    .select("id, tree_version_id")
-    .eq("id", parsed.data.treeLevelId)
-    .maybeSingle();
-
-  if (levelResult.error || !levelResult.data) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+encontrar+o+nivel`);
-  }
-
-  const treeVersionId = String(levelResult.data.tree_version_id);
-
-  const deleteResult = await supabase
-    .from("skus_family_tree_levels")
-    .delete()
-    .eq("id", parsed.data.treeLevelId);
-
+  const deleteResult = await supabase.from("skus_words").delete().eq("id", parsed.data.wordId);
   if (deleteResult.error) {
-    redirect(`/families-manage/${parsed.data.familyId}?status=error&message=Nao+foi+possivel+remover+o+nivel`);
+    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+eliminar+a+palavra");
   }
 
-  const remainingLevelsResult = await supabase
-    .from("skus_family_tree_levels")
-    .select("id, level_order")
-    .eq("tree_version_id", treeVersionId)
-    .order("level_order", { ascending: true });
-
-  const remainingLevels = remainingLevelsResult.data ?? [];
-  for (const [index, level] of remainingLevels.entries()) {
-    const expectedOrder = index + 1;
-    if (level.level_order !== expectedOrder) {
-      await supabase
-        .from("skus_family_tree_levels")
-        .update({ level_order: expectedOrder })
-        .eq("id", level.id);
-    }
-  }
-
-  revalidatePath(`/families-manage/${parsed.data.familyId}`);
-  revalidatePath("/families-manage");
-  revalidatePath("/generator");
-  redirect(`/families-manage/${parsed.data.familyId}?status=success&message=Nivel+removido+com+sucesso`);
+  revalidateCatalog();
+  redirect("/catalog/words-manage?status=success&message=Palavra+eliminada+com+sucesso");
 }

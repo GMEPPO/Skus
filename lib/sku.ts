@@ -1,4 +1,4 @@
-import type { GeneratorFamily, GeneratorWord } from "@/lib/types";
+import type { GeneratorCatalog, GeneratorWord } from "@/lib/types";
 
 export const MAX_DESIGNATION_LENGTH = 60;
 export const EMPTY_SELECTION_PREFIX = "__empty__:";
@@ -13,63 +13,50 @@ export function isEmptySelection(value?: string) {
 }
 
 export function getAvailableOptions(
-  family: GeneratorFamily,
+  catalog: GeneratorCatalog,
   levelId: string,
-  selections: Record<string, string>,
 ): GeneratorWord[] {
-  const level = family.levels.find((item) => item.id === levelId);
-  if (!level) return [];
+  return catalog.levels.find((item) => item.id === levelId)?.options ?? [];
+}
 
-  if (level.order === 1) {
-    return level.options;
-  }
+export function filterGeneratorWords(options: GeneratorWord[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return options;
 
-  const previousLevel = family.levels.find((item) => item.order === level.order - 1);
-  if (!previousLevel) return level.options;
+  return options.filter((option) => {
+    const haystack = [
+      option.label,
+      option.referenceCode,
+      option.designation,
+      option.designationPt,
+      option.designationEs,
+      option.designationEn,
+    ]
+      .join(" ")
+      .toLowerCase();
 
-  const previousSelection = selections[previousLevel.id];
-  if (!previousSelection) return [];
-  if (isEmptySelection(previousSelection)) return [];
-
-  const levelEdges = family.edges.filter(
-    (edge) => edge.fromLevelId === previousLevel.id && edge.toLevelId === level.id,
-  );
-
-  if (levelEdges.length === 0) {
-    return level.options;
-  }
-
-  const allowedIds = new Set(
-    levelEdges.filter((edge) => edge.fromWordId === previousSelection).map((edge) => edge.toWordId),
-  );
-
-  return level.options.filter((option) => {
-    if (allowedIds.has(option.id)) return true;
-    return option.parentWordIds.includes(previousSelection);
+    return haystack.includes(normalizedQuery);
   });
 }
 
 export function buildDesignation(
-  family: GeneratorFamily,
+  catalog: GeneratorCatalog,
   selections: Record<string, string>,
 ) {
-  const designation = buildDesignationByLocale(family, selections, "pt");
+  const designation = buildDesignationByLocale(catalog, selections, "pt");
   return designation.replace(/\s+/g, " ");
 }
 
 export function buildDesignationByLocale(
-  family: GeneratorFamily,
+  catalog: GeneratorCatalog,
   selections: Record<string, string>,
   locale: DesignationLocale,
 ) {
-  const familyNameByLocale =
-    locale === "en" ? family.nameEn : locale === "es" ? family.nameEs : family.namePt;
-
-  const segments = family.levels
+  const segments = catalog.levels
     .map((level) => {
       const selectedValue = selections[level.id];
       if (isEmptySelection(selectedValue)) return null;
-      const option = level.options.find((item) => item.id === selections[level.id]);
+      const option = level.options.find((item) => item.id === selectedValue);
       if (!option || !option.includeInDesignation) return null;
       if (locale === "en") return option.designationEn || option.designation || option.label;
       if (locale === "es") return option.designationEs || option.designation || option.label;
@@ -77,23 +64,19 @@ export function buildDesignationByLocale(
     })
     .filter((value): value is string => Boolean(value));
 
-  return [familyNameByLocale || family.name, ...segments].join(" ").trim().replace(/\s+/g, " ");
+  return segments.join(" ").trim().replace(/\s+/g, " ");
 }
 
 export function buildSkuPreview(
-  family: GeneratorFamily,
+  catalog: GeneratorCatalog,
   selections: Record<string, string>,
 ) {
-  const segments = [
-    family.name.slice(0, 3).toUpperCase(),
-    ...family.levels.map(
-      (level) => {
-        const selectedValue = selections[level.id];
-        if (isEmptySelection(selectedValue)) return "000";
-        return level.options.find((option) => option.id === selectedValue)?.referenceCode ?? "000";
-      },
-    ),
-  ];
+  const segments = catalog.levels.map((level) => {
+    const selectedValue = selections[level.id];
+    if (isEmptySelection(selectedValue)) return "000";
+    return level.options.find((option) => option.id === selectedValue)?.referenceCode ?? "000";
+  });
 
   return segments.join("-");
 }
+

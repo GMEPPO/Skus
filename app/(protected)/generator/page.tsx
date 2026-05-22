@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SkuGeneratorWizardMain } from "@/components/generator/sku-generator-wizard-main";
-import { getGeneratorFamilies } from "@/lib/generator-data";
+import { getGeneratorCatalog } from "@/lib/generator-data";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -14,14 +14,14 @@ export default async function GeneratorPage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
-  const families = await getGeneratorFamilies();
+  const catalog = await getGeneratorCatalog();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Gerador de SKU</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-400">
-          Fluxo dependente por árvore configurável, com designação em tempo real e preview do código final.
+          Biblioteca global de 6 niveis, com designacao em tempo real e preview do codigo final.
         </p>
       </div>
 
@@ -33,16 +33,16 @@ export default async function GeneratorPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Wizard de composição</CardTitle>
+          <CardTitle>Wizard de composicao</CardTitle>
           <CardDescription>
-            O exemplo abaixo já replica o comportamento principal pedido: seleção encadeada,
-            designação automática e proposta de SKU sequencial.
+            Procura e seleciona palavras por nivel para construir a referencia final.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SkuGeneratorWizardMain families={families} />
+          <SkuGeneratorWizardMain catalog={catalog} />
         </CardContent>
       </Card>
     </div>
   );
 }
+
