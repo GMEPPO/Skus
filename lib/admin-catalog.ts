@@ -322,41 +322,41 @@ export async function getFamiliesCatalog(): Promise<FamilyCatalogItem[]> {
   return [];
 }
 
-export async function getFamilyBuilderDetail(): Promise<FamilyBuilderDetail | null> {
+export async function getFamilyBuilderDetail(_familyId?: string): Promise<FamilyBuilderDetail | null> {
   return null;
 }
 
-export async function createFamilyAction() {
+export async function createFamilyAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
 
-export async function deleteFamilyAction() {
+export async function deleteFamilyAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
 
-export async function createFamilyDraftTreeAction() {
+export async function createFamilyDraftTreeAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
 
-export async function updateFamilyLevelLabelAction() {
+export async function updateFamilyLevelLabelAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
 
-export async function createFamilyLevelAction() {
+export async function createFamilyLevelAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
 
-export async function attachWordToFamilyLevelAction() {
+export async function attachWordToFamilyLevelAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
 
-export async function deleteFamilyLevelAction() {
+export async function deleteFamilyLevelAction(_formData?: FormData) {
   "use server";
   redirect("/catalog/words-manage");
 }
