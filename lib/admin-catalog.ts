@@ -60,6 +60,7 @@ export interface FamilyCatalogItem {
   description: string;
   status: "draft" | "active" | "archived";
   activeTreeVersionId: string | null;
+  levelLabels: string[];
   flowLabels: string[];
 }
 
@@ -144,6 +145,10 @@ function mapWord(row: WordRow): WordListItem {
     designationEs: String(row.designation_es ?? row.designation ?? row.label ?? ""),
     designationEn: String(row.designation_en ?? row.designation ?? row.label ?? ""),
     includeInDesignation: Boolean(row.include_in_designation ?? true),
+    familyIds: [],
+    familyLabels: [],
+    parentWordIds: [],
+    parentWordLabels: [],
   };
 }
 

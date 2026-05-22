@@ -27,6 +27,10 @@ export interface WordListItem {
   designationEs: string;
   designationEn: string;
   includeInDesignation: boolean;
+  familyIds: string[];
+  familyLabels: string[];
+  parentWordIds: string[];
+  parentWordLabels: string[];
 }
 
 export interface GeneratorWord {

@@ -51,12 +51,19 @@ const users: AppUser[] = [
   { id: "user-4", name: "Marta Silva", email: "marta@groupegm.local", role: "viewer", department: "Backoffice", isActive: false },
 ];
 
+const legacyWordRelations = {
+  familyIds: [],
+  familyLabels: [],
+  parentWordIds: [],
+  parentWordLabels: [],
+};
+
 const words: WordListItem[] = [
-  { id: "w-alg", label: "ALG OCEAN SPA", referenceCode: "ALG", fieldTypeId: "ft-brand", fieldTypeLabel: "Familia/Marca", designation: "ALG OCEAN SPA", designationPt: "ALG OCEAN SPA", designationEs: "ALG Ocean Spa", designationEn: "ALG Ocean Spa", includeInDesignation: true },
-  { id: "w-sol", label: "Solido", referenceCode: "SOL", fieldTypeId: "ft-format", fieldTypeLabel: "Formato", designation: "Solido", designationPt: "Solido", designationEs: "Solido", designationEn: "Solid", includeInDesignation: false },
-  { id: "w-sab", label: "Sabonete", referenceCode: "SAB", fieldTypeId: "ft-product", fieldTypeLabel: "Produto", designation: "Sabonete", designationPt: "Sabonete", designationEs: "Jabon", designationEn: "Soap", includeInDesignation: true },
-  { id: "w-020", label: "20g", referenceCode: "020", fieldTypeId: "ft-size", fieldTypeLabel: "Tamanho/Gramaje", designation: "20g", designationPt: "20g", designationEs: "20g", designationEn: "20g", includeInDesignation: true },
-  { id: "w-cxa", label: "Caixa Cartao", referenceCode: "CXA", fieldTypeId: "ft-packaging", fieldTypeLabel: "Embalagem", designation: "Caixa Cartao", designationPt: "Caixa Cartao", designationEs: "Caja Carton", designationEn: "Card Box", includeInDesignation: true },
+  { id: "w-alg", label: "ALG OCEAN SPA", referenceCode: "ALG", fieldTypeId: "ft-brand", fieldTypeLabel: "Familia/Marca", designation: "ALG OCEAN SPA", designationPt: "ALG OCEAN SPA", designationEs: "ALG Ocean Spa", designationEn: "ALG Ocean Spa", includeInDesignation: true, ...legacyWordRelations },
+  { id: "w-sol", label: "Solido", referenceCode: "SOL", fieldTypeId: "ft-format", fieldTypeLabel: "Formato", designation: "Solido", designationPt: "Solido", designationEs: "Solido", designationEn: "Solid", includeInDesignation: false, ...legacyWordRelations },
+  { id: "w-sab", label: "Sabonete", referenceCode: "SAB", fieldTypeId: "ft-product", fieldTypeLabel: "Produto", designation: "Sabonete", designationPt: "Sabonete", designationEs: "Jabon", designationEn: "Soap", includeInDesignation: true, ...legacyWordRelations },
+  { id: "w-020", label: "20g", referenceCode: "020", fieldTypeId: "ft-size", fieldTypeLabel: "Tamanho/Gramaje", designation: "20g", designationPt: "20g", designationEs: "20g", designationEn: "20g", includeInDesignation: true, ...legacyWordRelations },
+  { id: "w-cxa", label: "Caixa Cartao", referenceCode: "CXA", fieldTypeId: "ft-packaging", fieldTypeLabel: "Embalagem", designation: "Caixa Cartao", designationPt: "Caixa Cartao", designationEs: "Caja Carton", designationEn: "Card Box", includeInDesignation: true, ...legacyWordRelations },
 ];
 
 function toGeneratorWord(word: WordListItem): GeneratorWord {
