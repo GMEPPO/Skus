@@ -96,8 +96,7 @@ create trigger skus_enforce_reference_uniqueness_normalizations
   for each row
   execute function skus_private.enforce_sku_reference_uniqueness();
 
-create unique index if not exists skus_code_normalizations_completed_ref_uidx
-  on public.skus_code_normalizations (skus_private.normalize_sku_reference(final_new_code))
-  where normalization_status = 'completed'
-    and final_new_code is not null
-    and btrim(final_new_code) <> '';
+-- Indice unico: aplicar APOS limpar duplicados existentes.
+-- Ver: supabase/diagnose_duplicate_sku_references.sql
+--      supabase/fix_duplicate_sku_references.sql
+--      supabase/migrations/20260806160001_sku_reference_normalizations_unique_index.sql
