@@ -76,7 +76,7 @@ SHA-256 `20260805140000…`:
 - Flag: `NEXT_PUBLIC_SKUS_NORMALIZATION_V2=false` (independent from generator)
 - Routes: `/normalization`, `/normalization/[id]`
 - Flow: queue → claim → catalog selection → `complete_sku_normalization`
-- Import Excel: not yet in app (batches visible if loaded via scripts)
+- Excel import: in-app upload (first sheet, SHA-256 dedupe, service role insert)
 
 Hold / go-nogo: `docs/phase2b2-r5-validation-hold.md`, `docs/phase2b2-r5-apply-go-nogo.md`
 

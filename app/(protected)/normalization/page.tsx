@@ -1,12 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { NormalizationImportForm } from "@/components/normalization/normalization-import-form";
 import { NormalizationQueueTable } from "@/components/normalization/normalization-queue-table";
 import { requireRole } from "@/lib/auth";
+import { getCategories } from "@/lib/category-catalog";
 import { getNormalizationImportBatches, getPendingNormalizationQueue } from "@/lib/normalization-data";
 import { isNormalizationV2Enabled } from "@/lib/skus-feature-flags";
 
 export default async function NormalizationPage() {
   const user = await requireRole("editor");
   const normalizationV2Enabled = isNormalizationV2Enabled();
+  const categories = await getCategories();
+  const preferredCategory = categories.find((category) => category.slug === "cosmetica") ?? categories[0] ?? null;
   const [queue, batches] = await Promise.all([getPendingNormalizationQueue(), getNormalizationImportBatches()]);
 
   return (
@@ -33,6 +37,11 @@ export default async function NormalizationPage() {
         </Card>
       ) : null}
 
+      <NormalizationImportForm
+        categories={categories.map((category) => ({ id: category.id, name: category.name, slug: category.slug }))}
+        defaultCategoryId={preferredCategory?.id ?? null}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Resumo de batches</CardTitle>
@@ -40,7 +49,7 @@ export default async function NormalizationPage() {
         </CardHeader>
         <CardContent>
           {batches.length === 0 ? (
-            <p className="text-sm text-slate-400">Sem batches importados. O upload de Excel sera adicionado numa fase posterior.</p>
+            <p className="text-sm text-slate-400">Sem batches importados. Usa o formulario acima para carregar um Excel.</p>
           ) : (
             <ul className="grid gap-2 text-sm md:grid-cols-2">
               {batches.slice(0, 6).map((batch) => (
