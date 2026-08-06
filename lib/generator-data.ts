@@ -33,16 +33,26 @@ type WordRow = {
 };
 
 function mapWord(row: WordRow): GeneratorWord {
+  const isEmptyReference = row.reference_code === "000";
+
   return {
     id: row.id,
     label: row.label,
     referenceCode: row.reference_code,
-    designation: String(row.designation ?? row.label ?? ""),
-    designationPt: String(row.designation_pt ?? row.designation ?? row.label ?? ""),
-    designationEs: String(row.designation_es ?? row.designation ?? row.label ?? ""),
-    designationEn: String(row.designation_en ?? row.designation ?? row.label ?? ""),
-    includeInDesignation: Boolean(row.include_in_designation ?? true),
+    designation: isEmptyReference ? "" : String(row.designation ?? row.label ?? ""),
+    designationPt: isEmptyReference ? "" : String(row.designation_pt ?? row.designation ?? row.label ?? ""),
+    designationEs: isEmptyReference ? "" : String(row.designation_es ?? row.designation ?? row.label ?? ""),
+    designationEn: isEmptyReference ? "" : String(row.designation_en ?? row.designation ?? row.label ?? ""),
+    includeInDesignation: isEmptyReference ? false : Boolean(row.include_in_designation ?? true),
   };
+}
+
+function sortWords(words: GeneratorWord[]) {
+  return [...words].sort((left, right) => {
+    if (left.referenceCode === "000") return -1;
+    if (right.referenceCode === "000") return 1;
+    return left.label.localeCompare(right.label, "pt");
+  });
 }
 
 export async function getGeneratorCatalog(): Promise<GeneratorCatalog> {
@@ -80,9 +90,11 @@ export async function getGeneratorCatalog(): Promise<GeneratorCatalog> {
     order: index + 1,
     fieldType: fieldType.code,
     label: LEVEL_LABELS[fieldType.code] ?? fieldType.name,
-    options: words
-      .filter((word) => word.default_field_type_id === fieldType.id)
-      .map(mapWord),
+    options: sortWords(
+      words
+        .filter((word) => word.default_field_type_id === fieldType.id)
+        .map(mapWord),
+    ),
   }));
 
   return { levels };

@@ -12,6 +12,18 @@ export function isEmptySelection(value?: string) {
   return Boolean(value && value.startsWith(EMPTY_SELECTION_PREFIX));
 }
 
+export function isEmptyReferenceWord(word?: Pick<GeneratorWord, "referenceCode"> | null) {
+  return word?.referenceCode === "000";
+}
+
+export function sortGeneratorWords(options: GeneratorWord[]): GeneratorWord[] {
+  return [...options].sort((left, right) => {
+    if (left.referenceCode === "000") return -1;
+    if (right.referenceCode === "000") return 1;
+    return left.label.localeCompare(right.label, "pt");
+  });
+}
+
 export function getAvailableOptions(
   catalog: GeneratorCatalog,
   levelId: string,
@@ -57,7 +69,7 @@ export function buildDesignationByLocale(
       const selectedValue = selections[level.id];
       if (isEmptySelection(selectedValue)) return null;
       const option = level.options.find((item) => item.id === selectedValue);
-      if (!option || !option.includeInDesignation) return null;
+      if (!option || !option.includeInDesignation || isEmptyReferenceWord(option)) return null;
       if (locale === "en") return option.designationEn || option.designation || option.label;
       if (locale === "es") return option.designationEs || option.designation || option.label;
       return option.designationPt || option.designation || option.label;
@@ -74,9 +86,33 @@ export function buildSkuPreview(
   const segments = catalog.levels.map((level) => {
     const selectedValue = selections[level.id];
     if (isEmptySelection(selectedValue)) return "000";
-    return level.options.find((option) => option.id === selectedValue)?.referenceCode ?? "000";
+    const option = level.options.find((item) => item.id === selectedValue);
+    return option?.referenceCode ?? "000";
   });
 
   return segments.join("-");
+}
+
+function escapeIlikeSegment(segment: string) {
+  return segment.replace(/[\\%_]/g, "\\$&");
+}
+
+export function buildSkuCodeExamplePattern(
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+): string | null {
+  let selectedSegmentCount = 0;
+  const segments = catalog.levels.map((level) => {
+    const selectedValue = selections[level.id];
+    if (!selectedValue) return null;
+    selectedSegmentCount += 1;
+    if (isEmptySelection(selectedValue)) return "000";
+    const option = level.options.find((item) => item.id === selectedValue);
+    return option?.referenceCode ?? null;
+  });
+
+  if (selectedSegmentCount === 0) return null;
+
+  return segments.map((segment) => (segment ? escapeIlikeSegment(segment) : "%")).join("-");
 }
 

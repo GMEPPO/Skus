@@ -7,17 +7,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { generateSkuAction } from "@/lib/sku-actions";
+import { fetchSkuCodeExamplesAction, type SkuCodeExample } from "@/lib/generator-code-examples-actions";
 import { completeSkuNormalizationSecureAction, generateSkuSecureAction } from "@/lib/sku-secure-actions";
 import type { GeneratorCatalog, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import {
   buildDesignation,
   buildDesignationByLocale,
   buildEmptySelectionId,
+  buildSkuCodeExamplePattern,
   buildSkuPreview,
   filterGeneratorWords,
   getAvailableOptions,
+  isEmptyReferenceWord,
   isEmptySelection,
   MAX_DESIGNATION_LENGTH,
+  sortGeneratorWords,
 } from "@/lib/sku";
 
 type Selections = Record<string, string>;
@@ -46,6 +50,24 @@ function isRequiredLevel(level: GeneratorLevel) {
 function getSelectedWord(level: GeneratorLevel, selectedId?: string) {
   if (!selectedId || isEmptySelection(selectedId)) return null;
   return level.options.find((option) => option.id === selectedId) ?? null;
+}
+
+function isLevelSelectionEmpty(level: GeneratorLevel, selectedId?: string) {
+  if (!selectedId) return false;
+  if (isEmptySelection(selectedId)) return true;
+  return isEmptyReferenceWord(getSelectedWord(level, selectedId));
+}
+
+function getSelectionDisplayLabel(level: GeneratorLevel, selectedId?: string) {
+  if (isEmptySelection(selectedId)) return "Vazio";
+  const selectedWord = getSelectedWord(level, selectedId);
+  if (isEmptyReferenceWord(selectedWord)) return "Vazio";
+  return selectedWord?.label ?? "";
+}
+
+function getSelectionDisplayCode(level: GeneratorLevel, selectedId?: string) {
+  if (isLevelSelectionEmpty(level, selectedId)) return "000";
+  return getSelectedWord(level, selectedId)?.referenceCode ?? "000";
 }
 
 function buildSecureSelectionsPayload(catalog: GeneratorCatalog, selections: Selections) {
@@ -98,11 +120,16 @@ export function SkuGeneratorWizardMain({
   const secureRequestIdRef = useRef(secureRequestId);
   const requestBoundPayloadKeyRef = useRef<string | null>(null);
   const [normalizationCompleted, setNormalizationCompleted] = useState(false);
+  const [codeExamples, setCodeExamples] = useState<SkuCodeExample[]>([]);
+  const [codeExamplesLoading, setCodeExamplesLoading] = useState(false);
 
   const isNormalizationMode = Boolean(normalizationTarget);
   const usesSecurePayload = secureGenerationV2Enabled || isNormalizationMode;
   const requiredLevels = useMemo(() => catalog.levels.filter(isRequiredLevel), [catalog.levels]);
-  const requiredCompletedCount = requiredLevels.filter((level) => selections[level.id] && !isEmptySelection(selections[level.id])).length;
+  const requiredCompletedCount = requiredLevels.filter((level) => {
+    const selectedId = selections[level.id];
+    return Boolean(selectedId) && !isEmptySelection(selectedId);
+  }).length;
   const selectedCount = Object.keys(selections).filter((key) => selections[key]).length;
   const designation = buildDesignation(catalog, selections);
   const designationPt = buildDesignationByLocale(catalog, selections, "pt");
@@ -136,6 +163,34 @@ export function SkuGeneratorWizardMain({
       }
     };
   }, [productImagePreviewUrl]);
+
+  useEffect(() => {
+    if (!categoryId) {
+      setCodeExamples([]);
+      return;
+    }
+
+    const pattern = buildSkuCodeExamplePattern(catalog, selections);
+    if (!pattern) {
+      setCodeExamples([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setCodeExamplesLoading(true);
+      const result = await fetchSkuCodeExamplesAction(categoryId, pattern);
+      if (!cancelled) {
+        setCodeExamples(result.ok ? result.examples : []);
+        setCodeExamplesLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [catalog, categoryId, selections]);
 
   function buildSecurePayloadKey(
     nextSelections: Selections = selections,
@@ -408,11 +463,12 @@ export function SkuGeneratorWizardMain({
             {catalog.levels.map((level) => {
               const selectedId = selections[level.id];
               const selectedWord = getSelectedWord(level, selectedId);
-              const emptyOptionSelected = isEmptySelection(selectedId);
-              const allOptions = getAvailableOptions(catalog, level.id);
+              const emptyOptionSelected = isLevelSelectionEmpty(level, selectedId);
+              const allOptions = sortGeneratorWords(getAvailableOptions(catalog, level.id));
+              const hasEmptyReferenceWord = allOptions.some((option) => option.referenceCode === "000");
               const query = searchByLevel[level.id] ?? "";
               const options = filterGeneratorWords(allOptions, query).slice(0, 36);
-              const showEmptyOption = level.fieldType === "extra";
+              const showLegacyEmptyOption = !hasEmptyReferenceWord && level.fieldType === "extra";
 
               return (
                 <div
@@ -436,14 +492,12 @@ export function SkuGeneratorWizardMain({
                     )}
                   </div>
 
-                  {selectedWord || emptyOptionSelected ? (
+                  {selectedId ? (
                     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-2">
                       <Sparkles className="h-4 w-4 text-amber-300" />
-                      <span className="text-sm text-slate-100">
-                        {emptyOptionSelected ? "Vazio" : selectedWord?.label}
-                      </span>
+                      <span className="text-sm text-slate-100">{getSelectionDisplayLabel(level, selectedId)}</span>
                       <span className="rounded-md bg-slate-950 px-2 py-1 text-xs text-slate-400">
-                        {emptyOptionSelected ? "000" : selectedWord?.referenceCode}
+                        {getSelectionDisplayCode(level, selectedId)}
                       </span>
                       <Button type="button" variant="outline" onClick={() => clearSelection(level)}>
                         Limpar
@@ -469,6 +523,7 @@ export function SkuGeneratorWizardMain({
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {options.map((option) => {
                       const isSelected = selectedId === option.id;
+                      const isEmptyOption = isEmptyReferenceWord(option);
                       return (
                         <button
                           key={option.id}
@@ -483,7 +538,7 @@ export function SkuGeneratorWizardMain({
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-medium text-slate-100">{option.label}</p>
+                              <p className="font-medium text-slate-100">{isEmptyOption ? "Vazio" : option.label}</p>
                               <p className="mt-1 text-xs text-slate-500">{option.referenceCode}</p>
                             </div>
                             {isSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
@@ -491,7 +546,7 @@ export function SkuGeneratorWizardMain({
                         </button>
                       );
                     })}
-                    {showEmptyOption ? (
+                    {showLegacyEmptyOption ? (
                       <button
                         type="button"
                         onClick={() => handleSelection(level, null)}
@@ -542,6 +597,30 @@ export function SkuGeneratorWizardMain({
                     Preview local apenas para orientacao. O resultado final vem exclusivamente da resposta do RPC.
                   </p>
                 ) : null}
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Exemplos existentes</p>
+                {codeExamplesLoading ? (
+                  <p className="mt-2 text-sm text-slate-500">A procurar codigos semelhantes...</p>
+                ) : codeExamples.length > 0 ? (
+                  <ul className="mt-3 space-y-3">
+                    {codeExamples.map((example) => (
+                      <li key={`${example.source}-${example.code}`} className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                        <p className="break-all font-medium text-amber-200">{example.code}</p>
+                        {example.designationPt ? (
+                          <p className="mt-1 text-sm text-slate-400">{example.designationPt}</p>
+                        ) : null}
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-600">
+                          {example.source === "normalization" ? "Normalizado" : "Codigo novo"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">
+                    Seleciona palavras em pelo menos um nivel para ver 1-2 codigos ja criados com combinacoes semelhantes.
+                  </p>
+                )}
               </div>
             </Card>
 

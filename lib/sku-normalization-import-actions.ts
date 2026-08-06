@@ -14,6 +14,11 @@ import {
   splitImportRowsByExistingLegacyCodes,
 } from "@/lib/normalization-import-sync";
 import { runNormalizationImportMaintenance } from "@/lib/normalization-data";
+import {
+  findDuplicateSkuReferencesWithinList,
+  findTakenSkuReferences,
+  formatTakenSkuReferenceMessage,
+} from "@/lib/sku-reference-uniqueness-data";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 
 export type ImportNormalizationBatchResult =
@@ -124,6 +129,36 @@ function buildInsertRow(
     final_designation_en: row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
     completed_at: row.normalizationStatus === "completed" ? new Date().toISOString() : null,
   };
+}
+
+function collectImportReferenceCodes(rows: ReturnType<typeof parseNormalizationWorkbook>["rows"]) {
+  return rows
+    .map((row) => (row.normalizationStatus === "completed" ? row.sourceNewCode : null))
+    .filter((code): code is string => Boolean(code));
+}
+
+async function validateImportReferenceUniqueness(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  rows: ReturnType<typeof parseNormalizationWorkbook>["rows"],
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const referenceCodes = collectImportReferenceCodes(rows);
+  const withinBatchDupes = findDuplicateSkuReferencesWithinList(referenceCodes);
+  if (withinBatchDupes.length > 0) {
+    return {
+      ok: false,
+      message: `${formatTakenSkuReferenceMessage(withinBatchDupes)} O Excel contem referencias novas duplicadas entre si.`,
+    };
+  }
+
+  const takenReferences = await findTakenSkuReferences(supabase, referenceCodes);
+  if (takenReferences.length > 0) {
+    return {
+      ok: false,
+      message: formatTakenSkuReferenceMessage(takenReferences),
+    };
+  }
+
+  return { ok: true };
 }
 
 export async function importNormalizationBatchAction(formData: FormData): Promise<ImportNormalizationBatchResult> {
@@ -246,6 +281,11 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       pendingRows: 0,
       invalidRows: parsed.rows.filter((row) => row.normalizationStatus === "cancelled").length,
     };
+  }
+
+  const referenceValidation = await validateImportReferenceUniqueness(supabase, rowsToInsert);
+  if (!referenceValidation.ok) {
+    return { ok: false, code: "duplicate_reference", message: referenceValidation.message };
   }
 
   const summary = summarizeImportRows(rowsToInsert);

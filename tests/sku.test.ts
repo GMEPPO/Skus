@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDesignationByLocale, buildSkuPreview, filterGeneratorWords } from "@/lib/sku";
+import { buildDesignationByLocale, buildSkuCodeExamplePattern, buildSkuPreview, filterGeneratorWords } from "@/lib/sku";
 import type { GeneratorCatalog } from "@/lib/types";
 
 const sabsolCatalog: GeneratorCatalog = {
@@ -133,5 +133,54 @@ describe("sku builder", () => {
     expect(filterGeneratorWords(options, "CXA")).toHaveLength(1);
     expect(filterGeneratorWords(options, "Caja")).toHaveLength(1);
     expect(filterGeneratorWords(options, "missing")).toHaveLength(0);
+  });
+
+  it("ignores empty reference 000 in designations", () => {
+    const catalogWithEmpty: GeneratorCatalog = {
+      ...sabsolCatalog,
+      levels: sabsolCatalog.levels.map((level) =>
+        level.id === "brand"
+          ? {
+              ...level,
+              options: [
+                {
+                  id: "empty-brand",
+                  label: "Vazio",
+                  referenceCode: "000",
+                  designation: "",
+                  designationPt: "",
+                  designationEs: "",
+                  designationEn: "",
+                  includeInDesignation: false,
+                },
+                ...level.options,
+              ],
+            }
+          : level,
+      ),
+    };
+
+    expect(
+      buildDesignationByLocale(
+        catalogWithEmpty,
+        {
+          brand: "empty-brand",
+          format: "sol",
+          product: "sab",
+          size: "020",
+          packaging: "cxa",
+        },
+        "pt",
+      ),
+    ).toBe("Sabonete 20g Caixa Cartao");
+  });
+
+  it("builds example pattern with wildcards for unselected levels", () => {
+    expect(
+      buildSkuCodeExamplePattern(sabsolCatalog, {
+        brand: "alg",
+        product: "sab",
+      }),
+    ).toBe("ALG-%-SAB-%-%-%");
   });
 });

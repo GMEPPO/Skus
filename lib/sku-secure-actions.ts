@@ -55,6 +55,8 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   measurement_request_conflict: "Conflito de requestId nas medidas.",
   sku_code_collision: "Colisao de codigo SKU (v2).",
   sku_code_collision_legacy: "Colisao com geracao legacy (fingerprint NULL).",
+  sku_reference_duplicate:
+    "Esta referencia SKU ja existe no historico de codigos novos ou normalizados. Escolhe outra combinacao.",
   sku_generation_invariant_violation: "Invariante de geracao violada.",
 };
 

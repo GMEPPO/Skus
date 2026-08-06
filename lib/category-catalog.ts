@@ -111,18 +111,29 @@ function mapLevel(row: Record<string, unknown>): CategoryLevelRow {
 }
 
 function mapWord(row: Record<string, unknown>): CatalogWordRow {
+  const referenceCode = String(row.reference_code ?? "");
+  const isEmptyReference = referenceCode === "000";
+
   return {
     id: String(row.id),
     categoryLevelId: String(row.category_level_id),
     defaultFieldTypeId: row.default_field_type_id ? String(row.default_field_type_id) : null,
     label: String(row.label ?? ""),
-    referenceCode: String(row.reference_code ?? ""),
-    designationPt: String(row.designation_pt ?? row.designation ?? row.label ?? ""),
-    designationEs: String(row.designation_es ?? row.designation ?? row.label ?? ""),
-    designationEn: String(row.designation_en ?? row.designation ?? row.label ?? ""),
-    includeInDesignation: Boolean(row.include_in_designation ?? true),
+    referenceCode,
+    designationPt: isEmptyReference ? "" : String(row.designation_pt ?? row.designation ?? row.label ?? ""),
+    designationEs: isEmptyReference ? "" : String(row.designation_es ?? row.designation ?? row.label ?? ""),
+    designationEn: isEmptyReference ? "" : String(row.designation_en ?? row.designation ?? row.label ?? ""),
+    includeInDesignation: isEmptyReference ? false : Boolean(row.include_in_designation ?? true),
     isActive: Boolean(row.is_active ?? true),
   };
+}
+
+function sortCatalogWords(words: CatalogWordRow[]) {
+  return [...words].sort((left, right) => {
+    if (left.referenceCode === "000") return -1;
+    if (right.referenceCode === "000") return 1;
+    return left.label.localeCompare(right.label, "pt");
+  });
 }
 
 export async function getCategories(options?: { includeInactive?: boolean }): Promise<SkuCategoryRow[]> {
@@ -188,7 +199,7 @@ export async function getGeneratorCatalogForCategory(categoryId: string): Promis
     category: mapCategory(category as Record<string, unknown>),
     levels: levelRows.map((level) => ({
       ...level,
-      options: words.filter((w) => w.categoryLevelId === level.id),
+      options: sortCatalogWords(words.filter((w) => w.categoryLevelId === level.id)),
     })),
   };
 }

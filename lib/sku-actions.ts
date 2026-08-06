@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
+import { findTakenSkuReferences, formatTakenSkuReferenceMessage } from "@/lib/sku-reference-uniqueness-data";
 
 const PRODUCT_IMAGE_BUCKET = "sku-product-images";
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -133,6 +134,14 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     .single();
 
   const sequenceValue = sequenceResult.data?.last_value ?? 1;
+
+  const takenReferences = await findTakenSkuReferences(supabase, [parsed.data.generatedCode]);
+  if (takenReferences.length > 0) {
+    if (productImagePath) {
+      await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([productImagePath]);
+    }
+    return { ok: false, message: formatTakenSkuReferenceMessage(takenReferences) };
+  }
 
   const insertResult = await supabase
     .from("skus_sku_generations")
