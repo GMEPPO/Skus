@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BarChart3, FileStack, Shield, Tags, Workflow } from "lucide-react";
+import { BarChart3, Shield, Tags, Workflow } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import type { AppUser } from "@/lib/types";
 import { canManageUsers, canNormalizeSku } from "@/lib/rbac";
@@ -16,7 +16,6 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/generator", label: "Gerador SKU", icon: Workflow },
-  { href: "/normalization", label: "Normalizacao", icon: FileStack, editorOnly: true },
   { href: "/catalog/words-manage", label: "Biblioteca", icon: Tags },
   { href: "/sku-history", label: "Historico", icon: BarChart3 },
   { href: "/admin/users", label: "Admin", icon: Shield, adminOnly: true },

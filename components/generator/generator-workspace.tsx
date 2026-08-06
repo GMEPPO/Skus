@@ -129,6 +129,9 @@ export function GeneratorWorkspace({
         onToggle={() => setSidebarOpen((open) => !open)}
         isLoadingId={isLoadingNormId}
         sidebarError={sidebarError}
+        categories={categories}
+        defaultCategoryId={categoryId}
+        onImportSuccess={() => router.refresh()}
       />
 
       <div className="min-w-0 flex-1 space-y-4">

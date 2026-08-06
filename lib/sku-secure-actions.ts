@@ -243,8 +243,6 @@ export async function completeSkuNormalizationSecureAction(
   revalidatePath("/generator");
   revalidatePath("/sku-history");
   revalidatePath("/dashboard");
-  revalidatePath("/normalization");
-  revalidatePath(`/normalization/${parsed.data.normalizationId}`);
 
   return {
     ok: true,

@@ -42,6 +42,22 @@ describe("normalization import parser", () => {
     expect(parsed.rows[0].importIssue).toBe("MISSING_LEGACY_CODE");
   });
 
+  it("mapeia Designacao_nova para designacao PT de destino", () => {
+    const buffer = buildWorkbookBuffer([
+      {
+        Referencia_antiga: "LEG-OLD",
+        Designacao_antiga: "Produto antigo",
+        Referencia_nova: "NEW-001",
+        Designacao_nova: "Produto novo PT",
+        Estado: "OK2",
+      },
+    ]);
+
+    const parsed = parseNormalizationWorkbook(buffer);
+    expect(parsed.rows[0].sourceDesignationPt).toBe("Produto novo PT");
+    expect(parsed.rows[0].normalizationStatus).toBe("completed");
+  });
+
   it("marca completed quando Status e OK2", () => {
     const buffer = buildWorkbookBuffer([
       {

@@ -1,0 +1,74 @@
+[
+  {
+    "vectorId": "G1_two_words_and_empty",
+    "note": "two participating words + participating empty",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"ALG\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"word\",\"wordId\":\"33333333-3333-3333-3333-333333333333\"}},{\"codeSegment\":\"FMT\",\"levelId\":\"44444444-4444-4444-4444-444444444444\",\"selection\":{\"kind\":\"word\",\"wordId\":\"55555555-5555-5555-5555-555555555555\"}},{\"codeSegment\":\"000\",\"levelId\":\"66666666-6666-6666-6666-666666666666\",\"selection\":{\"kind\":\"empty\"}}]}",
+    "expectedSha256": "269f5d97aacfa1f71be369169dbb50600dec758cae7149f457a8ba6574ac38e4",
+    "typescriptSha256": "269f5d97aacfa1f71be369169dbb50600dec758cae7149f457a8ba6574ac38e4",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G2_empty_participant",
+    "note": "single participating empty",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"000\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"empty\"}}]}",
+    "expectedSha256": "3b300d59db29e1654a66dde184a5f03fa0856ebdd9bf4050c38dd4337200b823",
+    "typescriptSha256": "3b300d59db29e1654a66dde184a5f03fa0856ebdd9bf4050c38dd4337200b823",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G3_shuffled_order",
+    "note": "same as G1 with levels shuffled — same hash",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"ALG\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"word\",\"wordId\":\"33333333-3333-3333-3333-333333333333\"}},{\"codeSegment\":\"FMT\",\"levelId\":\"44444444-4444-4444-4444-444444444444\",\"selection\":{\"kind\":\"word\",\"wordId\":\"55555555-5555-5555-5555-555555555555\"}},{\"codeSegment\":\"000\",\"levelId\":\"66666666-6666-6666-6666-666666666666\",\"selection\":{\"kind\":\"empty\"}}]}",
+    "expectedSha256": "269f5d97aacfa1f71be369169dbb50600dec758cae7149f457a8ba6574ac38e4",
+    "typescriptSha256": "269f5d97aacfa1f71be369169dbb50600dec758cae7149f457a8ba6574ac38e4",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G4_omit_non_participating_empty",
+    "note": "non-participating empty omitted from canonical",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"ALG\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"word\",\"wordId\":\"33333333-3333-3333-3333-333333333333\"}}]}",
+    "expectedSha256": "3aa63026659b0706a2dee5c28369e3f8939e02773fcde9888f6a51ea3fcb43c5",
+    "typescriptSha256": "3aa63026659b0706a2dee5c28369e3f8939e02773fcde9888f6a51ea3fcb43c5",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G5_non_participating_word_null",
+    "note": "non-participating word with codeSegment null included",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"ALG\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"word\",\"wordId\":\"33333333-3333-3333-3333-333333333333\"}},{\"codeSegment\":null,\"levelId\":\"44444444-4444-4444-4444-444444444444\",\"selection\":{\"kind\":\"word\",\"wordId\":\"55555555-5555-5555-5555-555555555555\"}}]}",
+    "expectedSha256": "fcd29af4cb3d5dca1d238ee66dbd5b4dbfb139e319a0629146581811e204752a",
+    "typescriptSha256": "fcd29af4cb3d5dca1d238ee66dbd5b4dbfb139e319a0629146581811e204752a",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G6_label_change_same_hash",
+    "note": "label/designation change must not affect fingerprint",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"ALG\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"word\",\"wordId\":\"33333333-3333-3333-3333-333333333333\"}},{\"codeSegment\":\"000\",\"levelId\":\"44444444-4444-4444-4444-444444444444\",\"selection\":{\"kind\":\"empty\"}}]}",
+    "expectedSha256": "b521696be1177c004c3fee5d6853c2da570b22f8b1774a6871d75720557538a2",
+    "typescriptSha256": "b521696be1177c004c3fee5d6853c2da570b22f8b1774a6871d75720557538a2",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G7_segment_change_diff_hash",
+    "note": "codeSegment change must change hash",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"11111111-1111-1111-1111-111111111111\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"XXX\",\"levelId\":\"22222222-2222-2222-2222-222222222222\",\"selection\":{\"kind\":\"word\",\"wordId\":\"33333333-3333-3333-3333-333333333333\"}},{\"codeSegment\":\"000\",\"levelId\":\"44444444-4444-4444-4444-444444444444\",\"selection\":{\"kind\":\"empty\"}}]}",
+    "expectedSha256": "e9ebce7dd6d0b767d8465ea7c2281bfc6c970895fed7a3403b101b9d30017b67",
+    "typescriptSha256": "e9ebce7dd6d0b767d8465ea7c2281bfc6c970895fed7a3403b101b9d30017b67",
+    "postgresSha256": null,
+    "match": null
+  },
+  {
+    "vectorId": "G8_uuid_uppercase_normalized",
+    "note": "uppercase A-F UUIDs normalize to lowercase in canonical text",
+    "canonicalText": "sku-selection:v2:{\"categoryId\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\",\"codeFormatVersion\":1,\"levels\":[{\"codeSegment\":\"ALG\",\"levelId\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"selection\":{\"kind\":\"word\",\"wordId\":\"dddddddd-dddd-4ddd-8ddd-dddddddddddd\"}},{\"codeSegment\":\"000\",\"levelId\":\"cccccccc-cccc-4ccc-8ccc-cccccccccccc\",\"selection\":{\"kind\":\"empty\"}}]}",
+    "expectedSha256": "fb4f57ccceefa2b6bf7048e2d03d8b0ada5b259211e22866220bb329eec10f57",
+    "typescriptSha256": "fb4f57ccceefa2b6bf7048e2d03d8b0ada5b259211e22866220bb329eec10f57",
+    "postgresSha256": null,
+    "match": null
+  }
+]

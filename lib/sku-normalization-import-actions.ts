@@ -124,7 +124,10 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     import_issue: row.importIssue,
     category_id: categoryId,
     final_new_code: row.normalizationStatus === "completed" ? row.sourceNewCode : null,
-    final_designation_pt: row.normalizationStatus === "completed" ? row.sourceDesignationPt : null,
+    final_designation_pt:
+      row.normalizationStatus === "completed"
+        ? (row.sourceDesignationPt ?? row.sourceDesignationEs ?? row.sourceDesignationEn)
+        : null,
     final_designation_es: row.normalizationStatus === "completed" ? row.sourceDesignationEs : null,
     final_designation_en: row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
     completed_at: row.normalizationStatus === "completed" ? new Date().toISOString() : null,
@@ -141,7 +144,6 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     }
   }
 
-  revalidatePath("/normalization");
   revalidatePath("/generator");
 
   return {

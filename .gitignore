@@ -6,3 +6,6 @@ node_modules
 .env.*.local
 coverage
 dist
+
+.vercel
+.env*

@@ -76,15 +76,95 @@ export async function getNormalizationImportBatches(): Promise<NormalizationImpo
 const NORMALIZATION_QUEUE_PAGE_SIZE = 1000;
 const NORMALIZATION_QUEUE_FETCH_ALL_CAP = 20_000;
 
+type NormalizationFieldRow = {
+  id: string;
+  source_new_code: string | null;
+  source_designation_pt: string | null;
+  source_designation_es: string | null;
+  source_designation_en: string | null;
+  final_new_code: string | null;
+  final_designation_pt: string | null;
+  final_designation_es: string | null;
+  final_designation_en: string | null;
+};
+
+function pickSourceDesignation(row: NormalizationFieldRow): string | null {
+  return row.source_designation_pt ?? row.source_designation_es ?? row.source_designation_en ?? null;
+}
+
 async function reconcileImportedOk2Rows(supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>) {
-  await supabase
+  const { data: pendingOk2, error } = await supabase
     .from("skus_code_normalizations")
-    .update({
-      normalization_status: "completed",
-      completed_at: new Date().toISOString(),
-    })
+    .select(
+      "id, source_new_code, source_designation_pt, source_designation_es, source_designation_en, final_new_code, final_designation_pt, final_designation_es, final_designation_en",
+    )
     .eq("normalization_status", "pending")
     .ilike("source_status", "ok2");
+
+  if (error) throw new Error(error.message);
+
+  const completedAt = new Date().toISOString();
+  for (const row of (pendingOk2 ?? []) as NormalizationFieldRow[]) {
+    const sourceDesignation = pickSourceDesignation(row);
+    await supabase
+      .from("skus_code_normalizations")
+      .update({
+        normalization_status: "completed",
+        completed_at: completedAt,
+        final_new_code: row.final_new_code ?? row.source_new_code,
+        final_designation_pt: row.final_designation_pt ?? row.source_designation_pt ?? sourceDesignation,
+        final_designation_es: row.final_designation_es ?? row.source_designation_es,
+        final_designation_en: row.final_designation_en ?? row.source_designation_en,
+      })
+      .eq("id", row.id);
+  }
+}
+
+async function backfillCompletedNormalizationFields(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+) {
+  let offset = 0;
+
+  while (offset < NORMALIZATION_QUEUE_FETCH_ALL_CAP) {
+    const { data, error } = await supabase
+      .from("skus_code_normalizations")
+      .select(
+        "id, source_new_code, source_designation_pt, source_designation_es, source_designation_en, final_new_code, final_designation_pt, final_designation_es, final_designation_en",
+      )
+      .eq("normalization_status", "completed")
+      .or("final_designation_pt.is.null,final_new_code.is.null")
+      .range(offset, offset + NORMALIZATION_QUEUE_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+
+    const page = (data ?? []) as NormalizationFieldRow[];
+    if (page.length === 0) break;
+
+    for (const row of page) {
+      const sourceDesignation = pickSourceDesignation(row);
+      const updates: Record<string, string> = {};
+
+      if (!row.final_new_code && row.source_new_code) {
+        updates.final_new_code = row.source_new_code;
+      }
+      if (!row.final_designation_pt && (row.source_designation_pt ?? sourceDesignation)) {
+        updates.final_designation_pt = row.source_designation_pt ?? sourceDesignation ?? "";
+      }
+      if (!row.final_designation_es && row.source_designation_es) {
+        updates.final_designation_es = row.source_designation_es;
+      }
+      if (!row.final_designation_en && row.source_designation_en) {
+        updates.final_designation_en = row.source_designation_en;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from("skus_code_normalizations").update(updates).eq("id", row.id);
+      }
+    }
+
+    if (page.length < NORMALIZATION_QUEUE_PAGE_SIZE) break;
+    offset += NORMALIZATION_QUEUE_PAGE_SIZE;
+  }
 }
 
 const PENDING_QUEUE_SELECT = `
@@ -150,8 +230,8 @@ export async function getPendingNormalizationQueue(limit?: number): Promise<Norm
 const COMPLETED_HISTORY_SELECT = `
       id,
       legacy_code, legacy_designation,
-      source_new_code, source_designation_pt,
-      final_new_code, final_designation_pt,
+      source_new_code, source_designation_pt, source_designation_es, source_designation_en,
+      final_new_code, final_designation_pt, final_designation_es, final_designation_en,
       source_status, category_id, completed_at,
       skus_categories ( name, slug )
     `;
@@ -162,13 +242,24 @@ function mapHistoryItem(row: Record<string, unknown>): NormalizationHistoryItem 
   const sourceNewCode = row.source_new_code ? String(row.source_new_code) : null;
   const finalDesignationPt = row.final_designation_pt ? String(row.final_designation_pt) : null;
   const sourceDesignationPt = row.source_designation_pt ? String(row.source_designation_pt) : null;
+  const sourceDesignationEs = row.source_designation_es ? String(row.source_designation_es) : null;
+  const sourceDesignationEn = row.source_designation_en ? String(row.source_designation_en) : null;
+  const finalDesignationEs = row.final_designation_es ? String(row.final_designation_es) : null;
+  const finalDesignationEn = row.final_designation_en ? String(row.final_designation_en) : null;
 
   return {
     id: String(row.id),
     legacyCode: row.legacy_code ? String(row.legacy_code) : null,
     legacyDesignation: row.legacy_designation ? String(row.legacy_designation) : null,
     newCode: finalNewCode ?? sourceNewCode,
-    newDesignationPt: finalDesignationPt ?? sourceDesignationPt,
+    newDesignationPt:
+      finalDesignationPt ??
+      sourceDesignationPt ??
+      finalDesignationEs ??
+      sourceDesignationEs ??
+      finalDesignationEn ??
+      sourceDesignationEn ??
+      null,
     categoryId: row.category_id ? String(row.category_id) : null,
     categoryName: category?.name ? String(category.name) : null,
     categorySlug: category?.slug ? String(category.slug) : null,
@@ -183,6 +274,7 @@ export async function getCompletedNormalizationHistory(limit?: number): Promise<
   if (!supabase) return [];
 
   await reconcileImportedOk2Rows(supabase);
+  await backfillCompletedNormalizationFields(supabase);
 
   const maxRows = limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP;
   const rows: Record<string, unknown>[] = [];

@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { isNormalizationV2Enabled } from "@/lib/skus-feature-flags";
@@ -78,9 +77,7 @@ async function claimNormalizationRpc(normalizationId: string) {
     return { ok: false as const, code: mapped.code, message: mapped.message };
   }
 
-  revalidatePath("/normalization");
   revalidatePath("/generator");
-  revalidatePath(`/normalization/${normalizationId}`);
   return { ok: true as const, message: "Registo reivindicado." };
 }
 
@@ -102,22 +99,6 @@ export async function claimNormalizationForGeneratorAction(
   return { ok: true, message: result.message };
 }
 
-export async function claimNormalizationAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
-  if (!isNormalizationV2Enabled()) {
-    return {
-      ok: false,
-      code: "flag_off",
-      message: "Normalizacao V2 desativada (feature flag OFF).",
-    };
-  }
-
-  const result = await claimNormalizationRpc(normalizationId);
-  if (!result.ok) {
-    return { ok: false, code: result.code, message: result.message };
-  }
-  redirect(`/normalization/${normalizationId}`);
-}
-
 export async function releaseNormalizationAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
   const client = await getAuthenticatedClient();
   if (!client.ok) {
@@ -133,9 +114,7 @@ export async function releaseNormalizationAction(normalizationId: string): Promi
     return { ok: false, code: mapped.code, message: mapped.message };
   }
 
-  revalidatePath("/normalization");
   revalidatePath("/generator");
-  revalidatePath(`/normalization/${normalizationId}`);
   return { ok: true, message: "Bloqueio libertado." };
 }
 
@@ -154,6 +133,6 @@ export async function renewNormalizationClaimAction(normalizationId: string): Pr
     return { ok: false, code: mapped.code, message: mapped.message };
   }
 
-  revalidatePath(`/normalization/${normalizationId}`);
+  revalidatePath("/generator");
   return { ok: true, message: "Bloqueio renovado." };
 }
