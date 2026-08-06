@@ -97,7 +97,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       status: "completed",
       total_rows: summary.totalRows,
       pending_rows: summary.pendingRows,
-      completed_rows: 0,
+      completed_rows: summary.completedRows,
       invalid_rows: summary.invalidRows,
       imported_by: user.id,
       completed_at: new Date().toISOString(),
@@ -123,6 +123,11 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     normalization_status: row.normalizationStatus,
     import_issue: row.importIssue,
     category_id: categoryId,
+    final_new_code: row.normalizationStatus === "completed" ? row.sourceNewCode : null,
+    final_designation_pt: row.normalizationStatus === "completed" ? row.sourceDesignationPt : null,
+    final_designation_es: row.normalizationStatus === "completed" ? row.sourceDesignationEs : null,
+    final_designation_en: row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
+    completed_at: row.normalizationStatus === "completed" ? new Date().toISOString() : null,
   }));
 
   const chunkSize = 100;
@@ -137,10 +142,11 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
   }
 
   revalidatePath("/normalization");
+  revalidatePath("/generator");
 
   return {
     ok: true,
-    message: `Import concluido: ${summary.pendingRows} pendentes, ${summary.invalidRows} invalidas.`,
+    message: `Import concluido: ${summary.pendingRows} pendentes, ${summary.completedRows} ja normalizados (OK2), ${summary.invalidRows} invalidas.`,
     batchId: batch.id,
     fileName: file.name,
     totalRows: summary.totalRows,

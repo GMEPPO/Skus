@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
+import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import type {
   NormalizationImportBatchSummary,
   NormalizationQueueItem,
@@ -75,12 +76,23 @@ export async function getPendingNormalizationQueue(limit = 100): Promise<Normali
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) return [];
 
+  // Reconcile rows imported before OK2 handling: mark them completed so they leave the queue.
+  await supabase
+    .from("skus_code_normalizations")
+    .update({
+      normalization_status: "completed",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("normalization_status", "pending")
+    .ilike("source_status", "ok2");
+
   const { data, error } = await supabase
     .from("skus_code_normalizations")
     .select(
       `
       id, import_batch_id, source_row_number,
       legacy_code, legacy_designation, source_new_code, source_designation_pt,
+      source_status,
       normalization_status, category_id, import_issue,
       locked_by, locked_at, lock_expires_at,
       final_new_code, completed_at,
@@ -92,7 +104,10 @@ export async function getPendingNormalizationQueue(limit = 100): Promise<Normali
     .limit(limit);
 
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map(mapQueueItem);
+
+  return ((data ?? []) as Record<string, unknown>[])
+    .filter((row) => !isOk2SourceStatus(row.source_status ? String(row.source_status) : null))
+    .map(mapQueueItem);
 }
 
 export async function getNormalizationById(id: string): Promise<NormalizationRecord | null> {

@@ -42,7 +42,22 @@ describe("normalization import parser", () => {
     expect(parsed.rows[0].importIssue).toBe("MISSING_LEGACY_CODE");
   });
 
-  it("resume totales pending e invalidas", () => {
+  it("marca completed quando Status e OK2", () => {
+    const buffer = buildWorkbookBuffer([
+      {
+        Referencia_antiga: "LEG-OK2",
+        Designacao_antiga: "Ja normalizado",
+        Referencia_nova: "NEW-OK2",
+        Estado: "OK2",
+      },
+    ]);
+
+    const parsed = parseNormalizationWorkbook(buffer);
+    expect(parsed.rows[0].normalizationStatus).toBe("completed");
+    expect(parsed.rows[0].sourceStatus).toBe("OK2");
+  });
+
+  it("resume totales pending, completed e invalidas", () => {
     const rows = summarizeImportRows([
       {
         sourceRowNumber: 2,
@@ -59,6 +74,19 @@ describe("normalization import parser", () => {
       },
       {
         sourceRowNumber: 3,
+        legacyCode: "B",
+        legacyDesignation: null,
+        sourceNewCode: "NEW-B",
+        sourceDesignationPt: null,
+        sourceDesignationEs: null,
+        sourceDesignationEn: null,
+        sourceStatus: "OK2",
+        sourceObservations: null,
+        normalizationStatus: "completed",
+        importIssue: null,
+      },
+      {
+        sourceRowNumber: 4,
         legacyCode: null,
         legacyDesignation: null,
         sourceNewCode: null,
@@ -72,8 +100,9 @@ describe("normalization import parser", () => {
       },
     ]);
 
-    expect(rows.totalRows).toBe(2);
+    expect(rows.totalRows).toBe(3);
     expect(rows.pendingRows).toBe(1);
+    expect(rows.completedRows).toBe(1);
     expect(rows.invalidRows).toBe(1);
   });
 

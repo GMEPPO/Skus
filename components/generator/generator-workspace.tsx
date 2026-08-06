@@ -31,7 +31,8 @@ export function GeneratorWorkspace({
 }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [filter, setFilter] = useState("");
+  const [referenceFilter, setReferenceFilter] = useState("");
+  const [designationFilter, setDesignationFilter] = useState("");
   const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [catalog, setCatalog] = useState(initialCatalog);
   const [selectedNorm, setSelectedNorm] = useState<NormalizationQueueItem | null>(null);
@@ -116,8 +117,10 @@ export function GeneratorWorkspace({
       <NormalizationPendingSidebar
         items={pendingItems}
         selectedId={selectedNorm?.id ?? null}
-        filter={filter}
-        onFilterChange={setFilter}
+        referenceFilter={referenceFilter}
+        designationFilter={designationFilter}
+        onReferenceFilterChange={setReferenceFilter}
+        onDesignationFilterChange={setDesignationFilter}
         onSelect={handleSelectNormalization}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen((open) => !open)}

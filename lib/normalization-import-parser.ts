@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
+import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 
 export const NORMALIZATION_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -13,7 +14,7 @@ export type ParsedNormalizationImportRow = {
   sourceDesignationEn: string | null;
   sourceStatus: string | null;
   sourceObservations: string | null;
-  normalizationStatus: "pending" | "cancelled";
+  normalizationStatus: "pending" | "completed" | "cancelled";
   importIssue: string | null;
 };
 
@@ -86,6 +87,8 @@ function mapRawRow(raw: Record<string, unknown>, sourceRowNumber: number): Parse
   if (!mapped.legacyCode) {
     mapped.normalizationStatus = "cancelled";
     mapped.importIssue = "MISSING_LEGACY_CODE";
+  } else if (isOk2SourceStatus(mapped.sourceStatus)) {
+    mapped.normalizationStatus = "completed";
   }
 
   return mapped;
@@ -123,10 +126,12 @@ export function sha256Buffer(buffer: Buffer): string {
 
 export function summarizeImportRows(rows: ParsedNormalizationImportRow[]) {
   const pendingRows = rows.filter((row) => row.normalizationStatus === "pending").length;
+  const completedRows = rows.filter((row) => row.normalizationStatus === "completed").length;
   const invalidRows = rows.filter((row) => row.normalizationStatus === "cancelled").length;
   return {
     totalRows: rows.length,
     pendingRows,
+    completedRows,
     invalidRows,
   };
 }

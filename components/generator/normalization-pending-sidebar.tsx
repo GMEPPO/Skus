@@ -7,11 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { NormalizationQueueItem } from "@/lib/types";
 
+function matchesPartialQuery(value: string | null | undefined, query: string) {
+  if (!query) return true;
+  return String(value ?? "")
+    .toLowerCase()
+    .includes(query);
+}
+
 export function NormalizationPendingSidebar({
   items,
   selectedId,
-  filter,
-  onFilterChange,
+  referenceFilter,
+  designationFilter,
+  onReferenceFilterChange,
+  onDesignationFilterChange,
   onSelect,
   isOpen,
   onToggle,
@@ -20,8 +29,10 @@ export function NormalizationPendingSidebar({
 }: {
   items: NormalizationQueueItem[];
   selectedId: string | null;
-  filter: string;
-  onFilterChange: (value: string) => void;
+  referenceFilter: string;
+  designationFilter: string;
+  onReferenceFilterChange: (value: string) => void;
+  onDesignationFilterChange: (value: string) => void;
   onSelect: (item: NormalizationQueueItem) => void;
   isOpen: boolean;
   onToggle: () => void;
@@ -29,22 +40,19 @@ export function NormalizationPendingSidebar({
   sidebarError: string | null;
 }) {
   const filteredItems = useMemo(() => {
-    const query = filter.trim().toLowerCase();
-    if (!query) return items;
+    const refQuery = referenceFilter.trim().toLowerCase();
+    const desQuery = designationFilter.trim().toLowerCase();
+    if (!refQuery && !desQuery) return items;
+
     return items.filter((item) => {
-      const haystack = [
-        item.legacyCode,
-        item.legacyDesignation,
-        item.sourceDesignationPt,
-        item.sourceNewCode,
-        item.batchFileName,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(query);
+      const referenceMatch =
+        matchesPartialQuery(item.legacyCode, refQuery) || matchesPartialQuery(item.sourceNewCode, refQuery);
+      const designationMatch =
+        matchesPartialQuery(item.legacyDesignation, desQuery) ||
+        matchesPartialQuery(item.sourceDesignationPt, desQuery);
+      return referenceMatch && designationMatch;
     });
-  }, [items, filter]);
+  }, [items, referenceFilter, designationFilter]);
 
   if (!isOpen) {
     return (
@@ -76,9 +84,19 @@ export function NormalizationPendingSidebar({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
-            value={filter}
-            onChange={(event) => onFilterChange(event.target.value)}
-            placeholder="Filtrar referencia ou designacao..."
+            value={referenceFilter}
+            onChange={(event) => onReferenceFilterChange(event.target.value)}
+            placeholder="Filtrar referencia..."
+            className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100"
+          />
+        </label>
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="search"
+            value={designationFilter}
+            onChange={(event) => onDesignationFilterChange(event.target.value)}
+            placeholder="Filtrar designacao..."
             className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100"
           />
         </label>
@@ -94,7 +112,7 @@ export function NormalizationPendingSidebar({
           <p className="p-3 text-sm text-slate-500">
             {items.length === 0
               ? "Sem registos pendentes. Importa um Excel para comecar."
-              : "Nenhum resultado para este filtro."}
+              : "Nenhum resultado para estes filtros."}
           </p>
         ) : (
           <ul className="space-y-1">
