@@ -72,11 +72,10 @@ export async function getNormalizationImportBatches(): Promise<NormalizationImpo
   return ((data ?? []) as Record<string, unknown>[]).map(mapBatch);
 }
 
-export async function getPendingNormalizationQueue(limit = 100): Promise<NormalizationQueueItem[]> {
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) return [];
+const NORMALIZATION_QUEUE_PAGE_SIZE = 1000;
+const NORMALIZATION_QUEUE_FETCH_ALL_CAP = 20_000;
 
-  // Reconcile rows imported before OK2 handling: mark them completed so they leave the queue.
+async function reconcileImportedOk2Rows(supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>) {
   await supabase
     .from("skus_code_normalizations")
     .update({
@@ -85,11 +84,9 @@ export async function getPendingNormalizationQueue(limit = 100): Promise<Normali
     })
     .eq("normalization_status", "pending")
     .ilike("source_status", "ok2");
+}
 
-  const { data, error } = await supabase
-    .from("skus_code_normalizations")
-    .select(
-      `
+const PENDING_QUEUE_SELECT = `
       id, import_batch_id, source_row_number,
       legacy_code, legacy_designation, source_new_code, source_designation_pt,
       source_status,
@@ -97,15 +94,54 @@ export async function getPendingNormalizationQueue(limit = 100): Promise<Normali
       locked_by, locked_at, lock_expires_at,
       final_new_code, completed_at,
       skus_normalization_import_batches ( file_name )
-    `,
-    )
-    .eq("normalization_status", "pending")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+    `;
+
+export async function getPendingNormalizationQueueCount(): Promise<number> {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) return 0;
+
+  await reconcileImportedOk2Rows(supabase);
+
+  const { count, error } = await supabase
+    .from("skus_code_normalizations")
+    .select("id", { count: "exact", head: true })
+    .eq("normalization_status", "pending");
 
   if (error) throw new Error(error.message);
+  return count ?? 0;
+}
 
-  return ((data ?? []) as Record<string, unknown>[])
+/** @param limit When omitted, loads all pending rows (paginated) up to NORMALIZATION_QUEUE_FETCH_ALL_CAP. */
+export async function getPendingNormalizationQueue(limit?: number): Promise<NormalizationQueueItem[]> {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) return [];
+
+  await reconcileImportedOk2Rows(supabase);
+
+  const maxRows = limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP;
+  const rows: Record<string, unknown>[] = [];
+  let offset = 0;
+
+  while (rows.length < maxRows) {
+    const batchSize = Math.min(NORMALIZATION_QUEUE_PAGE_SIZE, maxRows - rows.length);
+    const { data, error } = await supabase
+      .from("skus_code_normalizations")
+      .select(PENDING_QUEUE_SELECT)
+      .eq("normalization_status", "pending")
+      .order("created_at", { ascending: true })
+      .range(offset, offset + batchSize - 1);
+
+    if (error) throw new Error(error.message);
+
+    const page = (data ?? []) as Record<string, unknown>[];
+    if (page.length === 0) break;
+
+    rows.push(...page);
+    if (page.length < batchSize) break;
+    offset += batchSize;
+  }
+
+  return rows
     .filter((row) => !isOk2SourceStatus(row.source_status ? String(row.source_status) : null))
     .map(mapQueueItem);
 }

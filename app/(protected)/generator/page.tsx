@@ -24,7 +24,7 @@ export default async function GeneratorPage({
   const categories = await getCategories();
   const preferredCategory = categories.find((category) => category.slug === "cosmetica") ?? categories[0] ?? null;
   const categoryCatalog = preferredCategory ? await getGeneratorCatalogForCategory(preferredCategory.id) : null;
-  const pendingQueue = await getPendingNormalizationQueue(500);
+  const pendingQueue = await getPendingNormalizationQueue();
 
   if (!preferredCategory || !categoryCatalog) {
     return (

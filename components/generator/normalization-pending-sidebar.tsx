@@ -71,8 +71,11 @@ export function NormalizationPendingSidebar({
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300">A normalizar</p>
           <p className="text-sm text-slate-400">
-            {filteredItems.length} de {items.length} pendente(s)
+            {filteredItems.length === items.length
+              ? `${items.length} pendente(s)`
+              : `${filteredItems.length} de ${items.length} pendente(s)`}
           </p>
+          <p className="text-xs text-slate-500">Linhas OK2 do Excel ficam fora desta fila.</p>
         </div>
         <Button type="button" variant="outline" className="h-8 w-8 p-0" onClick={onToggle} aria-label="Ocultar painel">
           <ChevronLeft className="h-4 w-4" />
