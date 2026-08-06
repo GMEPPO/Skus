@@ -57,10 +57,13 @@ SHA-256 `20260805140000…`:
 - Gate separado para `NORMALIZATION_UI_V2`
 
 **UI status (supervisor 2026-08-06):**
-- `PHASE2B2_BACKEND_VALIDATED`
-- `GENERATOR_UI_V2=REMEDIATION_REQUIRED`
-- `NORMALIZATION_UI_V2=PENDING`
-- `UI_V2_ACTIVATION=NOT_AUTHORIZED`
+- `PHASE2B2_BACKEND_VALIDATED` / `R5_BACKEND=VALIDATED`
+- `GENERATOR_UI_V2=ACTIVATION_FAILED_UI_IDEMPOTENCY` → remediación de idempotencia en curso
+- `UI_V2_ACTIVATION=ROLLED_BACK` (`NEXT_PUBLIC_SKUS_SECURE_GENERATION_V2=false`, redeploy Ready)
+- Smoke V2 fallido (UI renovó `requestId` tras éxito): `generationId=16b66b28-6f64-408e-b45d-fcc2ec4dc626`, `generatedCode=ACBBISBOD020FLW000`, `requestIdA=81fd5bdb-fe26-455c-9b4a-afbca264b606`, `requestIdB=a7573a8e-275b-4097-b4e6-6d2391c3dd9c`, `historyRows=6` (no cleanup SQL)
+- Fix UI: no renovar `requestId` en éxito/modal/retry; renovar solo si cambia payload (selección/medidas/status)
+- `NORMALIZATION_UI_V2=PENDING_SEPARATE_GATE`
+- Base commit pre-fix: `25a895909ab74371d08250053ec9ba0a3d482b9c`
 
 Hold / go-nogo: `docs/phase2b2-r5-validation-hold.md`, `docs/phase2b2-r5-apply-go-nogo.md`
 

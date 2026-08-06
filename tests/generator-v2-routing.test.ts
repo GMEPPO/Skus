@@ -225,6 +225,135 @@ describe("generator V2 routing", () => {
     expect(first).toBe(second);
   });
 
+  it("created=true y cerrar modal no renuevan requestId en el retry", async () => {
+    generateSkuSecureActionMock.mockResolvedValue({
+      ok: true,
+      message: "SKU criado com sucesso.",
+      created: true,
+      generationId: "11111111-1111-4111-8111-111111111111",
+      generatedCode: "SRV-001",
+      generatedCodeCompact: "SRV001",
+      designationPt: "Servidor PT",
+      designationEs: "Servidor ES",
+      designationEn: "Server EN",
+      snapshotVersion: 2,
+      selectionFingerprint: "a".repeat(64),
+      unitsPerBox: 12,
+      unitsPerBoxStatus: "estimated",
+      multiples: 6,
+      multiplesStatus: "estimated",
+      weight: 1.5,
+      weightStatus: "estimated",
+      requestId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    renderWizard({
+      secureGenerationV2Enabled: true,
+      categoryId: "22222222-2222-4222-8222-222222222222",
+    });
+    fillRequiredFields();
+    clickSubmit();
+    await screen.findByText("SKU gerado com sucesso");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Fechar" })[0]);
+    clickSubmit();
+    await waitFor(() => expect(generateSkuSecureActionMock).toHaveBeenCalledTimes(2));
+
+    const first = (generateSkuSecureActionMock.mock.calls[0][0] as FormData).get("requestId");
+    const second = (generateSkuSecureActionMock.mock.calls[1][0] as FormData).get("requestId");
+    expect(first).toBe(second);
+  });
+
+  it("editar seleccion renueva requestId y luego el retry conserva el nuevo", async () => {
+    generateSkuSecureActionMock.mockResolvedValue({
+      ok: true,
+      message: "SKU criado com sucesso.",
+      created: true,
+      generationId: "11111111-1111-4111-8111-111111111111",
+      generatedCode: "SRV-001",
+      generatedCodeCompact: "SRV001",
+      designationPt: "Servidor PT",
+      designationEs: "Servidor ES",
+      designationEn: "Server EN",
+      snapshotVersion: 2,
+      selectionFingerprint: "a".repeat(64),
+      unitsPerBox: 12,
+      unitsPerBoxStatus: "estimated",
+      multiples: 6,
+      multiplesStatus: "estimated",
+      weight: 1.5,
+      weightStatus: "estimated",
+      requestId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    renderWizard({
+      secureGenerationV2Enabled: true,
+      categoryId: "22222222-2222-4222-8222-222222222222",
+    });
+    fillRequiredFields();
+    clickSubmit();
+    await waitFor(() => expect(generateSkuSecureActionMock).toHaveBeenCalledTimes(1));
+    const first = (generateSkuSecureActionMock.mock.calls[0][0] as FormData).get("requestId");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Fechar" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Limpar" }));
+    const optionLabel = screen.getAllByText("ALG").find((node) => node.closest("button")) ?? null;
+    fireEvent.click(optionLabel!.closest("button") as HTMLButtonElement);
+
+    clickSubmit();
+    await waitFor(() => expect(generateSkuSecureActionMock).toHaveBeenCalledTimes(2));
+    const second = (generateSkuSecureActionMock.mock.calls[1][0] as FormData).get("requestId");
+    expect(second).not.toBe(first);
+
+    clickSubmit();
+    await waitFor(() => expect(generateSkuSecureActionMock).toHaveBeenCalledTimes(3));
+    const third = (generateSkuSecureActionMock.mock.calls[2][0] as FormData).get("requestId");
+    expect(third).toBe(second);
+  });
+
+  it("editar una medida renueva requestId", async () => {
+    generateSkuSecureActionMock.mockResolvedValue({
+      ok: true,
+      message: "SKU criado com sucesso.",
+      created: true,
+      generationId: "11111111-1111-4111-8111-111111111111",
+      generatedCode: "SRV-001",
+      generatedCodeCompact: "SRV001",
+      designationPt: "Servidor PT",
+      designationEs: "Servidor ES",
+      designationEn: "Server EN",
+      snapshotVersion: 2,
+      selectionFingerprint: "a".repeat(64),
+      unitsPerBox: 12,
+      unitsPerBoxStatus: "estimated",
+      multiples: 6,
+      multiplesStatus: "estimated",
+      weight: 1.5,
+      weightStatus: "estimated",
+      requestId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    renderWizard({
+      secureGenerationV2Enabled: true,
+      categoryId: "22222222-2222-4222-8222-222222222222",
+    });
+    fillRequiredFields();
+    clickSubmit();
+    await waitFor(() => expect(generateSkuSecureActionMock).toHaveBeenCalledTimes(1));
+    const first = (generateSkuSecureActionMock.mock.calls[0][0] as FormData).get("requestId");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Fechar" })[0]);
+    const [unitsInput] = screen.getAllByRole("spinbutton");
+    fireEvent.change(unitsInput, { target: { value: "24" } });
+    fireEvent.blur(unitsInput);
+
+    clickSubmit();
+    await waitFor(() => expect(generateSkuSecureActionMock).toHaveBeenCalledTimes(2));
+    const second = (generateSkuSecureActionMock.mock.calls[1][0] as FormData).get("requestId");
+    expect(second).not.toBe(first);
+    expect(String((generateSkuSecureActionMock.mock.calls[1][0] as FormData).get("unitsPerBox"))).toBe("24");
+  });
+
   it("rechaza medidas parciales antes de invocar la action V2", () => {
     renderWizard({
       secureGenerationV2Enabled: true,

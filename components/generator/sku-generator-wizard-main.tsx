@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { ArrowRight, CheckCircle2, ImagePlus, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +67,8 @@ export function SkuGeneratorWizardMain({
   const [productImagePreviewUrl, setProductImagePreviewUrl] = useState<string | null>(null);
   const [productImageName, setProductImageName] = useState("");
   const [secureRequestId, setSecureRequestId] = useState(() => crypto.randomUUID());
+  const secureRequestIdRef = useRef(secureRequestId);
+  const requestBoundPayloadKeyRef = useRef<string | null>(null);
 
   const requiredLevels = useMemo(() => catalog.levels.filter(isRequiredLevel), [catalog.levels]);
   const requiredCompletedCount = requiredLevels.filter((level) => selections[level.id] && !isEmptySelection(selections[level.id])).length;
@@ -100,10 +101,43 @@ export function SkuGeneratorWizardMain({
     };
   }, [productImagePreviewUrl]);
 
-  function renewSecureRequestId() {
-    if (secureGenerationV2Enabled) {
-      setSecureRequestId(crypto.randomUUID());
+  function buildSecurePayloadKey(
+    nextSelections: Selections = selections,
+    nextUnitsPerBox = unitsPerBox,
+    nextUnitsPerBoxStatus = unitsPerBoxStatus,
+    nextMultiples = multiples,
+    nextMultiplesStatus = multiplesStatus,
+    nextWeight = weight,
+    nextWeightStatus = weightStatus,
+  ) {
+    return JSON.stringify({
+      categoryId,
+      selections: nextSelections,
+      unitsPerBox: nextUnitsPerBox,
+      unitsPerBoxStatus: nextUnitsPerBoxStatus,
+      multiples: nextMultiples,
+      multiplesStatus: nextMultiplesStatus,
+      weight: nextWeight,
+      weightStatus: nextWeightStatus,
+    });
+  }
+
+  function bindOrRenewRequestIdForPayload(payloadKey: string): string {
+    if (!secureGenerationV2Enabled) {
+      return secureRequestIdRef.current;
     }
+    if (requestBoundPayloadKeyRef.current === null) {
+      requestBoundPayloadKeyRef.current = payloadKey;
+      return secureRequestIdRef.current;
+    }
+    if (requestBoundPayloadKeyRef.current === payloadKey) {
+      return secureRequestIdRef.current;
+    }
+    const nextRequestId = crypto.randomUUID();
+    requestBoundPayloadKeyRef.current = payloadKey;
+    secureRequestIdRef.current = nextRequestId;
+    setSecureRequestId(nextRequestId);
+    return nextRequestId;
   }
 
   if (catalog.levels.length === 0) {
@@ -115,19 +149,20 @@ export function SkuGeneratorWizardMain({
   }
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
-    renewSecureRequestId();
-    setSelections((current) => ({
-      ...current,
-      [level.id]: word === null ? buildEmptySelectionId(level.id) : word?.id ?? "",
-    }));
+    const nextValue = word === null ? buildEmptySelectionId(level.id) : word?.id ?? "";
+    const nextSelections = {
+      ...selections,
+      [level.id]: nextValue,
+    };
+    bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
+    setSelections(nextSelections);
   }
 
   function clearSelection(level: GeneratorLevel) {
-    setSelections((current) => {
-      const next = { ...current };
-      delete next[level.id];
-      return next;
-    });
+    const nextSelections = { ...selections };
+    delete nextSelections[level.id];
+    bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
+    setSelections(nextSelections);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -151,7 +186,8 @@ export function SkuGeneratorWizardMain({
 
       formData.set("categoryId", categoryId);
       formData.set("selectionsJson", JSON.stringify(buildSecureSelectionsPayload(catalog, selections)));
-      formData.set("requestId", secureRequestId);
+      const requestIdForSubmit = bindOrRenewRequestIdForPayload(buildSecurePayloadKey());
+      formData.set("requestId", requestIdForSubmit);
 
       const secureResult = await generateSkuSecureAction(formData);
       if (!secureResult.ok) {
@@ -176,7 +212,7 @@ export function SkuGeneratorWizardMain({
         weight: secureResult.weight,
         weightStatus: secureResult.weightStatus,
       });
-      setSecureRequestId(crypto.randomUUID());
+      // Keep the same requestId after success so retries of the same payload stay idempotent.
       setIsSubmitting(false);
       return;
     }
@@ -202,7 +238,7 @@ export function SkuGeneratorWizardMain({
   }
 
   function handleProductImageChange(event: ChangeEvent<HTMLInputElement>) {
-    renewSecureRequestId();
+    // Image is not part of the secure RPC payload; do not rotate requestId.
     const nextFile = event.target.files?.[0];
     setProductImagePreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current);
@@ -420,10 +456,8 @@ export function SkuGeneratorWizardMain({
                       step="0.01"
                       required
                       value={unitsPerBox}
-                      onChange={(event) => {
-                        renewSecureRequestId();
-                        setUnitsPerBox(event.target.value);
-                      }}
+                      onChange={(event) => setUnitsPerBox(event.target.value)}
+                      onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
                       className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     />
                   </label>
@@ -433,8 +467,11 @@ export function SkuGeneratorWizardMain({
                       name="unitsPerBoxStatus"
                       value={unitsPerBoxStatus}
                       onChange={(event) => {
-                        renewSecureRequestId();
-                        setUnitsPerBoxStatus(event.target.value as "real" | "estimated");
+                        const next = event.target.value as "real" | "estimated";
+                        bindOrRenewRequestIdForPayload(
+                          buildSecurePayloadKey(selections, unitsPerBox, next, multiples, multiplesStatus, weight, weightStatus),
+                        );
+                        setUnitsPerBoxStatus(next);
                       }}
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
@@ -454,10 +491,8 @@ export function SkuGeneratorWizardMain({
                       step="0.01"
                       required
                       value={multiples}
-                      onChange={(event) => {
-                        renewSecureRequestId();
-                        setMultiples(event.target.value);
-                      }}
+                      onChange={(event) => setMultiples(event.target.value)}
+                      onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
                       className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     />
                   </label>
@@ -467,8 +502,11 @@ export function SkuGeneratorWizardMain({
                       name="multiplesStatus"
                       value={multiplesStatus}
                       onChange={(event) => {
-                        renewSecureRequestId();
-                        setMultiplesStatus(event.target.value as "real" | "estimated");
+                        const next = event.target.value as "real" | "estimated";
+                        bindOrRenewRequestIdForPayload(
+                          buildSecurePayloadKey(selections, unitsPerBox, unitsPerBoxStatus, multiples, next, weight, weightStatus),
+                        );
+                        setMultiplesStatus(next);
                       }}
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
@@ -488,10 +526,8 @@ export function SkuGeneratorWizardMain({
                       step="0.01"
                       required
                       value={weight}
-                      onChange={(event) => {
-                        renewSecureRequestId();
-                        setWeight(event.target.value);
-                      }}
+                      onChange={(event) => setWeight(event.target.value)}
+                      onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
                       className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     />
                   </label>
@@ -501,8 +537,11 @@ export function SkuGeneratorWizardMain({
                       name="weightStatus"
                       value={weightStatus}
                       onChange={(event) => {
-                        renewSecureRequestId();
-                        setWeightStatus(event.target.value as "real" | "estimated");
+                        const next = event.target.value as "real" | "estimated";
+                        bindOrRenewRequestIdForPayload(
+                          buildSecurePayloadKey(selections, unitsPerBox, unitsPerBoxStatus, multiples, multiplesStatus, weight, next),
+                        );
+                        setWeightStatus(next);
                       }}
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
