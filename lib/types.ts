@@ -120,6 +120,8 @@ export interface NormalizationHistoryItem {
   legacyDesignation: string | null;
   newCode: string | null;
   newDesignationPt: string | null;
+  newDesignationEs: string | null;
+  newDesignationEn: string | null;
   categoryId: string | null;
   categoryName: string | null;
   categorySlug: string | null;

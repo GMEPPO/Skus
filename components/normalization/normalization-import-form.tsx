@@ -53,7 +53,7 @@ export function NormalizationImportForm({
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Importar Excel</p>
           <p className="mt-1 text-sm text-slate-400">
             Carrega a primeira folha com colunas como Referencia_antiga, Designacao_antiga, Referencia_nova,
-            Designacao_PT/ES/EN, Estado e Observacoes.
+            Designacao_nova_pt/es/en (ou Designacao_PT/ES/EN), Estado e Observacoes.
           </p>
         </div>
       ) : null}
@@ -83,6 +83,18 @@ export function NormalizationImportForm({
           required
           className="block w-full text-xs text-slate-300 file:mr-2 file:rounded-md file:border-0 file:bg-amber-400 file:px-2 file:py-1.5 file:text-xs file:font-medium file:text-slate-950"
         />
+      </label>
+
+      <label className="flex items-start gap-2 text-xs text-slate-400">
+        <input
+          name="updateDesignations"
+          type="checkbox"
+          value="true"
+          className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-950"
+        />
+        <span>
+          Atualizar designacoes PT/ES/EN se o ficheiro ja foi importado (util para corrigir colunas do Excel).
+        </span>
       </label>
 
       <div className="flex flex-wrap items-center gap-2">

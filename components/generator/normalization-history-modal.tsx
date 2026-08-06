@@ -1,18 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { History, X } from "lucide-react";
+import { NormalizationPaginationControls } from "@/components/generator/normalization-pagination-controls";
+import { useDebouncedValue } from "@/components/generator/use-debounced-value";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { isOk2SourceStatus } from "@/lib/normalization-source-status";
+import {
+  countCompletedNormalizationAction,
+  searchCompletedNormalizationHistoryAction,
+} from "@/lib/normalization-query-actions";
 import type { NormalizationHistoryItem } from "@/lib/types";
-
-function matchesPartialQuery(value: string | null | undefined, query: string) {
-  if (!query) return true;
-  return String(value ?? "")
-    .toLowerCase()
-    .includes(query);
-}
 
 function formatCompletedAt(value: string | null) {
   if (!value) return "—";
@@ -30,45 +29,99 @@ function formatCompletedAt(value: string | null) {
 const filterInputClassName =
   "mt-2 flex h-8 w-full min-w-[7rem] rounded-md border border-slate-700 bg-slate-950 px-2 text-xs text-slate-100 placeholder:text-slate-600";
 
-export function NormalizationHistoryModal({ items }: { items: NormalizationHistoryItem[] }) {
+export function NormalizationHistoryModal({ refreshToken }: { refreshToken: number }) {
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<NormalizationHistoryItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [completedTotal, setCompletedTotal] = useState<number | null>(null);
+
   const [legacyCodeFilter, setLegacyCodeFilter] = useState("");
   const [legacyDesignationFilter, setLegacyDesignationFilter] = useState("");
   const [newCodeFilter, setNewCodeFilter] = useState("");
   const [newDesignationFilter, setNewDesignationFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const filteredItems = useMemo(() => {
-    const legacyCodeQuery = legacyCodeFilter.trim().toLowerCase();
-    const legacyDesignationQuery = legacyDesignationFilter.trim().toLowerCase();
-    const newCodeQuery = newCodeFilter.trim().toLowerCase();
-    const newDesignationQuery = newDesignationFilter.trim().toLowerCase();
-    const categoryQuery = categoryFilter.trim().toLowerCase();
+  const debouncedLegacyCodeFilter = useDebouncedValue(legacyCodeFilter);
+  const debouncedLegacyDesignationFilter = useDebouncedValue(legacyDesignationFilter);
+  const debouncedNewCodeFilter = useDebouncedValue(newCodeFilter);
+  const debouncedNewDesignationFilter = useDebouncedValue(newDesignationFilter);
+  const debouncedCategoryFilter = useDebouncedValue(categoryFilter);
 
-    if (!legacyCodeQuery && !legacyDesignationQuery && !newCodeQuery && !newDesignationQuery && !categoryQuery) {
-      return items;
+  const loadHistory = useCallback(async () => {
+    if (!open) return;
+    setIsLoading(true);
+    try {
+      const result = await searchCompletedNormalizationHistoryAction({
+        page,
+        legacyCodeFilter: debouncedLegacyCodeFilter,
+        legacyDesignationFilter: debouncedLegacyDesignationFilter,
+        newCodeFilter: debouncedNewCodeFilter,
+        newDesignationFilter: debouncedNewDesignationFilter,
+        categoryFilter: debouncedCategoryFilter,
+      });
+      setItems(result.items);
+      setTotal(result.total);
+      setTotalPages(result.totalPages);
+      if (page > result.totalPages && result.totalPages > 0) {
+        setPage(result.totalPages);
+      }
+    } finally {
+      setIsLoading(false);
     }
+  }, [
+    open,
+    page,
+    debouncedLegacyCodeFilter,
+    debouncedLegacyDesignationFilter,
+    debouncedNewCodeFilter,
+    debouncedNewDesignationFilter,
+    debouncedCategoryFilter,
+  ]);
 
-    return items.filter(
-      (item) =>
-        matchesPartialQuery(item.legacyCode, legacyCodeQuery) &&
-        matchesPartialQuery(item.legacyDesignation, legacyDesignationQuery) &&
-        matchesPartialQuery(item.newCode, newCodeQuery) &&
-        matchesPartialQuery(item.newDesignationPt, newDesignationQuery) &&
-        (matchesPartialQuery(item.categoryName, categoryQuery) ||
-          matchesPartialQuery(item.categorySlug, categoryQuery)),
-    );
-  }, [items, legacyCodeFilter, legacyDesignationFilter, newCodeFilter, newDesignationFilter, categoryFilter]);
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory, refreshToken]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    debouncedLegacyCodeFilter,
+    debouncedLegacyDesignationFilter,
+    debouncedNewCodeFilter,
+    debouncedNewDesignationFilter,
+    debouncedCategoryFilter,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void countCompletedNormalizationAction().then((count) => {
+      if (!cancelled) setCompletedTotal(count);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken]);
 
   function closeModal() {
     setOpen(false);
   }
 
+  const hasFilters = Boolean(
+    legacyCodeFilter.trim() ||
+      legacyDesignationFilter.trim() ||
+      newCodeFilter.trim() ||
+      newDesignationFilter.trim() ||
+      categoryFilter.trim(),
+  );
+
   return (
     <>
       <Button type="button" variant="outline" className="h-9 gap-2 px-3" onClick={() => setOpen(true)}>
         <History className="h-4 w-4" />
-        Historico normalizados ({items.length})
+        Historico normalizados ({completedTotal ?? "…"})
       </Button>
 
       {open ? (
@@ -81,7 +134,7 @@ export function NormalizationHistoryModal({ items }: { items: NormalizationHisto
           role="presentation"
         >
           <div
-            className="flex max-h-[min(90vh,960px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl"
+            className="flex max-h-[min(90vh,960px)] w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -93,12 +146,11 @@ export function NormalizationHistoryModal({ items }: { items: NormalizationHisto
                   Historico de normalizacao
                 </h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  Referencias e designacoes antigas e novas, com categoria. Usa um filtro por coluna.
+                  Referencias e designacoes antigas e novas (PT, ES, EN), com categoria. Os filtros pesquisam em todo
+                  o historico.
                 </p>
                 <p className="mt-2 text-xs text-slate-500">
-                  {filteredItems.length === items.length
-                    ? `${items.length} registo(s)`
-                    : `${filteredItems.length} de ${items.length} registo(s)`}
+                  {hasFilters ? `${total} resultado(s) no universo total` : `${total} registo(s)`}
                 </p>
               </div>
               <Button type="button" variant="outline" className="h-9 w-9 shrink-0 p-0" onClick={closeModal}>
@@ -108,7 +160,11 @@ export function NormalizationHistoryModal({ items }: { items: NormalizationHisto
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto p-4">
-              {items.length === 0 ? (
+              {isLoading && items.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">
+                  A carregar historico...
+                </p>
+              ) : total === 0 && !hasFilters ? (
                 <p className="rounded-xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">
                   Ainda nao existem produtos normalizados. Conclui registos no gerador ou importa um Excel com linhas
                   OK2.
@@ -149,14 +205,20 @@ export function NormalizationHistoryModal({ items }: { items: NormalizationHisto
                           />
                         </th>
                         <th className="px-3 py-2 align-top">
-                          <span>Designacao nova</span>
+                          <span>Designacao nova PT</span>
                           <input
                             type="search"
                             value={newDesignationFilter}
                             onChange={(event) => setNewDesignationFilter(event.target.value)}
-                            placeholder="Filtrar..."
+                            placeholder="Filtrar PT/ES/EN..."
                             className={filterInputClassName}
                           />
+                        </th>
+                        <th className="px-3 py-2 align-top">
+                          <span>Designacao nova ES</span>
+                        </th>
+                        <th className="px-3 py-2 align-top">
+                          <span>Designacao nova EN</span>
                         </th>
                         <th className="px-3 py-2 align-top">
                           <span>Categoria</span>
@@ -172,19 +234,21 @@ export function NormalizationHistoryModal({ items }: { items: NormalizationHisto
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800 bg-slate-900/40">
-                      {filteredItems.length === 0 ? (
+                      {items.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                            Nenhum resultado para estes filtros.
+                          <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                            {isLoading ? "A pesquisar..." : "Nenhum resultado para estes filtros."}
                           </td>
                         </tr>
                       ) : (
-                        filteredItems.map((item) => (
+                        items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-3 py-2.5 font-mono text-slate-100">{item.legacyCode ?? "—"}</td>
                             <td className="max-w-xs px-3 py-2.5 text-slate-300">{item.legacyDesignation ?? "—"}</td>
                             <td className="px-3 py-2.5 font-mono text-emerald-200">{item.newCode ?? "—"}</td>
-                            <td className="max-w-md px-3 py-2.5 text-slate-300">{item.newDesignationPt ?? "—"}</td>
+                            <td className="max-w-sm px-3 py-2.5 text-slate-300">{item.newDesignationPt ?? "—"}</td>
+                            <td className="max-w-sm px-3 py-2.5 text-slate-300">{item.newDesignationEs ?? "—"}</td>
+                            <td className="max-w-sm px-3 py-2.5 text-slate-300">{item.newDesignationEn ?? "—"}</td>
                             <td className="px-3 py-2.5 text-slate-300">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span>{item.categoryName ?? "—"}</span>
@@ -206,6 +270,14 @@ export function NormalizationHistoryModal({ items }: { items: NormalizationHisto
                 </div>
               )}
             </div>
+
+            <NormalizationPaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              isLoading={isLoading}
+              onPageChange={setPage}
+            />
           </div>
         </div>
       ) : null}

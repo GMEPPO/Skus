@@ -42,6 +42,26 @@ describe("normalization import parser", () => {
     expect(parsed.rows[0].importIssue).toBe("MISSING_LEGACY_CODE");
   });
 
+  it("mapeia Designacao_nova_pt, _es e _en", () => {
+    const buffer = buildWorkbookBuffer([
+      {
+        Referencia_antiga: "ACHB-001",
+        Designacao_antiga: "Sabonete antigo",
+        Referencia_nova: "ACHB-NEW",
+        Designacao_nova_pt: "ACHB LAVANDA Sabonete 20g ALLEGRO",
+        Designacao_nova_es: "ACHB Lavanda Jabon 20g ALLEGRO",
+        Designacao_nova_en: "ACHB Lavender Soap 20g ALLEGRO",
+        Estado: "OK2",
+      },
+    ]);
+
+    const parsed = parseNormalizationWorkbook(buffer);
+    expect(parsed.rows[0].sourceDesignationPt).toBe("ACHB LAVANDA Sabonete 20g ALLEGRO");
+    expect(parsed.rows[0].sourceDesignationEs).toBe("ACHB Lavanda Jabon 20g ALLEGRO");
+    expect(parsed.rows[0].sourceDesignationEn).toBe("ACHB Lavender Soap 20g ALLEGRO");
+    expect(parsed.rows[0].normalizationStatus).toBe("completed");
+  });
+
   it("mapeia Designacao_nova para designacao PT de destino", () => {
     const buffer = buildWorkbookBuffer([
       {

@@ -2,6 +2,13 @@
 
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import { isOk2SourceStatus } from "@/lib/normalization-source-status";
+import {
+  buildIlikePattern,
+  NORMALIZATION_HISTORY_PAGE_SIZE,
+  NORMALIZATION_PENDING_PAGE_SIZE,
+  toPaginatedResult,
+  type PaginatedResult,
+} from "@/lib/normalization-search-utils";
 import type {
   NormalizationHistoryItem,
   NormalizationImportBatchSummary,
@@ -177,54 +184,135 @@ const PENDING_QUEUE_SELECT = `
       skus_normalization_import_batches ( file_name )
     `;
 
-export async function getPendingNormalizationQueueCount(): Promise<number> {
+export async function runNormalizationImportMaintenance() {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) return;
+  await reconcileImportedOk2Rows(supabase);
+  await backfillCompletedNormalizationFields(supabase);
+}
+
+function applyPendingOk2Exclusion<T extends { not: (column: string, operator: string, value: string) => T }>(query: T) {
+  return query.not("source_status", "ilike", "OK2");
+}
+
+function applyPendingReferenceFilter<T extends { or: (filters: string) => T }>(query: T, referenceFilter?: string) {
+  const pattern = buildIlikePattern(referenceFilter ?? "");
+  if (!pattern) return query;
+  return query.or(`legacy_code.ilike.${pattern},source_new_code.ilike.${pattern}`);
+}
+
+function applyPendingDesignationFilter<T extends { or: (filters: string) => T }>(query: T, designationFilter?: string) {
+  const pattern = buildIlikePattern(designationFilter ?? "");
+  if (!pattern) return query;
+  return query.or(`legacy_designation.ilike.${pattern},source_designation_pt.ilike.${pattern}`);
+}
+
+async function resolveCategoryIdsForFilter(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  categoryFilter?: string,
+): Promise<string[] | null> {
+  const pattern = buildIlikePattern(categoryFilter ?? "");
+  if (!pattern) return null;
+
+  const { data, error } = await supabase
+    .from("skus_categories")
+    .select("id")
+    .or(`name.ilike.${pattern},slug.ilike.${pattern}`);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => String(row.id));
+}
+
+function applyHistoryLegacyCodeFilter<T extends { ilike: (column: string, pattern: string) => T }>(
+  query: T,
+  legacyCodeFilter?: string,
+) {
+  const pattern = buildIlikePattern(legacyCodeFilter ?? "");
+  if (!pattern) return query;
+  return query.ilike("legacy_code", pattern);
+}
+
+function applyHistoryLegacyDesignationFilter<T extends { ilike: (column: string, pattern: string) => T }>(
+  query: T,
+  legacyDesignationFilter?: string,
+) {
+  const pattern = buildIlikePattern(legacyDesignationFilter ?? "");
+  if (!pattern) return query;
+  return query.ilike("legacy_designation", pattern);
+}
+
+function applyHistoryNewCodeFilter<T extends { or: (filters: string) => T }>(query: T, newCodeFilter?: string) {
+  const pattern = buildIlikePattern(newCodeFilter ?? "");
+  if (!pattern) return query;
+  return query.or(`final_new_code.ilike.${pattern},source_new_code.ilike.${pattern}`);
+}
+
+function applyHistoryNewDesignationFilter<T extends { or: (filters: string) => T }>(
+  query: T,
+  newDesignationFilter?: string,
+) {
+  const pattern = buildIlikePattern(newDesignationFilter ?? "");
+  if (!pattern) return query;
+  return query.or(
+    `final_designation_pt.ilike.${pattern},source_designation_pt.ilike.${pattern},final_designation_es.ilike.${pattern},source_designation_es.ilike.${pattern},final_designation_en.ilike.${pattern},source_designation_en.ilike.${pattern}`,
+  );
+}
+
+export async function countPendingNormalizationQueue(input?: {
+  referenceFilter?: string;
+  designationFilter?: string;
+}): Promise<number> {
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) return 0;
 
-  await reconcileImportedOk2Rows(supabase);
-
-  const { count, error } = await supabase
+  let query = supabase
     .from("skus_code_normalizations")
     .select("id", { count: "exact", head: true })
     .eq("normalization_status", "pending");
 
+  query = applyPendingOk2Exclusion(query);
+  query = applyPendingReferenceFilter(query, input?.referenceFilter);
+  query = applyPendingDesignationFilter(query, input?.designationFilter);
+
+  const { count, error } = await query;
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
 
-/** @param limit When omitted, loads all pending rows (paginated) up to NORMALIZATION_QUEUE_FETCH_ALL_CAP. */
-export async function getPendingNormalizationQueue(limit?: number): Promise<NormalizationQueueItem[]> {
+export async function searchPendingNormalizationQueue(input: {
+  page: number;
+  pageSize?: number;
+  referenceFilter?: string;
+  designationFilter?: string;
+}): Promise<PaginatedResult<NormalizationQueueItem>> {
   const supabase = createSupabaseServiceServerClient();
-  if (!supabase) return [];
-
-  await reconcileImportedOk2Rows(supabase);
-
-  const maxRows = limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP;
-  const rows: Record<string, unknown>[] = [];
-  let offset = 0;
-
-  while (rows.length < maxRows) {
-    const batchSize = Math.min(NORMALIZATION_QUEUE_PAGE_SIZE, maxRows - rows.length);
-    const { data, error } = await supabase
-      .from("skus_code_normalizations")
-      .select(PENDING_QUEUE_SELECT)
-      .eq("normalization_status", "pending")
-      .order("created_at", { ascending: true })
-      .range(offset, offset + batchSize - 1);
-
-    if (error) throw new Error(error.message);
-
-    const page = (data ?? []) as Record<string, unknown>[];
-    if (page.length === 0) break;
-
-    rows.push(...page);
-    if (page.length < batchSize) break;
-    offset += batchSize;
+  if (!supabase) {
+    return toPaginatedResult([], 0, input.page, input.pageSize ?? NORMALIZATION_PENDING_PAGE_SIZE);
   }
 
-  return rows
+  const pageSize = input.pageSize ?? NORMALIZATION_PENDING_PAGE_SIZE;
+  const page = Math.max(1, input.page);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from("skus_code_normalizations")
+    .select(PENDING_QUEUE_SELECT, { count: "exact" })
+    .eq("normalization_status", "pending")
+    .order("created_at", { ascending: true });
+
+  query = applyPendingOk2Exclusion(query);
+  query = applyPendingReferenceFilter(query, input.referenceFilter);
+  query = applyPendingDesignationFilter(query, input.designationFilter);
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw new Error(error.message);
+
+  const items = ((data ?? []) as Record<string, unknown>[])
     .filter((row) => !isOk2SourceStatus(row.source_status ? String(row.source_status) : null))
     .map(mapQueueItem);
+
+  return toPaginatedResult(items, count ?? 0, page, pageSize);
 }
 
 const COMPLETED_HISTORY_SELECT = `
@@ -252,14 +340,9 @@ function mapHistoryItem(row: Record<string, unknown>): NormalizationHistoryItem 
     legacyCode: row.legacy_code ? String(row.legacy_code) : null,
     legacyDesignation: row.legacy_designation ? String(row.legacy_designation) : null,
     newCode: finalNewCode ?? sourceNewCode,
-    newDesignationPt:
-      finalDesignationPt ??
-      sourceDesignationPt ??
-      finalDesignationEs ??
-      sourceDesignationEs ??
-      finalDesignationEn ??
-      sourceDesignationEn ??
-      null,
+    newDesignationPt: finalDesignationPt ?? sourceDesignationPt,
+    newDesignationEs: finalDesignationEs ?? sourceDesignationEs,
+    newDesignationEn: finalDesignationEn ?? sourceDesignationEn,
     categoryId: row.category_id ? String(row.category_id) : null,
     categoryName: category?.name ? String(category.name) : null,
     categorySlug: category?.slug ? String(category.slug) : null,
@@ -268,39 +351,99 @@ function mapHistoryItem(row: Record<string, unknown>): NormalizationHistoryItem 
   };
 }
 
-/** Loads completed normalizations (wizard + OK2 import) for history view. */
-export async function getCompletedNormalizationHistory(limit?: number): Promise<NormalizationHistoryItem[]> {
+export async function countCompletedNormalizationHistory(input?: {
+  legacyCodeFilter?: string;
+  legacyDesignationFilter?: string;
+  newCodeFilter?: string;
+  newDesignationFilter?: string;
+  categoryFilter?: string;
+}): Promise<number> {
   const supabase = createSupabaseServiceServerClient();
-  if (!supabase) return [];
+  if (!supabase) return 0;
 
-  await reconcileImportedOk2Rows(supabase);
-  await backfillCompletedNormalizationFields(supabase);
+  const categoryIds = await resolveCategoryIdsForFilter(supabase, input?.categoryFilter);
+  if (categoryIds && categoryIds.length === 0) return 0;
 
-  const maxRows = limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP;
-  const rows: Record<string, unknown>[] = [];
-  let offset = 0;
+  let query = supabase
+    .from("skus_code_normalizations")
+    .select("id", { count: "exact", head: true })
+    .eq("normalization_status", "completed");
 
-  while (rows.length < maxRows) {
-    const batchSize = Math.min(NORMALIZATION_QUEUE_PAGE_SIZE, maxRows - rows.length);
-    const { data, error } = await supabase
-      .from("skus_code_normalizations")
-      .select(COMPLETED_HISTORY_SELECT)
-      .eq("normalization_status", "completed")
-      .order("completed_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .range(offset, offset + batchSize - 1);
+  if (categoryIds) query = query.in("category_id", categoryIds);
+  query = applyHistoryLegacyCodeFilter(query, input?.legacyCodeFilter);
+  query = applyHistoryLegacyDesignationFilter(query, input?.legacyDesignationFilter);
+  query = applyHistoryNewCodeFilter(query, input?.newCodeFilter);
+  query = applyHistoryNewDesignationFilter(query, input?.newDesignationFilter);
 
-    if (error) throw new Error(error.message);
+  const { count, error } = await query;
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
 
-    const page = (data ?? []) as Record<string, unknown>[];
-    if (page.length === 0) break;
-
-    rows.push(...page);
-    if (page.length < batchSize) break;
-    offset += batchSize;
+export async function searchCompletedNormalizationHistory(input: {
+  page: number;
+  pageSize?: number;
+  legacyCodeFilter?: string;
+  legacyDesignationFilter?: string;
+  newCodeFilter?: string;
+  newDesignationFilter?: string;
+  categoryFilter?: string;
+}): Promise<PaginatedResult<NormalizationHistoryItem>> {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    return toPaginatedResult([], 0, input.page, input.pageSize ?? NORMALIZATION_HISTORY_PAGE_SIZE);
   }
 
-  return rows.map(mapHistoryItem);
+  const pageSize = input.pageSize ?? NORMALIZATION_HISTORY_PAGE_SIZE;
+  const page = Math.max(1, input.page);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const categoryIds = await resolveCategoryIdsForFilter(supabase, input.categoryFilter);
+  if (categoryIds && categoryIds.length === 0) {
+    return toPaginatedResult([], 0, page, pageSize);
+  }
+
+  let query = supabase
+    .from("skus_code_normalizations")
+    .select(COMPLETED_HISTORY_SELECT, { count: "exact" })
+    .eq("normalization_status", "completed")
+    .order("completed_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (categoryIds) query = query.in("category_id", categoryIds);
+  query = applyHistoryLegacyCodeFilter(query, input.legacyCodeFilter);
+  query = applyHistoryLegacyDesignationFilter(query, input.legacyDesignationFilter);
+  query = applyHistoryNewCodeFilter(query, input.newCodeFilter);
+  query = applyHistoryNewDesignationFilter(query, input.newDesignationFilter);
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw new Error(error.message);
+
+  return toPaginatedResult(((data ?? []) as Record<string, unknown>[]).map(mapHistoryItem), count ?? 0, page, pageSize);
+}
+
+/** @deprecated Prefer searchPendingNormalizationQueue for UI pagination. */
+export async function getPendingNormalizationQueueCount(): Promise<number> {
+  return countPendingNormalizationQueue();
+}
+
+/** @deprecated Prefer searchPendingNormalizationQueue for UI pagination. */
+export async function getPendingNormalizationQueue(limit?: number): Promise<NormalizationQueueItem[]> {
+  const result = await searchPendingNormalizationQueue({
+    page: 1,
+    pageSize: limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP,
+  });
+  return result.items;
+}
+
+/** @deprecated Prefer searchCompletedNormalizationHistory for UI pagination. */
+export async function getCompletedNormalizationHistory(limit?: number): Promise<NormalizationHistoryItem[]> {
+  const result = await searchCompletedNormalizationHistory({
+    page: 1,
+    pageSize: limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP,
+  });
+  return result.items;
 }
 
 export async function getNormalizationById(id: string): Promise<NormalizationRecord | null> {

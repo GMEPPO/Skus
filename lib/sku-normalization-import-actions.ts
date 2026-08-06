@@ -8,6 +8,7 @@ import {
   sha256Buffer,
   summarizeImportRows,
 } from "@/lib/normalization-import-parser";
+import { runNormalizationImportMaintenance } from "@/lib/normalization-data";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 
 export type ImportNormalizationBatchResult =
@@ -27,6 +28,54 @@ const ALLOWED_EXTENSIONS = [".xlsx", ".xls"];
 function isAllowedExcelName(fileName: string) {
   const lower = fileName.toLowerCase();
   return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+function buildDesignationFields(row: {
+  sourceDesignationPt: string | null;
+  sourceDesignationEs: string | null;
+  sourceDesignationEn: string | null;
+  normalizationStatus: "pending" | "completed" | "cancelled";
+  sourceNewCode: string | null;
+}) {
+  const isCompleted = row.normalizationStatus === "completed";
+  return {
+    source_designation_pt: row.sourceDesignationPt,
+    source_designation_es: row.sourceDesignationEs,
+    source_designation_en: row.sourceDesignationEn,
+    ...(isCompleted
+      ? {
+          final_designation_pt: row.sourceDesignationPt,
+          final_designation_es: row.sourceDesignationEs,
+          final_designation_en: row.sourceDesignationEn,
+          final_new_code: row.sourceNewCode,
+        }
+      : {}),
+  };
+}
+
+async function updateDesignationsFromDuplicateImport(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  batchId: string,
+  parsed: ReturnType<typeof parseNormalizationWorkbook>,
+) {
+  let updatedRows = 0;
+
+  for (const row of parsed.rows) {
+    if (!row.legacyCode) continue;
+    const hasDesignation = Boolean(row.sourceDesignationPt || row.sourceDesignationEs || row.sourceDesignationEn);
+    if (!hasDesignation) continue;
+
+    const { error, count } = await supabase
+      .from("skus_code_normalizations")
+      .update(buildDesignationFields(row), { count: "exact" })
+      .eq("import_batch_id", batchId)
+      .eq("legacy_code", row.legacyCode);
+
+    if (error) throw new Error(error.message);
+    updatedRows += count ?? 0;
+  }
+
+  return updatedRows;
 }
 
 export async function importNormalizationBatchAction(formData: FormData): Promise<ImportNormalizationBatchResult> {
@@ -77,11 +126,36 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
   }
 
   if (existing.data) {
-    return {
-      ok: false,
-      code: "duplicate_file",
-      message: `Este ficheiro ja foi importado (${existing.data.file_name}).`,
-    };
+    const updateDesignations = formData.get("updateDesignations") === "true";
+    if (!updateDesignations) {
+      return {
+        ok: false,
+        code: "duplicate_file",
+        message: `Este ficheiro ja foi importado (${existing.data.file_name}). Marca "Atualizar designacoes" para sincronizar PT/ES/EN.`,
+      };
+    }
+
+    try {
+      const updatedRows = await updateDesignationsFromDuplicateImport(supabase, existing.data.id, parsed);
+      await runNormalizationImportMaintenance();
+      revalidatePath("/generator");
+
+      return {
+        ok: true,
+        message: `Designacoes atualizadas em ${updatedRows} registo(s) do ficheiro ${existing.data.file_name}.`,
+        batchId: existing.data.id,
+        fileName: existing.data.file_name,
+        totalRows: parsed.rows.length,
+        pendingRows: 0,
+        invalidRows: 0,
+      };
+    } catch {
+      return {
+        ok: false,
+        code: "update_failed",
+        message: "Nao foi possivel atualizar as designacoes do ficheiro importado.",
+      };
+    }
   }
 
   const categoryIdRaw = formData.get("categoryId");
@@ -124,10 +198,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     import_issue: row.importIssue,
     category_id: categoryId,
     final_new_code: row.normalizationStatus === "completed" ? row.sourceNewCode : null,
-    final_designation_pt:
-      row.normalizationStatus === "completed"
-        ? (row.sourceDesignationPt ?? row.sourceDesignationEs ?? row.sourceDesignationEn)
-        : null,
+    final_designation_pt: row.normalizationStatus === "completed" ? row.sourceDesignationPt : null,
     final_designation_es: row.normalizationStatus === "completed" ? row.sourceDesignationEs : null,
     final_designation_en: row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
     completed_at: row.normalizationStatus === "completed" ? new Date().toISOString() : null,
@@ -143,6 +214,8 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       return { ok: false, code: "rows_insert_failed", message: "Falha ao gravar linhas do Excel." };
     }
   }
+
+  await runNormalizationImportMaintenance();
 
   revalidatePath("/generator");
 

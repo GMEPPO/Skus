@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NormalizationHistoryModal } from "@/components/generator/normalization-history-modal";
@@ -11,7 +10,7 @@ import {
   claimNormalizationForGeneratorAction,
   releaseNormalizationAction,
 } from "@/lib/sku-normalization-actions";
-import type { GeneratorCatalog, NormalizationHistoryItem, NormalizationQueueItem } from "@/lib/types";
+import type { GeneratorCatalog, NormalizationQueueItem } from "@/lib/types";
 
 type CategoryOption = { id: string; name: string; slug: string };
 
@@ -19,20 +18,15 @@ export function GeneratorWorkspace({
   categories,
   initialCategoryId,
   initialCatalog,
-  pendingItems,
-  historyItems,
   secureGenerationV2Enabled,
   normalizationV2Enabled,
 }: {
   categories: CategoryOption[];
   initialCategoryId: string;
   initialCatalog: GeneratorCatalog;
-  pendingItems: NormalizationQueueItem[];
-  historyItems: NormalizationHistoryItem[];
   secureGenerationV2Enabled: boolean;
   normalizationV2Enabled: boolean;
 }) {
-  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [referenceFilter, setReferenceFilter] = useState("");
   const [designationFilter, setDesignationFilter] = useState("");
@@ -43,8 +37,10 @@ export function GeneratorWorkspace({
   const [isLoadingNormId, setIsLoadingNormId] = useState<string | null>(null);
   const [sidebarError, setSidebarError] = useState<string | null>(null);
   const [isChangingCategory, setIsChangingCategory] = useState(false);
+  const [queueRefreshToken, setQueueRefreshToken] = useState(0);
 
   const bumpWizard = useCallback(() => setWizardKey((value) => value + 1), []);
+  const refreshNormalizationLists = useCallback(() => setQueueRefreshToken((value) => value + 1), []);
 
   async function handleCategoryChange(nextCategoryId: string) {
     if (nextCategoryId === categoryId || isChangingCategory) return;
@@ -110,7 +106,7 @@ export function GeneratorWorkspace({
   function handleNormalizationComplete() {
     setSelectedNorm(null);
     bumpWizard();
-    router.refresh();
+    refreshNormalizationLists();
   }
 
   const activeCategory = categories.find((category) => category.id === categoryId);
@@ -118,7 +114,6 @@ export function GeneratorWorkspace({
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
       <NormalizationPendingSidebar
-        items={pendingItems}
         selectedId={selectedNorm?.id ?? null}
         referenceFilter={referenceFilter}
         designationFilter={designationFilter}
@@ -131,12 +126,13 @@ export function GeneratorWorkspace({
         sidebarError={sidebarError}
         categories={categories}
         defaultCategoryId={categoryId}
-        onImportSuccess={() => router.refresh()}
+        onImportSuccess={refreshNormalizationLists}
+        refreshToken={queueRefreshToken}
       />
 
       <div className="min-w-0 flex-1 space-y-4">
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <NormalizationHistoryModal items={historyItems} />
+          <NormalizationHistoryModal refreshToken={queueRefreshToken} />
         </div>
 
         <Card>

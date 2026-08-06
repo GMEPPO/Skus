@@ -1,23 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { NormalizationImportForm } from "@/components/normalization/normalization-import-form";
+import { NormalizationPaginationControls } from "@/components/generator/normalization-pagination-controls";
+import { useDebouncedValue } from "@/components/generator/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  countPendingNormalizationAction,
+  searchPendingNormalizationAction,
+} from "@/lib/normalization-query-actions";
 import type { NormalizationQueueItem } from "@/lib/types";
 
 type CategoryOption = { id: string; name: string; slug: string };
 
-function matchesPartialQuery(value: string | null | undefined, query: string) {
-  if (!query) return true;
-  return String(value ?? "")
-    .toLowerCase()
-    .includes(query);
-}
-
 export function NormalizationPendingSidebar({
-  items,
   selectedId,
   referenceFilter,
   designationFilter,
@@ -31,8 +29,8 @@ export function NormalizationPendingSidebar({
   categories,
   defaultCategoryId,
   onImportSuccess,
+  refreshToken,
 }: {
-  items: NormalizationQueueItem[];
   selectedId: string | null;
   referenceFilter: string;
   designationFilter: string;
@@ -46,28 +44,64 @@ export function NormalizationPendingSidebar({
   categories: CategoryOption[];
   defaultCategoryId: string;
   onImportSuccess: () => void;
+  refreshToken: number;
 }) {
-  const filteredItems = useMemo(() => {
-    const refQuery = referenceFilter.trim().toLowerCase();
-    const desQuery = designationFilter.trim().toLowerCase();
-    if (!refQuery && !desQuery) return items;
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<NormalizationQueueItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pendingTotal, setPendingTotal] = useState<number | null>(null);
 
-    return items.filter((item) => {
-      const referenceMatch =
-        matchesPartialQuery(item.legacyCode, refQuery) || matchesPartialQuery(item.sourceNewCode, refQuery);
-      const designationMatch =
-        matchesPartialQuery(item.legacyDesignation, desQuery) ||
-        matchesPartialQuery(item.sourceDesignationPt, desQuery);
-      return referenceMatch && designationMatch;
+  const debouncedReferenceFilter = useDebouncedValue(referenceFilter);
+  const debouncedDesignationFilter = useDebouncedValue(designationFilter);
+
+  const loadQueue = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await searchPendingNormalizationAction({
+        page,
+        referenceFilter: debouncedReferenceFilter,
+        designationFilter: debouncedDesignationFilter,
+      });
+      setItems(result.items);
+      setTotal(result.total);
+      setTotalPages(result.totalPages);
+      if (page > result.totalPages && result.totalPages > 0) {
+        setPage(result.totalPages);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, debouncedReferenceFilter, debouncedDesignationFilter]);
+
+  useEffect(() => {
+    void loadQueue();
+  }, [loadQueue, refreshToken]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedReferenceFilter, debouncedDesignationFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void countPendingNormalizationAction().then((count) => {
+      if (!cancelled) setPendingTotal(count);
     });
-  }, [items, referenceFilter, designationFilter]);
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken]);
+
+  const hasFilters = Boolean(referenceFilter.trim() || designationFilter.trim());
+  const collapsedCount = pendingTotal ?? total;
 
   if (!isOpen) {
     return (
       <div className="flex shrink-0 flex-col items-start gap-2">
         <Button type="button" variant="outline" className="h-9 gap-2 px-3" onClick={onToggle}>
           <ChevronRight className="h-4 w-4" />
-          Normalizar ({items.length})
+          Normalizar ({collapsedCount})
         </Button>
       </div>
     );
@@ -79,9 +113,7 @@ export function NormalizationPendingSidebar({
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300">A normalizar</p>
           <p className="text-sm text-slate-400">
-            {filteredItems.length === items.length
-              ? `${items.length} pendente(s)`
-              : `${filteredItems.length} de ${items.length} pendente(s)`}
+            {hasFilters ? `${total} resultado(s) no universo total` : `${total} pendente(s)`}
           </p>
           <p className="text-xs text-slate-500">Linhas OK2 do Excel ficam fora desta fila.</p>
         </div>
@@ -116,17 +148,17 @@ export function NormalizationPendingSidebar({
       {sidebarError ? <p className="px-3 py-2 text-xs text-red-300">{sidebarError}</p> : null}
 
       <div className="max-h-[min(50vh,520px)] overflow-y-auto p-2">
-        {filteredItems.length === 0 ? (
+        {isLoading ? (
+          <p className="p-3 text-sm text-slate-500">A carregar pendentes...</p>
+        ) : items.length === 0 ? (
           <p className="p-3 text-sm text-slate-500">
-            {items.length === 0
-              ? "Sem registos pendentes. Importa um Excel abaixo."
-              : "Nenhum resultado para estes filtros."}
+            {hasFilters ? "Nenhum resultado para estes filtros." : "Sem registos pendentes. Importa um Excel abaixo."}
           </p>
         ) : (
           <ul className="space-y-1">
-            {filteredItems.map((item) => {
+            {items.map((item) => {
               const isSelected = selectedId === item.id;
-              const isLoading = isLoadingId === item.id;
+              const isLoadingItem = isLoadingId === item.id;
               return (
                 <li key={item.id}>
                   <button
@@ -143,7 +175,7 @@ export function NormalizationPendingSidebar({
                     <p className="mt-1 line-clamp-2 text-xs text-slate-400">
                       {item.legacyDesignation ?? item.sourceDesignationPt ?? "Sem designacao"}
                     </p>
-                    {isLoading ? <p className="mt-1 text-xs text-amber-300">A reivindicar...</p> : null}
+                    {isLoadingItem ? <p className="mt-1 text-xs text-amber-300">A reivindicar...</p> : null}
                   </button>
                 </li>
               );
@@ -151,6 +183,14 @@ export function NormalizationPendingSidebar({
           </ul>
         )}
       </div>
+
+      <NormalizationPaginationControls
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        isLoading={isLoading}
+        onPageChange={setPage}
+      />
 
       <NormalizationImportForm
         compact
