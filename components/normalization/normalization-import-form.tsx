@@ -93,7 +93,8 @@ export function NormalizationImportForm({
           className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-950"
         />
         <span>
-          Atualizar designacoes PT/ES/EN se o ficheiro ja foi importado (util para corrigir colunas do Excel).
+          Atualizar designacoes PT/ES/EN em falta se o ficheiro ja foi importado. Nunca duplica referencias
+          existentes.
         </span>
       </label>
 
