@@ -2,7 +2,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { GeneratorWorkspace } from "@/components/generator/generator-workspace";
 import { getCategories, getGeneratorCatalogForCategory } from "@/lib/category-catalog";
 import { mapCategoryCatalogToGeneratorCatalog } from "@/lib/generator-catalog-mapper";
-import { getPendingNormalizationQueue } from "@/lib/normalization-data";
+import { getCompletedNormalizationHistory, getPendingNormalizationQueue } from "@/lib/normalization-data";
 import { requireRole } from "@/lib/auth";
 import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
 
@@ -24,7 +24,10 @@ export default async function GeneratorPage({
   const categories = await getCategories();
   const preferredCategory = categories.find((category) => category.slug === "cosmetica") ?? categories[0] ?? null;
   const categoryCatalog = preferredCategory ? await getGeneratorCatalogForCategory(preferredCategory.id) : null;
-  const pendingQueue = await getPendingNormalizationQueue();
+  const [pendingQueue, historyItems] = await Promise.all([
+    getPendingNormalizationQueue(),
+    getCompletedNormalizationHistory(),
+  ]);
 
   if (!preferredCategory || !categoryCatalog) {
     return (
@@ -71,6 +74,7 @@ export default async function GeneratorPage({
         initialCategoryId={preferredCategory.id}
         initialCatalog={catalog}
         pendingItems={pendingQueue}
+        historyItems={historyItems}
         secureGenerationV2Enabled={secureGenerationV2Enabled}
         normalizationV2Enabled={normalizationV2Enabled}
       />

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { NormalizationHistoryModal } from "@/components/generator/normalization-history-modal";
 import { NormalizationPendingSidebar } from "@/components/generator/normalization-pending-sidebar";
 import { SkuGeneratorWizardMain } from "@/components/generator/sku-generator-wizard-main";
 import { fetchGeneratorCatalogAction } from "@/lib/generator-catalog-actions";
@@ -10,7 +11,7 @@ import {
   claimNormalizationForGeneratorAction,
   releaseNormalizationAction,
 } from "@/lib/sku-normalization-actions";
-import type { GeneratorCatalog, NormalizationQueueItem } from "@/lib/types";
+import type { GeneratorCatalog, NormalizationHistoryItem, NormalizationQueueItem } from "@/lib/types";
 
 type CategoryOption = { id: string; name: string; slug: string };
 
@@ -19,6 +20,7 @@ export function GeneratorWorkspace({
   initialCategoryId,
   initialCatalog,
   pendingItems,
+  historyItems,
   secureGenerationV2Enabled,
   normalizationV2Enabled,
 }: {
@@ -26,6 +28,7 @@ export function GeneratorWorkspace({
   initialCategoryId: string;
   initialCatalog: GeneratorCatalog;
   pendingItems: NormalizationQueueItem[];
+  historyItems: NormalizationHistoryItem[];
   secureGenerationV2Enabled: boolean;
   normalizationV2Enabled: boolean;
 }) {
@@ -129,6 +132,10 @@ export function GeneratorWorkspace({
       />
 
       <div className="min-w-0 flex-1 space-y-4">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <NormalizationHistoryModal items={historyItems} />
+        </div>
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle>Wizard de composicao</CardTitle>

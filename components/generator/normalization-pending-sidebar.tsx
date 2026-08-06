@@ -103,14 +103,9 @@ export function NormalizationPendingSidebar({
             className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100"
           />
         </label>
-        <div className="flex flex-col gap-1">
-          <Link href="/normalization/history" className="text-xs text-amber-300 hover:text-amber-200">
-            Historico de normalizados
-          </Link>
-          <Link href="/normalization" className="text-xs text-amber-300 hover:text-amber-200">
-            Importar Excel / ver fila completa
-          </Link>
-        </div>
+        <Link href="/normalization" className="text-xs text-amber-300 hover:text-amber-200">
+          Importar Excel / ver fila completa
+        </Link>
       </div>
 
       {sidebarError ? <p className="px-3 py-2 text-xs text-red-300">{sidebarError}</p> : null}
