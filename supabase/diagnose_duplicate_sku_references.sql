@@ -1,5 +1,16 @@
 -- Diagnostico de referencias SKU duplicadas (normalizadas, sin guiones).
 -- Executar no Supabase SQL Editor antes de criar o indice unico.
+-- Cria a funcao auxiliar se ainda nao existir.
+
+create schema if not exists skus_private;
+
+create or replace function skus_private.normalize_sku_reference(p_code text)
+returns text
+language sql
+immutable
+as $$
+  select upper(regexp_replace(btrim(coalesce(p_code, '')), '-', '', 'g'));
+$$;
 
 -- 1) Duplicados dentro de normalizaciones completadas
 select
@@ -31,7 +42,7 @@ join public.skus_sku_generations g
 where n.normalization_status = 'completed'
   and n.final_new_code is not null
   and btrim(n.final_new_code) <> ''
-order by ref_normalizada, n.legacy_code;
+order by 1, n.legacy_code;
 
 -- 3) Duplicados dentro de skus_sku_generations
 select

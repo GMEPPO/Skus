@@ -3,6 +3,8 @@
 --   - skus_code_normalizations completed final_new_code / source_new_code (normalized)
 -- Comparison ignores hyphens and uses uppercase.
 
+create schema if not exists skus_private;
+
 create or replace function skus_private.normalize_sku_reference(p_code text)
 returns text
 language sql

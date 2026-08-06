@@ -4,6 +4,8 @@
 
 begin;
 
+create schema if not exists skus_private;
+
 create or replace function skus_private.normalize_sku_reference(p_code text)
 returns text
 language sql
