@@ -48,10 +48,9 @@ async function queryNormalizations(
 ) {
   const { data, error } = await supabase
     .from("skus_code_normalizations")
-    .select("final_new_code, final_designation_pt")
+    .select("final_new_code, source_new_code, final_designation_pt, source_designation_pt")
     .eq("normalization_status", "completed")
-    .not("final_new_code", "is", null)
-    .ilike("final_new_code", pattern)
+    .or(`final_new_code.ilike.${pattern},source_new_code.ilike.${pattern}`)
     .order("completed_at", { ascending: false })
     .limit(limit);
 
@@ -65,7 +64,7 @@ export async function fetchSkuCodeExamplesAction(
 ): Promise<{ ok: true; examples: SkuCodeExample[] } | { ok: false; examples: [] }> {
   await requireRole("viewer");
 
-  const validPatterns = patterns.filter((pattern) => pattern.includes("-"));
+  const validPatterns = patterns.filter((pattern) => pattern.trim().length >= 2);
   if (!categoryId || validPatterns.length === 0) {
     return { ok: false, examples: [] };
   }
@@ -79,6 +78,22 @@ export async function fetchSkuCodeExamplesAction(
   const seen = new Set<string>();
 
   for (const pattern of validPatterns) {
+    const normalizations = await queryNormalizations(supabase, pattern, EXAMPLE_LIMIT * 3);
+    for (const row of normalizations) {
+      const code = String(row.final_new_code ?? row.source_new_code ?? "").trim();
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      examples.push({
+        code,
+        designationPt: String(row.final_designation_pt ?? row.source_designation_pt ?? "").trim(),
+        source: "normalization",
+        matchedPattern: pattern,
+      });
+      if (examples.length >= EXAMPLE_LIMIT) {
+        return { ok: true, examples };
+      }
+    }
+
     const generations = await queryGenerations(supabase, categoryId, pattern, EXAMPLE_LIMIT * 3);
     for (const row of generations) {
       const code = String(row.generated_code ?? "").trim();
@@ -88,22 +103,6 @@ export async function fetchSkuCodeExamplesAction(
         code,
         designationPt: String(row.designation_pt ?? "").trim(),
         source: "generation",
-        matchedPattern: pattern,
-      });
-      if (examples.length >= EXAMPLE_LIMIT) {
-        return { ok: true, examples };
-      }
-    }
-
-    const normalizations = await queryNormalizations(supabase, pattern, EXAMPLE_LIMIT * 3);
-    for (const row of normalizations) {
-      const code = String(row.final_new_code ?? "").trim();
-      if (!code || seen.has(code)) continue;
-      seen.add(code);
-      examples.push({
-        code,
-        designationPt: String(row.final_designation_pt ?? "").trim(),
-        source: "normalization",
         matchedPattern: pattern,
       });
       if (examples.length >= EXAMPLE_LIMIT) {

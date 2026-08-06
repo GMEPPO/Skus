@@ -116,21 +116,78 @@ export function buildSkuCodeExamplePattern(
   return segments.map((segment) => (segment ? escapeIlikeSegment(segment) : "%")).join("-");
 }
 
+export function buildSkuCodeExampleCompactPrefix(
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+): string | null {
+  const parts: string[] = [];
+
+  for (const level of catalog.levels) {
+    const selectedValue = selections[level.id];
+    if (!selectedValue) break;
+
+    if (isEmptySelection(selectedValue)) {
+      parts.push("000");
+      continue;
+    }
+
+    const option = level.options.find((item) => item.id === selectedValue);
+    parts.push(option?.referenceCode ?? "000");
+  }
+
+  if (parts.length === 0) return null;
+  return `${escapeIlikeSegment(parts.join(""))}%`;
+}
+
+function buildSkuCodeExampleLooseCompactPattern(
+  catalog: GeneratorCatalog,
+  levelId: string,
+  selectedValue: string,
+): string | null {
+  const levelIndex = catalog.levels.findIndex((level) => level.id === levelId);
+  if (levelIndex <= 0) return null;
+
+  if (isEmptySelection(selectedValue)) return "%000%";
+
+  const level = catalog.levels[levelIndex];
+  const option = level.options.find((item) => item.id === selectedValue);
+  const segment = option?.referenceCode;
+  if (!segment) return null;
+
+  return `%${escapeIlikeSegment(segment)}%`;
+}
+
 export function buildSkuCodeExamplePatterns(
   catalog: GeneratorCatalog,
   selections: Record<string, string>,
   selectionOrder: string[],
 ): string[] {
   const patterns: string[] = [];
-  const fullPattern = buildSkuCodeExamplePattern(catalog, selections);
-  if (fullPattern) patterns.push(fullPattern);
+
+  const fullHyphenPattern = buildSkuCodeExamplePattern(catalog, selections);
+  if (fullHyphenPattern) patterns.push(fullHyphenPattern);
+
+  const compactPrefix = buildSkuCodeExampleCompactPrefix(catalog, selections);
+  if (compactPrefix && !patterns.includes(compactPrefix)) patterns.push(compactPrefix);
 
   for (const levelId of [...selectionOrder].reverse()) {
     const selectedValue = selections[levelId];
     if (!selectedValue) continue;
-    const singleLevelPattern = buildSkuCodeExamplePattern(catalog, { [levelId]: selectedValue });
-    if (singleLevelPattern && !patterns.includes(singleLevelPattern)) {
-      patterns.push(singleLevelPattern);
+
+    const singleSelection = { [levelId]: selectedValue };
+    const singleHyphenPattern = buildSkuCodeExamplePattern(catalog, singleSelection);
+    if (singleHyphenPattern && !patterns.includes(singleHyphenPattern)) {
+      patterns.push(singleHyphenPattern);
+    }
+
+    const singleCompactPrefix = buildSkuCodeExampleCompactPrefix(catalog, singleSelection);
+    if (singleCompactPrefix && !patterns.includes(singleCompactPrefix)) {
+      patterns.push(singleCompactPrefix);
+    }
+
+    const looseCompactPattern = buildSkuCodeExampleLooseCompactPattern(catalog, levelId, selectedValue);
+    if (looseCompactPattern && !patterns.includes(looseCompactPattern)) {
+      patterns.push(looseCompactPattern);
     }
   }
 

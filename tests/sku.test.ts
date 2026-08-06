@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildDesignationByLocale, buildSkuCodeExamplePattern, buildSkuCodeExamplePatterns, buildSkuPreview, filterGeneratorWords } from "@/lib/sku";
+import {
+  buildDesignationByLocale,
+  buildSkuCodeExamplePattern,
+  buildSkuCodeExamplePatterns,
+  buildSkuPreview,
+  filterGeneratorWords,
+} from "@/lib/sku";
 import type { GeneratorCatalog } from "@/lib/types";
 
 const sabsolCatalog: GeneratorCatalog = {
@@ -194,6 +200,25 @@ describe("sku builder", () => {
         },
         ["brand", "format"],
       ),
-    ).toEqual(["ALG-SOL-%-%-%-%", "%-SOL-%-%-%-%", "ALG-%-%-%-%-%"]);
+    ).toEqual([
+      "ALG-SOL-%-%-%-%",
+      "ALGSOL%",
+      "%-SOL-%-%-%-%",
+      "%SOL%",
+      "ALG-%-%-%-%-%",
+      "ALG%",
+    ]);
+  });
+
+  it("builds compact prefix for normalized codes without hyphens", () => {
+    expect(
+      buildSkuCodeExamplePatterns(
+        sabsolCatalog,
+        {
+          brand: "alg",
+        },
+        ["brand"],
+      ),
+    ).toContain("ALG%");
   });
 });
