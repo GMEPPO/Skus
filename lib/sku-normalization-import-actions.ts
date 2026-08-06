@@ -240,7 +240,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     return {
       ok: true,
       message: `Nenhuma referencia nova. ${syncedExistingRows} registo(s) actualizado(s), ${skippedExistingRows} ja completos. Nenhuma duplicacao criada.`,
-      batchId: existingBatch.data?.id ?? "",
+      batchId: "",
       fileName: file.name,
       totalRows: parsed.rows.length,
       pendingRows: 0,
