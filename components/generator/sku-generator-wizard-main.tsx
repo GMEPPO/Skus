@@ -602,30 +602,6 @@ export function SkuGeneratorWizardMain({
                   </p>
                 ) : null}
               </div>
-              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Exemplos existentes</p>
-                {codeExamplesLoading ? (
-                  <p className="mt-2 text-sm text-slate-500">A procurar codigos semelhantes...</p>
-                ) : codeExamples.length > 0 ? (
-                  <ul className="mt-3 space-y-3">
-                    {codeExamples.map((example) => (
-                      <li key={`${example.source}-${example.code}`} className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
-                        <p className="break-all font-medium text-amber-200">{example.code}</p>
-                        {example.designationPt ? (
-                          <p className="mt-1 text-sm text-slate-400">{example.designationPt}</p>
-                        ) : null}
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-600">
-                          {example.source === "normalization" ? "Normalizado" : "Codigo novo"}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-2 text-sm text-slate-500">
-                    Seleciona palavras em pelo menos um nivel para ver 1-2 codigos ja criados com combinacoes semelhantes.
-                  </p>
-                )}
-              </div>
             </Card>
 
             <Card className="p-4">
@@ -814,28 +790,61 @@ export function SkuGeneratorWizardMain({
           </div>
         </div>
 
-        <div className="sticky bottom-4 z-20 rounded-2xl border border-amber-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-amber-300">Designacao</p>
-              <p className={`mt-2 text-base ${isDesignationTooLong ? "text-red-300" : "text-slate-100"}`}>
-                {designation || "Seleciona os campos para construir a designacao final."}
-              </p>
-              {designation ? (
-                <p className={`mt-2 text-xs ${isDesignationTooLong ? "text-red-300" : "text-slate-400"}`}>
-                  {designationLength}/{MAX_DESIGNATION_LENGTH} caracteres
-                  {isDesignationTooLong ? " - limite excedido" : ""}
+        <div className="sticky bottom-4 z-20 space-y-2">
+          <div className="rounded-2xl border border-amber-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-amber-300">Designacao</p>
+                <p className={`mt-2 text-base ${isDesignationTooLong ? "text-red-300" : "text-slate-100"}`}>
+                  {designation || "Seleciona os campos para construir a designacao final."}
                 </p>
-              ) : null}
+                {designation ? (
+                  <p className={`mt-2 text-xs ${isDesignationTooLong ? "text-red-300" : "text-slate-400"}`}>
+                    {designationLength}/{MAX_DESIGNATION_LENGTH} caracteres
+                    {isDesignationTooLong ? " - limite excedido" : ""}
+                  </p>
+                ) : null}
+              </div>
+              <Button type="submit" disabled={!canSubmit || isSubmitting}>
+                {isSubmitting
+                  ? "A guardar..."
+                  : isNormalizationMode
+                    ? "Concluir normalizacao"
+                    : "Gerar SKU"}
+              </Button>
             </div>
-            <Button type="submit" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting
-                ? "A guardar..."
-                : isNormalizationMode
-                  ? "Concluir normalizacao"
-                  : "Gerar SKU"}
-            </Button>
           </div>
+
+          {selectionOrder.length > 0 ? (
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-950/95 p-4 shadow-xl shadow-black/20 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Codigos semelhantes</p>
+              <p className="mt-1 text-xs text-slate-600">Historico de codigos novos e normalizados</p>
+              {codeExamplesLoading ? (
+                <p className="mt-3 text-sm text-slate-500">A procurar codigos semelhantes...</p>
+              ) : codeExamples.length > 0 ? (
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {codeExamples.map((example) => (
+                    <li
+                      key={`${example.source}-${example.code}`}
+                      className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2.5"
+                    >
+                      <p className="break-all text-sm font-semibold text-amber-200">{example.code}</p>
+                      {example.designationPt ? (
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-400">{example.designationPt}</p>
+                      ) : null}
+                      <p className="mt-1.5 text-[10px] uppercase tracking-[0.16em] text-slate-600">
+                        {example.source === "normalization" ? "Normalizacao" : "Historico"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-slate-500">
+                  Ainda nao existem codigos criados com esta combinacao de palavras.
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {submitError ? (
