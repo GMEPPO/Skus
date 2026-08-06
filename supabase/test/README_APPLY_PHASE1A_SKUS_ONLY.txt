@@ -1,0 +1,19 @@
+-- INSTRUCCIONES — Prueba A Fase 1A (alcance SOLO skus_*)
+--
+-- 1. Abre Supabase Dashboard del proyecto GGMPI → SQL Editor.
+-- 2. Abre y pega íntegro el contenido de:
+--    supabase/migrations/20260805100000_phase1a_categories_levels_normalizations.sql
+-- 3. Ejecuta (Run). Es una sola transacción BEGIN…COMMIT.
+--
+-- Qué hace (solo skus_*):
+--   - Crea funciones skus_current_role_code / skus_has_min_role
+--   - Crea skus_categories, skus_category_levels
+--   - Añade columnas a skus_words y skus_sku_generations
+--   - Crea skus_normalization_import_batches, skus_code_normalizations
+--   - Crea RPC claim/renew/release
+--   - create extension pgcrypto SI no existe (idempotente)
+--
+-- Qué NO hace:
+--   - No toca apps, clientes, documents, ni ninguna tabla sin prefijo skus_
+--
+-- Tras Run, avisa al agente para verificar conteos y continuar Auth/RPC.

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { requireRole } from "@/lib/auth";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import type { WordListItem } from "@/lib/types";
 
@@ -77,12 +78,14 @@ type WordRow = {
   id: string;
   label: string;
   reference_code: string;
-  default_field_type_id: string;
+  default_field_type_id: string | null;
+  category_level_id?: string | null;
   designation: string | null;
   designation_pt: string | null;
   designation_es: string | null;
   designation_en: string | null;
   include_in_designation: boolean | null;
+  is_active?: boolean | null;
   skus_field_types?: FieldTypeRelation;
 };
 
@@ -93,7 +96,10 @@ const deleteWordSchema = z.object({
 const createWordSchema = z.object({
   label: z.string().trim().min(1),
   referenceCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9&.]{1,3}$/),
-  fieldTypeId: z.string().uuid(),
+  /** Preferido: pertenencia canónica al nivel */
+  categoryLevelId: z.string().uuid().optional(),
+  /** Compat legacy; opcional si el nivel aporta legacy_field_type_id */
+  fieldTypeId: z.string().uuid().optional(),
   designationPt: z.string().trim().min(1),
   designationEs: z.string().trim().min(1),
   designationEn: z.string().trim().min(1),
@@ -198,11 +204,13 @@ function revalidateCatalog() {
 
 export async function createWordAction(formData: FormData) {
   "use server";
+  await requireRole("editor");
 
   const parsed = createWordSchema.safeParse({
     label: formData.get("label"),
     referenceCode: formData.get("referenceCode"),
-    fieldTypeId: formData.get("fieldTypeId"),
+    categoryLevelId: formData.get("categoryLevelId") || undefined,
+    fieldTypeId: formData.get("fieldTypeId") || undefined,
     designationPt: formData.get("designationPt"),
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
@@ -218,12 +226,60 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const { label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation } = parsed.data;
+  const { label, referenceCode, designationPt, designationEs, designationEn, includeInDesignation } =
+    parsed.data;
+
+  let categoryLevelId = parsed.data.categoryLevelId ?? null;
+  let defaultFieldTypeId = parsed.data.fieldTypeId ?? null;
+
+  if (categoryLevelId) {
+    const { data: level, error: levelErr } = await supabase
+      .from("skus_category_levels")
+      .select("id, legacy_field_type_id, is_enabled")
+      .eq("id", categoryLevelId)
+      .maybeSingle();
+    if (levelErr || !level) {
+      redirect("/catalog/words-manage?status=error&message=Nivel+invalido");
+    }
+    if (!defaultFieldTypeId) {
+      defaultFieldTypeId = level.legacy_field_type_id ? String(level.legacy_field_type_id) : null;
+    }
+  } else if (defaultFieldTypeId) {
+    // Compat UI legacy: resolver nivel Cosmética por legacy_field_type_id
+    const { data: level } = await supabase
+      .from("skus_category_levels")
+      .select("id")
+      .eq("legacy_field_type_id", defaultFieldTypeId)
+      .limit(1)
+      .maybeSingle();
+    categoryLevelId = level?.id ? String(level.id) : null;
+  }
+
+  if (!categoryLevelId && !defaultFieldTypeId) {
+    redirect("/catalog/words-manage?status=error&message=Falta+nivel+ou+field+type");
+  }
+
+  // Advertir conflictos de reference_code en el mismo nivel (sin índice unique aún)
+  if (categoryLevelId) {
+    const { data: conflict } = await supabase
+      .from("skus_words")
+      .select("id")
+      .eq("category_level_id", categoryLevelId)
+      .eq("reference_code", referenceCode)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    if (conflict) {
+      redirect("/catalog/words-manage?status=error&message=Codigo+de+referencia+ja+existe+neste+nivel");
+    }
+  }
+
   const insertResult = await supabase.from("skus_words").insert({
     label,
     normalized_label: normalizeLabel(label),
     reference_code: referenceCode,
-    default_field_type_id: fieldTypeId,
+    default_field_type_id: defaultFieldTypeId,
+    category_level_id: categoryLevelId,
     designation: designationPt,
     designation_pt: designationPt,
     designation_es: designationEs,
@@ -242,12 +298,14 @@ export async function createWordAction(formData: FormData) {
 
 export async function updateWordAction(formData: FormData) {
   "use server";
+  await requireRole("editor");
 
   const parsed = updateWordSchema.safeParse({
     wordId: formData.get("wordId"),
     label: formData.get("label"),
     referenceCode: formData.get("referenceCode"),
-    fieldTypeId: formData.get("fieldTypeId"),
+    categoryLevelId: formData.get("categoryLevelId") || undefined,
+    fieldTypeId: formData.get("fieldTypeId") || undefined,
     designationPt: formData.get("designationPt"),
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
@@ -263,19 +321,40 @@ export async function updateWordAction(formData: FormData) {
     redirect(`/catalog/words-manage/${parsed.data.wordId}?status=error&message=Supabase+service+role+nao+configurada`);
   }
 
-  const { wordId, label, referenceCode, fieldTypeId, designationPt, designationEs, designationEn, includeInDesignation } = parsed.data;
+  const { wordId, label, referenceCode, designationPt, designationEs, designationEn, includeInDesignation } =
+    parsed.data;
+
+  let categoryLevelId = parsed.data.categoryLevelId ?? null;
+  let defaultFieldTypeId = parsed.data.fieldTypeId ?? null;
+
+  if (categoryLevelId) {
+    const { data: level } = await supabase
+      .from("skus_category_levels")
+      .select("id, legacy_field_type_id")
+      .eq("id", categoryLevelId)
+      .maybeSingle();
+    if (!level) {
+      redirect(`/catalog/words-manage/${wordId}?status=error&message=Nivel+invalido`);
+    }
+    if (!defaultFieldTypeId) {
+      defaultFieldTypeId = level.legacy_field_type_id ? String(level.legacy_field_type_id) : null;
+    }
+  }
+
   const updateResult = await supabase
     .from("skus_words")
     .update({
       label,
       normalized_label: normalizeLabel(label),
       reference_code: referenceCode,
-      default_field_type_id: fieldTypeId,
+      default_field_type_id: defaultFieldTypeId,
+      ...(categoryLevelId ? { category_level_id: categoryLevelId } : {}),
       designation: designationPt,
       designation_pt: designationPt,
       designation_es: designationEs,
       designation_en: designationEn,
       include_in_designation: includeInDesignation,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", wordId);
 
@@ -288,15 +367,17 @@ export async function updateWordAction(formData: FormData) {
   redirect("/catalog/words-manage?status=success&message=Palavra+editada+com+sucesso");
 }
 
+/** Soft-delete: is_active=false. Sin hard delete en 2B. */
 export async function deleteWordAction(formData: FormData) {
   "use server";
+  await requireRole("editor");
 
   const parsed = deleteWordSchema.safeParse({
     wordId: formData.get("wordId"),
   });
 
   if (!parsed.success) {
-    redirect("/catalog/words-manage?status=error&message=Palavra+invalida+para+eliminar");
+    redirect("/catalog/words-manage?status=error&message=Palavra+invalida+para+desativar");
   }
 
   const supabase = createSupabaseServiceServerClient();
@@ -304,13 +385,46 @@ export async function deleteWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
   }
 
-  const deleteResult = await supabase.from("skus_words").delete().eq("id", parsed.data.wordId);
-  if (deleteResult.error) {
-    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+eliminar+a+palavra");
+  const deactivateResult = await supabase
+    .from("skus_words")
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq("id", parsed.data.wordId);
+  if (deactivateResult.error) {
+    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+desativar+a+palavra");
   }
 
   revalidateCatalog();
-  redirect("/catalog/words-manage?status=success&message=Palavra+eliminada+com+sucesso");
+  redirect("/catalog/words-manage?status=success&message=Palavra+desativada");
+}
+
+export async function reactivateWordAction(formData: FormData) {
+  "use server";
+  await requireRole("editor");
+
+  const parsed = deleteWordSchema.safeParse({
+    wordId: formData.get("wordId"),
+  });
+
+  if (!parsed.success) {
+    redirect("/catalog/words-manage?status=error&message=Palavra+invalida");
+  }
+
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) {
+    redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
+  }
+
+  const { error } = await supabase
+    .from("skus_words")
+    .update({ is_active: true, updated_at: new Date().toISOString() })
+    .eq("id", parsed.data.wordId);
+
+  if (error) {
+    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+reativar+a+palavra");
+  }
+
+  revalidateCatalog();
+  redirect("/catalog/words-manage?status=success&message=Palavra+reativada");
 }
 
 // Compatibilidad para despliegues que todavia compilen rutas antiguas de familias.

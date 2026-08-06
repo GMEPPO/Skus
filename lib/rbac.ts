@@ -19,6 +19,16 @@ export function canManageVocabulary(role: UserRole) {
   return hasMinimumRole(role, "manager");
 }
 
+/** Palabras: editor+ (crear/editar/desactivar/reactivar). */
+export function canManageWords(role: UserRole) {
+  return hasMinimumRole(role, "editor");
+}
+
+/** Niveles por categoría: manager+. */
+export function canManageCategoryLevels(role: UserRole) {
+  return hasMinimumRole(role, "manager");
+}
+
 export function canManageFamilies(role: UserRole) {
   return hasMinimumRole(role, "manager");
 }
