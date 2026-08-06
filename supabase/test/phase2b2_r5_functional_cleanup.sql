@@ -1,0 +1,27 @@
+-- ============================================================================
+-- FASE 2B.2 R5 — FUNCTIONAL CLEANUP (ENTORNO TEMPORAL ONLY)
+-- Deletes ONLY rows created by a given test_run_id / prefix.
+-- NO EJECUTAR EN GGMPI
+-- ============================================================================
+-- Replace :test_run_id before use. Prefer the Node runner to track IDs.
+-- Example pattern:
+--
+-- delete from public.skus_sku_generation_measurement_history h
+-- using public.skus_sku_generations g
+-- where h.sku_generation_id = g.id
+--   and g.generated_code like 'p2b2r5_' || :test_run_id || '_%';
+--
+-- delete from public.skus_sku_generations
+-- where generated_code like 'p2b2r5_' || :test_run_id || '_%';
+--
+-- delete from public.skus_code_normalizations n
+-- using public.skus_normalization_import_batches b
+-- where n.import_batch_id = b.id
+--   and b.file_name like 'p2b2r5_' || :test_run_id || '_%';
+--
+-- delete from public.skus_normalization_import_batches
+-- where file_name like 'p2b2r5_' || :test_run_id || '_%';
+--
+-- Auth users / skus_profiles: clean via service-role in the Node runner.
+
+select 'phase2b2_r5_functional_cleanup: prepared — bind test_run_id before execute' as status;

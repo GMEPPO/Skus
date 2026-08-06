@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { ArrowRight, CheckCircle2, ImagePlus, Search, Sparkles, X } from "lucide-react";
@@ -7,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { generateSkuAction, type GenerateSkuActionResult } from "@/lib/sku-actions";
+import { generateSkuSecureAction } from "@/lib/sku-secure-actions";
 import type { GeneratorCatalog, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import {
   buildDesignation,
@@ -32,10 +34,25 @@ function getSelectedWord(level: GeneratorLevel, selectedId?: string) {
   return level.options.find((option) => option.id === selectedId) ?? null;
 }
 
+function buildSecureSelectionsPayload(catalog: GeneratorCatalog, selections: Selections) {
+  const payload: Record<string, { kind: "word"; wordId: string } | { kind: "empty" }> = {};
+  for (const level of catalog.levels) {
+    const selectedId = selections[level.id];
+    if (!selectedId) continue;
+    payload[level.id] = isEmptySelection(selectedId) ? { kind: "empty" } : { kind: "word", wordId: selectedId };
+  }
+  return payload;
+}
+
 export function SkuGeneratorWizardMain({
   catalog,
+  secureGenerationV2Enabled = false,
+  categoryId = null,
 }: {
   catalog: GeneratorCatalog;
+  /** When true, calls generate_sku_secure (requires categoryId + level selections). Default OFF. */
+  secureGenerationV2Enabled?: boolean;
+  categoryId?: string | null;
 }) {
   const [selections, setSelections] = useState<Selections>({});
   const [searchByLevel, setSearchByLevel] = useState<SearchByLevel>({});
@@ -50,6 +67,7 @@ export function SkuGeneratorWizardMain({
   const [modalData, setModalData] = useState<GeneratedSkuModalData | null>(null);
   const [productImagePreviewUrl, setProductImagePreviewUrl] = useState<string | null>(null);
   const [productImageName, setProductImageName] = useState("");
+  const [secureRequestId, setSecureRequestId] = useState(() => crypto.randomUUID());
 
   const requiredLevels = useMemo(() => catalog.levels.filter(isRequiredLevel), [catalog.levels]);
   const requiredCompletedCount = requiredLevels.filter((level) => selections[level.id] && !isEmptySelection(selections[level.id])).length;
@@ -61,12 +79,18 @@ export function SkuGeneratorWizardMain({
   const designationLength = designation.length;
   const isDesignationTooLong = designationLength > MAX_DESIGNATION_LENGTH;
   const skuPreview = buildSkuPreview(catalog, selections);
-  const hasMeasurements = Boolean(unitsPerBox && multiples && weight);
+  const hasAnyMeasurements = Boolean(unitsPerBox || multiples || weight);
+  const hasAllMeasurements = Boolean(unitsPerBox && multiples && weight);
+  const hasPartialMeasurements = hasAnyMeasurements && !hasAllMeasurements;
+  const measurementError = hasPartialMeasurements
+    ? "As medidas devem ser enviadas em conjunto: quantidade por caixa, multiplos e peso."
+    : null;
   const canSubmit =
     catalog.levels.length > 0 &&
     requiredCompletedCount === requiredLevels.length &&
     !isDesignationTooLong &&
-    hasMeasurements;
+    hasAllMeasurements &&
+    (!secureGenerationV2Enabled || Boolean(categoryId));
 
   useEffect(() => {
     return () => {
@@ -75,6 +99,12 @@ export function SkuGeneratorWizardMain({
       }
     };
   }, [productImagePreviewUrl]);
+
+  function renewSecureRequestId() {
+    if (secureGenerationV2Enabled) {
+      setSecureRequestId(crypto.randomUUID());
+    }
+  }
 
   if (catalog.levels.length === 0) {
     return (
@@ -85,6 +115,7 @@ export function SkuGeneratorWizardMain({
   }
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
+    renewSecureRequestId();
     setSelections((current) => ({
       ...current,
       [level.id]: word === null ? buildEmptySelectionId(level.id) : word?.id ?? "",
@@ -102,10 +133,54 @@ export function SkuGeneratorWizardMain({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit || isSubmitting) return;
+    if (measurementError) {
+      setSubmitError(measurementError);
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitError(null);
     const formData = new FormData(event.currentTarget);
+
+    if (secureGenerationV2Enabled) {
+      if (!categoryId) {
+        setSubmitError("Geracao V2 requer categoryId (catalogo por categoria).");
+        setIsSubmitting(false);
+        return;
+      }
+
+      formData.set("categoryId", categoryId);
+      formData.set("selectionsJson", JSON.stringify(buildSecureSelectionsPayload(catalog, selections)));
+      formData.set("requestId", secureRequestId);
+
+      const secureResult = await generateSkuSecureAction(formData);
+      if (!secureResult.ok) {
+        setSubmitError(secureResult.message);
+        setModalData(null);
+        setIsSubmitting(false);
+        return;
+      }
+
+      setModalData({
+        ok: true,
+        message: secureResult.message,
+        generatedCode: secureResult.generatedCode,
+        generatedCodeCompact: secureResult.generatedCodeCompact,
+        designationPt: secureResult.designationPt,
+        designationEs: secureResult.designationEs,
+        designationEn: secureResult.designationEn,
+        unitsPerBox: secureResult.unitsPerBox,
+        unitsPerBoxStatus: secureResult.unitsPerBoxStatus,
+        multiples: secureResult.multiples,
+        multiplesStatus: secureResult.multiplesStatus,
+        weight: secureResult.weight,
+        weightStatus: secureResult.weightStatus,
+      });
+      setSecureRequestId(crypto.randomUUID());
+      setIsSubmitting(false);
+      return;
+    }
+
     const result = await generateSkuAction(formData);
     if (!result.ok) {
       setSubmitError(result.message);
@@ -127,6 +202,7 @@ export function SkuGeneratorWizardMain({
   }
 
   function handleProductImageChange(event: ChangeEvent<HTMLInputElement>) {
+    renewSecureRequestId();
     const nextFile = event.target.files?.[0];
     setProductImagePreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current);
@@ -149,12 +225,21 @@ export function SkuGeneratorWizardMain({
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <input type="hidden" name="generatedCode" value={skuPreview} />
-        <input type="hidden" name="designation" value={designation} />
-        <input type="hidden" name="designationPt" value={designationPt} />
-        <input type="hidden" name="designationEs" value={designationEs} />
-        <input type="hidden" name="designationEn" value={designationEn} />
-        <input type="hidden" name="selectionSnapshot" value={JSON.stringify(selections)} />
+        {secureGenerationV2Enabled ? (
+          <>
+            <input type="hidden" name="categoryId" value={categoryId ?? ""} />
+            <input type="hidden" name="requestId" value={secureRequestId} />
+          </>
+        ) : (
+          <>
+            <input type="hidden" name="generatedCode" value={skuPreview} />
+            <input type="hidden" name="designation" value={designation} />
+            <input type="hidden" name="designationPt" value={designationPt} />
+            <input type="hidden" name="designationEs" value={designationEs} />
+            <input type="hidden" name="designationEn" value={designationEn} />
+            <input type="hidden" name="selectionSnapshot" value={JSON.stringify(selections)} />
+          </>
+        )}
 
         <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="space-y-4">
@@ -275,7 +360,11 @@ export function SkuGeneratorWizardMain({
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Resumo</p>
                 <h3 className="mt-1 text-xl font-semibold text-slate-50">SKU global</h3>
-                <p className="mt-2 text-sm text-slate-400">Biblioteca livre por nivel.</p>
+                <p className="mt-2 text-sm text-slate-400">
+                  {secureGenerationV2Enabled
+                    ? "Fluxo V2 seguro: o servidor e a fonte autoritativa para codigo e designacoes."
+                    : "Biblioteca livre por nivel."}
+                </p>
               </div>
               <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Progressao</p>
@@ -286,11 +375,19 @@ export function SkuGeneratorWizardMain({
               <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Preview SKU</p>
                 <p className="mt-2 break-all text-lg font-semibold text-amber-300">{skuPreview}</p>
+                {secureGenerationV2Enabled ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Preview local apenas para orientacao. O resultado final vem exclusivamente da resposta do RPC.
+                  </p>
+                ) : null}
               </div>
             </Card>
 
             <Card className="p-4">
               <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-500">Fluxo ativo</p>
+              <p className="mb-3 text-sm text-slate-400">
+                {secureGenerationV2Enabled ? "generateSkuSecureAction -> generate_sku_secure" : "generateSkuAction legacy"}
+              </p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 {catalog.levels.map((level, index) => (
                   <div
@@ -310,6 +407,7 @@ export function SkuGeneratorWizardMain({
                 <p className="mt-1 text-sm text-slate-400">
                   Estes campos sao obrigatorios e cada um pode ser marcado como real ou estimado.
                 </p>
+                {measurementError ? <p className="mt-2 text-sm text-amber-300">{measurementError}</p> : null}
               </div>
               <div className="grid gap-4">
                 <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -322,7 +420,10 @@ export function SkuGeneratorWizardMain({
                       step="0.01"
                       required
                       value={unitsPerBox}
-                      onChange={(event) => setUnitsPerBox(event.target.value)}
+                      onChange={(event) => {
+                        renewSecureRequestId();
+                        setUnitsPerBox(event.target.value);
+                      }}
                       className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     />
                   </label>
@@ -331,7 +432,10 @@ export function SkuGeneratorWizardMain({
                     <select
                       name="unitsPerBoxStatus"
                       value={unitsPerBoxStatus}
-                      onChange={(event) => setUnitsPerBoxStatus(event.target.value as "real" | "estimated")}
+                      onChange={(event) => {
+                        renewSecureRequestId();
+                        setUnitsPerBoxStatus(event.target.value as "real" | "estimated");
+                      }}
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
                       <option value="estimated">Estimado</option>
@@ -350,7 +454,10 @@ export function SkuGeneratorWizardMain({
                       step="0.01"
                       required
                       value={multiples}
-                      onChange={(event) => setMultiples(event.target.value)}
+                      onChange={(event) => {
+                        renewSecureRequestId();
+                        setMultiples(event.target.value);
+                      }}
                       className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     />
                   </label>
@@ -359,7 +466,10 @@ export function SkuGeneratorWizardMain({
                     <select
                       name="multiplesStatus"
                       value={multiplesStatus}
-                      onChange={(event) => setMultiplesStatus(event.target.value as "real" | "estimated")}
+                      onChange={(event) => {
+                        renewSecureRequestId();
+                        setMultiplesStatus(event.target.value as "real" | "estimated");
+                      }}
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
                       <option value="estimated">Estimado</option>
@@ -378,7 +488,10 @@ export function SkuGeneratorWizardMain({
                       step="0.01"
                       required
                       value={weight}
-                      onChange={(event) => setWeight(event.target.value)}
+                      onChange={(event) => {
+                        renewSecureRequestId();
+                        setWeight(event.target.value);
+                      }}
                       className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     />
                   </label>
@@ -387,7 +500,10 @@ export function SkuGeneratorWizardMain({
                     <select
                       name="weightStatus"
                       value={weightStatus}
-                      onChange={(event) => setWeightStatus(event.target.value as "real" | "estimated")}
+                      onChange={(event) => {
+                        renewSecureRequestId();
+                        setWeightStatus(event.target.value as "real" | "estimated");
+                      }}
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
                       <option value="estimated">Estimado</option>
@@ -481,12 +597,17 @@ export function SkuGeneratorWizardMain({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-50">SKU gerado com sucesso</h3>
+              <h3 className="text-lg font-semibold text-slate-50">
+                {modalData.message?.includes("reutilizado") ? "SKU reutilizado" : "SKU gerado com sucesso"}
+              </h3>
               <Button type="button" variant="outline" onClick={() => setModalData(null)}>
                 Fechar
               </Button>
             </div>
             <div className="grid gap-3">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                {modalData.message}
+              </div>
               {modalData.productImageUrl ? (
                 <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
                   <p className="mb-3 text-sm text-slate-200">

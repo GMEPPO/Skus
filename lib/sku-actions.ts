@@ -55,6 +55,15 @@ function getFileExtension(fileName: string, mimeType: string) {
 }
 
 export async function generateSkuAction(formData: FormData): Promise<GenerateSkuActionResult> {
+  // Legacy path only. Secure R5 RPC lives in sku-secure-actions.ts behind feature flag.
+  const { isSecureGenerationV2Enabled } = await import("@/lib/skus-feature-flags");
+  if (isSecureGenerationV2Enabled()) {
+    return {
+      ok: false,
+      message: "Feature flag V2 ativa: usa generateSkuSecureAction (nao o fluxo legacy).",
+    };
+  }
+
   const parsed = generateSkuSchema.safeParse({
     generatedCode: formData.get("generatedCode"),
     designation: formData.get("designation"),
