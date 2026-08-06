@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDesignationByLocale, buildSkuCodeExamplePattern, buildSkuPreview, filterGeneratorWords } from "@/lib/sku";
+import { buildDesignationByLocale, buildSkuCodeExamplePattern, buildSkuCodeExamplePatterns, buildSkuPreview, filterGeneratorWords } from "@/lib/sku";
 import type { GeneratorCatalog } from "@/lib/types";
 
 const sabsolCatalog: GeneratorCatalog = {
@@ -182,5 +182,18 @@ describe("sku builder", () => {
         product: "sab",
       }),
     ).toBe("ALG-%-SAB-%-%-%");
+  });
+
+  it("builds fallback patterns from full selection to single levels", () => {
+    expect(
+      buildSkuCodeExamplePatterns(
+        sabsolCatalog,
+        {
+          brand: "alg",
+          format: "sol",
+        },
+        ["brand", "format"],
+      ),
+    ).toEqual(["ALG-SOL-%-%-%-%", "%-SOL-%-%-%-%", "ALG-%-%-%-%-%"]);
   });
 });

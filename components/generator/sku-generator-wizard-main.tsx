@@ -14,7 +14,7 @@ import {
   buildDesignation,
   buildDesignationByLocale,
   buildEmptySelectionId,
-  buildSkuCodeExamplePattern,
+  buildSkuCodeExamplePatterns,
   buildSkuPreview,
   filterGeneratorWords,
   getAvailableOptions,
@@ -104,6 +104,7 @@ export function SkuGeneratorWizardMain({
   onNormalizationComplete?: () => void;
 }) {
   const [selections, setSelections] = useState<Selections>({});
+  const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
   const [searchByLevel, setSearchByLevel] = useState<SearchByLevel>({});
   const [unitsPerBox, setUnitsPerBox] = useState("");
   const [unitsPerBoxStatus, setUnitsPerBoxStatus] = useState<"real" | "estimated">("estimated");
@@ -170,8 +171,8 @@ export function SkuGeneratorWizardMain({
       return;
     }
 
-    const pattern = buildSkuCodeExamplePattern(catalog, selections);
-    if (!pattern) {
+    const patterns = buildSkuCodeExamplePatterns(catalog, selections, selectionOrder);
+    if (patterns.length === 0) {
       setCodeExamples([]);
       return;
     }
@@ -179,7 +180,7 @@ export function SkuGeneratorWizardMain({
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setCodeExamplesLoading(true);
-      const result = await fetchSkuCodeExamplesAction(categoryId, pattern);
+      const result = await fetchSkuCodeExamplesAction(categoryId, patterns);
       if (!cancelled) {
         setCodeExamples(result.ok ? result.examples : []);
         setCodeExamplesLoading(false);
@@ -190,7 +191,7 @@ export function SkuGeneratorWizardMain({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [catalog, categoryId, selections]);
+  }, [catalog, categoryId, selectionOrder, selections]);
 
   function buildSecurePayloadKey(
     nextSelections: Selections = selections,
@@ -246,7 +247,9 @@ export function SkuGeneratorWizardMain({
       ...selections,
       [level.id]: nextValue,
     };
+    const nextSelectionOrder = [...selectionOrder.filter((id) => id !== level.id), level.id];
     bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
+    setSelectionOrder(nextSelectionOrder);
     setSelections(nextSelections);
   }
 
@@ -254,6 +257,7 @@ export function SkuGeneratorWizardMain({
     const nextSelections = { ...selections };
     delete nextSelections[level.id];
     bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
+    setSelectionOrder(selectionOrder.filter((id) => id !== level.id));
     setSelections(nextSelections);
   }
 

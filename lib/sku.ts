@@ -116,3 +116,24 @@ export function buildSkuCodeExamplePattern(
   return segments.map((segment) => (segment ? escapeIlikeSegment(segment) : "%")).join("-");
 }
 
+export function buildSkuCodeExamplePatterns(
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+  selectionOrder: string[],
+): string[] {
+  const patterns: string[] = [];
+  const fullPattern = buildSkuCodeExamplePattern(catalog, selections);
+  if (fullPattern) patterns.push(fullPattern);
+
+  for (const levelId of [...selectionOrder].reverse()) {
+    const selectedValue = selections[levelId];
+    if (!selectedValue) continue;
+    const singleLevelPattern = buildSkuCodeExamplePattern(catalog, { [levelId]: selectedValue });
+    if (singleLevelPattern && !patterns.includes(singleLevelPattern)) {
+      patterns.push(singleLevelPattern);
+    }
+  }
+
+  return patterns;
+}
+
