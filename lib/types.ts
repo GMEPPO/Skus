@@ -70,3 +70,46 @@ export interface RecentSkuGeneration {
   weight?: number;
   weightStatus?: "real" | "estimated";
 }
+
+export type NormalizationStatus = "pending" | "completed" | "cancelled";
+
+export interface NormalizationImportBatchSummary {
+  id: string;
+  fileName: string;
+  status: string;
+  totalRows: number;
+  pendingRows: number;
+  completedRows: number;
+  invalidRows: number;
+  createdAt: string;
+}
+
+export interface NormalizationQueueItem {
+  id: string;
+  importBatchId: string;
+  batchFileName: string;
+  sourceRowNumber: number;
+  legacyCode: string | null;
+  legacyDesignation: string | null;
+  sourceNewCode: string | null;
+  sourceDesignationPt: string | null;
+  normalizationStatus: NormalizationStatus;
+  categoryId: string | null;
+  importIssue: string | null;
+  lockedBy: string | null;
+  lockedAt: string | null;
+  lockExpiresAt: string | null;
+  finalNewCode: string | null;
+  completedAt: string | null;
+}
+
+export interface NormalizationRecord extends NormalizationQueueItem {
+  sourceDesignationEs: string | null;
+  sourceDesignationEn: string | null;
+  sourceStatus: string | null;
+  sourceObservations: string | null;
+  generationId: string | null;
+  finalDesignationPt: string | null;
+  finalDesignationEs: string | null;
+  finalDesignationEn: string | null;
+}

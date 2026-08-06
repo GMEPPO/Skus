@@ -53,17 +53,30 @@ SHA-256 `20260805140000…`:
 
 **Pending:**
 - Repo hygiene con repositorio Git real (`git status --short` / `git diff --check` / `git log -1 --oneline`)
-- Activación controlada de `GENERATOR_UI_V2` con `NEXT_PUBLIC_SKUS_SECURE_GENERATION_V2=false` hasta nuevo OK
+- Validación productiva de `GENERATOR_UI_V2` aplazada por decisión de product owner
 - Gate separado para `NORMALIZATION_UI_V2`
 
-**UI status (supervisor 2026-08-06):**
-- `PHASE2B2_BACKEND_VALIDATED` / `R5_BACKEND=VALIDATED`
-- `GENERATOR_UI_V2=ACTIVATION_FAILED_UI_IDEMPOTENCY` → remediación de idempotencia en curso
-- `UI_V2_ACTIVATION=ROLLED_BACK` (`NEXT_PUBLIC_SKUS_SECURE_GENERATION_V2=false`, redeploy Ready)
-- Smoke V2 fallido (UI renovó `requestId` tras éxito): `generationId=16b66b28-6f64-408e-b45d-fcc2ec4dc626`, `generatedCode=ACBBISBOD020FLW000`, `requestIdA=81fd5bdb-fe26-455c-9b4a-afbca264b606`, `requestIdB=a7573a8e-275b-4097-b4e6-6d2391c3dd9c`, `historyRows=6` (no cleanup SQL)
-- Fix UI: no renovar `requestId` en éxito/modal/retry; renovar solo si cambia payload (selección/medidas/status)
+**UI status (supervisor 2026-08-06, cierre administrativo):**
+- `PHASE2B2_BACKEND_VALIDATED` / `R5=APPLIED`
+- `GENERATOR_UI_V2_IMPLEMENTATION=COMPLETE`
+- `GENERATOR_UI_V2_IDEMPOTENCY_FIX=DEPLOYED_FLAG_OFF`
+- `GENERATOR_UI_V2_COMMIT=650f0e0633df39d864663692805e79d087251881`
+- `GENERATOR_UI_V2_PRODUCTION_VALIDATION=DEFERRED_BY_PRODUCT_OWNER`
+- `GENERATOR_UI_V2_ACTIVATION=NOT_AUTHORIZED`
+- `GENERATOR_UI_V2_FEATURE_FLAG=false` (`NEXT_PUBLIC_SKUS_SECURE_GENERATION_V2=false`)
+- `GENERATOR_UI_V2=NOT_VALIDATED_IN_PRODUCTION` / `KEEP_ENABLED=NOT_AUTHORIZED`
+- `SECOND_CONTROLLED_ACTIVATION=CANCELLED_NOT_EXECUTED`
+- `DEFER_REASON="Product owner declined the second controlled activation and database verification."`
+- Evidencia smoke V2 fallido (sin cleanup SQL): `FAILED_SMOKE_GENERATION_ID=16b66b28-6f64-408e-b45d-fcc2ec4dc626`, `FAILED_SMOKE_GENERATED_CODE=ACBBISBOD020FLW000`, `FAILED_SMOKE_HISTORY_ROWS=6`, `FAILED_SMOKE_DISTINCT_REQUEST_IDS=2`
 - `NORMALIZATION_UI_V2=PENDING_SEPARATE_GATE`
-- Base commit pre-fix: `25a895909ab74371d08250053ec9ba0a3d482b9c`
+- `LEGACY_GENERATOR=ACTIVE`
+
+**Normalization UI (2026-08-06):**
+- `NORMALIZATION_UI_V2=SCaffold_IMPLEMENTED`
+- Flag: `NEXT_PUBLIC_SKUS_NORMALIZATION_V2=false` (independent from generator)
+- Routes: `/normalization`, `/normalization/[id]`
+- Flow: queue → claim → catalog selection → `complete_sku_normalization`
+- Import Excel: not yet in app (batches visible if loaded via scripts)
 
 Hold / go-nogo: `docs/phase2b2-r5-validation-hold.md`, `docs/phase2b2-r5-apply-go-nogo.md`
 

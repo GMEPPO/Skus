@@ -36,3 +36,7 @@ export function canManageFamilies(role: UserRole) {
 export function canGenerateSku(role: UserRole) {
   return hasMinimumRole(role, "editor");
 }
+
+export function canNormalizeSku(role: UserRole) {
+  return hasMinimumRole(role, "editor");
+}

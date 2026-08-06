@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
+import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
 
 const measureStatusSchema = z.enum(["real", "estimated"]);
 
@@ -180,12 +180,12 @@ export type CompleteSkuNormalizationActionResult =
 
 /**
  * Server action for public.complete_sku_normalization.
- * Gated by the same V2 feature flag (OFF by default).
+ * Gated by NEXT_PUBLIC_SKUS_NORMALIZATION_V2 (independent from generator V2).
  */
 export async function completeSkuNormalizationSecureAction(
   formData: FormData,
 ): Promise<CompleteSkuNormalizationActionResult> {
-  if (!isSecureGenerationV2Enabled()) {
+  if (!isNormalizationV2Enabled()) {
     return {
       ok: false,
       code: "flag_off",
@@ -243,6 +243,8 @@ export async function completeSkuNormalizationSecureAction(
   revalidatePath("/generator");
   revalidatePath("/sku-history");
   revalidatePath("/dashboard");
+  revalidatePath("/normalization");
+  revalidatePath(`/normalization/${parsed.data.normalizationId}`);
 
   return {
     ok: true,

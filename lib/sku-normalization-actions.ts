@@ -1,0 +1,117 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { requireRole } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { isNormalizationV2Enabled } from "@/lib/skus-feature-flags";
+
+const NORMALIZATION_RPC_ERRORS: Record<string, string> = {
+  not_authenticated: "Sessao expirada. Volta a autenticar-te.",
+  forbidden: "Nao tens permissao para normalizar SKUs.",
+  not_found: "Registo de normalizacao nao encontrado.",
+  completed: "Esta normalizacao ja foi concluida.",
+  cancelled: "Esta normalizacao foi cancelada.",
+  locked_by_other_user: "Este registo esta bloqueado por outro utilizador.",
+  lock_expired: "O bloqueio expirou. Volta a reivindicar o registo.",
+  lock_required: "Precisas de reivindicar o registo antes de concluir.",
+  claim_failed: "Nao foi possivel reivindicar o registo.",
+  renew_failed: "Nao foi possivel renovar o bloqueio.",
+  release_failed: "Nao foi possivel libertar o bloqueio.",
+  missing_legacy_code: "Registo sem codigo legacy valido.",
+};
+
+function mapRpcError(error: { message?: string } | null): { code: string; message: string } {
+  const raw = (error?.message ?? "unknown_error").trim();
+  const known = Object.keys(NORMALIZATION_RPC_ERRORS).find((key) => raw.includes(key));
+  if (known) {
+    return { code: known, message: NORMALIZATION_RPC_ERRORS[known] };
+  }
+  return { code: "rpc_error", message: "Operacao de normalizacao falhou (RPC)." };
+}
+
+export type NormalizationRpcActionResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string; code?: string };
+
+async function getAuthenticatedClient() {
+  if (!isNormalizationV2Enabled()) {
+    return {
+      ok: false as const,
+      code: "flag_off",
+      message: "Normalizacao V2 desativada (feature flag OFF).",
+    };
+  }
+
+  await requireRole("editor");
+  const supabase = createSupabaseServerClient();
+  if (!supabase) {
+    return { ok: false as const, code: "not_authenticated", message: "Supabase client nao configurado." };
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false as const, code: "not_authenticated", message: NORMALIZATION_RPC_ERRORS.not_authenticated };
+  }
+
+  return { ok: true as const, supabase };
+}
+
+export async function claimNormalizationAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
+  const client = await getAuthenticatedClient();
+  if (!client.ok) {
+    return { ok: false, code: client.code, message: client.message };
+  }
+
+  const { error } = await client.supabase.rpc("claim_sku_normalization", {
+    p_normalization_id: normalizationId,
+  });
+
+  if (error) {
+    const mapped = mapRpcError(error);
+    return { ok: false, code: mapped.code, message: mapped.message };
+  }
+
+  revalidatePath("/normalization");
+  revalidatePath(`/normalization/${normalizationId}`);
+  redirect(`/normalization/${normalizationId}`);
+}
+
+export async function releaseNormalizationAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
+  const client = await getAuthenticatedClient();
+  if (!client.ok) {
+    return { ok: false, code: client.code, message: client.message };
+  }
+
+  const { error } = await client.supabase.rpc("release_sku_normalization_claim", {
+    p_normalization_id: normalizationId,
+  });
+
+  if (error) {
+    const mapped = mapRpcError(error);
+    return { ok: false, code: mapped.code, message: mapped.message };
+  }
+
+  revalidatePath("/normalization");
+  revalidatePath(`/normalization/${normalizationId}`);
+  return { ok: true, message: "Bloqueio libertado." };
+}
+
+export async function renewNormalizationClaimAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
+  const client = await getAuthenticatedClient();
+  if (!client.ok) {
+    return { ok: false, code: client.code, message: client.message };
+  }
+
+  const { error } = await client.supabase.rpc("renew_sku_normalization_claim", {
+    p_normalization_id: normalizationId,
+  });
+
+  if (error) {
+    const mapped = mapRpcError(error);
+    return { ok: false, code: mapped.code, message: mapped.message };
+  }
+
+  revalidatePath(`/normalization/${normalizationId}`);
+  return { ok: true, message: "Bloqueio renovado." };
+}
