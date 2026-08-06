@@ -3,6 +3,7 @@
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import type {
+  NormalizationHistoryItem,
   NormalizationImportBatchSummary,
   NormalizationQueueItem,
   NormalizationRecord,
@@ -144,6 +145,70 @@ export async function getPendingNormalizationQueue(limit?: number): Promise<Norm
   return rows
     .filter((row) => !isOk2SourceStatus(row.source_status ? String(row.source_status) : null))
     .map(mapQueueItem);
+}
+
+const COMPLETED_HISTORY_SELECT = `
+      id,
+      legacy_code, legacy_designation,
+      source_new_code, source_designation_pt,
+      final_new_code, final_designation_pt,
+      source_status, category_id, completed_at,
+      skus_categories ( name, slug )
+    `;
+
+function mapHistoryItem(row: Record<string, unknown>): NormalizationHistoryItem {
+  const category = row.skus_categories as Record<string, unknown> | null;
+  const finalNewCode = row.final_new_code ? String(row.final_new_code) : null;
+  const sourceNewCode = row.source_new_code ? String(row.source_new_code) : null;
+  const finalDesignationPt = row.final_designation_pt ? String(row.final_designation_pt) : null;
+  const sourceDesignationPt = row.source_designation_pt ? String(row.source_designation_pt) : null;
+
+  return {
+    id: String(row.id),
+    legacyCode: row.legacy_code ? String(row.legacy_code) : null,
+    legacyDesignation: row.legacy_designation ? String(row.legacy_designation) : null,
+    newCode: finalNewCode ?? sourceNewCode,
+    newDesignationPt: finalDesignationPt ?? sourceDesignationPt,
+    categoryId: row.category_id ? String(row.category_id) : null,
+    categoryName: category?.name ? String(category.name) : null,
+    categorySlug: category?.slug ? String(category.slug) : null,
+    completedAt: row.completed_at ? String(row.completed_at) : null,
+    sourceStatus: row.source_status ? String(row.source_status) : null,
+  };
+}
+
+/** Loads completed normalizations (wizard + OK2 import) for history view. */
+export async function getCompletedNormalizationHistory(limit?: number): Promise<NormalizationHistoryItem[]> {
+  const supabase = createSupabaseServiceServerClient();
+  if (!supabase) return [];
+
+  await reconcileImportedOk2Rows(supabase);
+
+  const maxRows = limit ?? NORMALIZATION_QUEUE_FETCH_ALL_CAP;
+  const rows: Record<string, unknown>[] = [];
+  let offset = 0;
+
+  while (rows.length < maxRows) {
+    const batchSize = Math.min(NORMALIZATION_QUEUE_PAGE_SIZE, maxRows - rows.length);
+    const { data, error } = await supabase
+      .from("skus_code_normalizations")
+      .select(COMPLETED_HISTORY_SELECT)
+      .eq("normalization_status", "completed")
+      .order("completed_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + batchSize - 1);
+
+    if (error) throw new Error(error.message);
+
+    const page = (data ?? []) as Record<string, unknown>[];
+    if (page.length === 0) break;
+
+    rows.push(...page);
+    if (page.length < batchSize) break;
+    offset += batchSize;
+  }
+
+  return rows.map(mapHistoryItem);
 }
 
 export async function getNormalizationById(id: string): Promise<NormalizationRecord | null> {

@@ -113,3 +113,16 @@ export interface NormalizationRecord extends NormalizationQueueItem {
   finalDesignationEs: string | null;
   finalDesignationEn: string | null;
 }
+
+export interface NormalizationHistoryItem {
+  id: string;
+  legacyCode: string | null;
+  legacyDesignation: string | null;
+  newCode: string | null;
+  newDesignationPt: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  categorySlug: string | null;
+  completedAt: string | null;
+  sourceStatus: string | null;
+}

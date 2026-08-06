@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NormalizationImportForm } from "@/components/normalization/normalization-import-form";
 import { NormalizationQueueTable } from "@/components/normalization/normalization-queue-table";
@@ -68,7 +69,12 @@ export default async function NormalizationPage() {
       <Card>
         <CardHeader>
           <CardTitle>Fila pendente</CardTitle>
-          <CardDescription>{queue.length} registo(s) aguardando normalizacao</CardDescription>
+          <CardDescription className="flex flex-wrap items-center gap-3">
+            <span>{queue.length} registo(s) aguardando normalizacao</span>
+            <Link href="/normalization/history" className="text-amber-300 hover:text-amber-200">
+              Ver historico de normalizados
+            </Link>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <NormalizationQueueTable items={queue} currentUserId={user.id} actionsEnabled={normalizationV2Enabled} />
