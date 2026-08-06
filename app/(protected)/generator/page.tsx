@@ -1,8 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SkuGeneratorWizardMain } from "@/components/generator/sku-generator-wizard-main";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GeneratorWorkspace } from "@/components/generator/generator-workspace";
 import { getCategories, getGeneratorCatalogForCategory } from "@/lib/category-catalog";
-import { isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
-import type { GeneratorCatalog } from "@/lib/types";
+import { mapCategoryCatalogToGeneratorCatalog } from "@/lib/generator-catalog-mapper";
+import { getPendingNormalizationQueue } from "@/lib/normalization-data";
+import { requireRole } from "@/lib/auth";
+import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -16,10 +18,13 @@ export default async function GeneratorPage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
+  await requireRole("editor");
   const secureGenerationV2Enabled = isSecureGenerationV2Enabled();
+  const normalizationV2Enabled = isNormalizationV2Enabled();
   const categories = await getCategories();
   const preferredCategory = categories.find((category) => category.slug === "cosmetica") ?? categories[0] ?? null;
   const categoryCatalog = preferredCategory ? await getGeneratorCatalogForCategory(preferredCategory.id) : null;
+  const pendingQueue = await getPendingNormalizationQueue(500);
 
   if (!preferredCategory || !categoryCatalog) {
     return (
@@ -35,8 +40,7 @@ export default async function GeneratorPage({
           <CardHeader>
             <CardTitle>Configuracao em falta</CardTitle>
             <CardDescription>
-              Nao foi possivel resolver uma categoria ativa para o gerador. Verifica a configuracao de categorias antes
-              de ativar a UI V2.
+              Nao foi possivel resolver uma categoria ativa para o gerador. Verifica a configuracao de categorias.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -44,34 +48,15 @@ export default async function GeneratorPage({
     );
   }
 
-  const catalog: GeneratorCatalog = {
-    levels: categoryCatalog.levels.map((level, index) => ({
-      id: level.id,
-      order: index + 1,
-      fieldType: level.key,
-      label: level.label,
-      options: level.options.map((option) => ({
-        id: option.id,
-        label: option.label,
-        referenceCode: option.referenceCode,
-        designation: option.designationPt,
-        designationPt: option.designationPt,
-        designationEs: option.designationEs,
-        designationEn: option.designationEn,
-        includeInDesignation: option.includeInDesignation,
-      })),
-    })),
-  };
+  const catalog = mapCategoryCatalogToGeneratorCatalog(categoryCatalog);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Gerador de SKU</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-400">
-          Biblioteca global de 6 niveis, com designacao em tempo real e preview do codigo final.
-        </p>
-        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">
-          Categoria ativa: {categoryCatalog.category.name} ({categoryCatalog.category.slug})
+          Cria SKUs novos ou normaliza referencias importadas no mesmo wizard. Usa o painel lateral para filtrar
+          pendentes por referencia ou designacao.
         </p>
       </div>
 
@@ -81,21 +66,14 @@ export default async function GeneratorPage({
         </div>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Wizard de composicao</CardTitle>
-          <CardDescription>
-            Procura e seleciona palavras por nivel para construir a referencia final.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SkuGeneratorWizardMain
-            catalog={catalog}
-            secureGenerationV2Enabled={secureGenerationV2Enabled}
-            categoryId={categoryCatalog.category.id}
-          />
-        </CardContent>
-      </Card>
+      <GeneratorWorkspace
+        categories={categories.map((category) => ({ id: category.id, name: category.name, slug: category.slug }))}
+        initialCategoryId={preferredCategory.id}
+        initialCatalog={catalog}
+        pendingItems={pendingQueue}
+        secureGenerationV2Enabled={secureGenerationV2Enabled}
+        normalizationV2Enabled={normalizationV2Enabled}
+      />
     </div>
   );
 }

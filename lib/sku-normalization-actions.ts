@@ -57,23 +57,64 @@ async function getAuthenticatedClient() {
   return { ok: true as const, supabase };
 }
 
-export async function claimNormalizationAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
-  const client = await getAuthenticatedClient();
-  if (!client.ok) {
-    return { ok: false, code: client.code, message: client.message };
+async function claimNormalizationRpc(normalizationId: string) {
+  await requireRole("editor");
+  const supabase = createSupabaseServerClient();
+  if (!supabase) {
+    return { ok: false as const, code: "not_authenticated", message: "Supabase client nao configurado." };
   }
 
-  const { error } = await client.supabase.rpc("claim_sku_normalization", {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false as const, code: "not_authenticated", message: NORMALIZATION_RPC_ERRORS.not_authenticated };
+  }
+
+  const { error } = await supabase.rpc("claim_sku_normalization", {
     p_normalization_id: normalizationId,
   });
 
   if (error) {
     const mapped = mapRpcError(error);
-    return { ok: false, code: mapped.code, message: mapped.message };
+    return { ok: false as const, code: mapped.code, message: mapped.message };
   }
 
   revalidatePath("/normalization");
+  revalidatePath("/generator");
   revalidatePath(`/normalization/${normalizationId}`);
+  return { ok: true as const, message: "Registo reivindicado." };
+}
+
+export async function claimNormalizationForGeneratorAction(
+  normalizationId: string,
+): Promise<NormalizationRpcActionResult> {
+  if (!isNormalizationV2Enabled()) {
+    return {
+      ok: false,
+      code: "flag_off",
+      message: "Normalizacao V2 desativada (feature flag OFF).",
+    };
+  }
+
+  const result = await claimNormalizationRpc(normalizationId);
+  if (!result.ok) {
+    return { ok: false, code: result.code, message: result.message };
+  }
+  return { ok: true, message: result.message };
+}
+
+export async function claimNormalizationAction(normalizationId: string): Promise<NormalizationRpcActionResult> {
+  if (!isNormalizationV2Enabled()) {
+    return {
+      ok: false,
+      code: "flag_off",
+      message: "Normalizacao V2 desativada (feature flag OFF).",
+    };
+  }
+
+  const result = await claimNormalizationRpc(normalizationId);
+  if (!result.ok) {
+    return { ok: false, code: result.code, message: result.message };
+  }
   redirect(`/normalization/${normalizationId}`);
 }
 
@@ -93,6 +134,7 @@ export async function releaseNormalizationAction(normalizationId: string): Promi
   }
 
   revalidatePath("/normalization");
+  revalidatePath("/generator");
   revalidatePath(`/normalization/${normalizationId}`);
   return { ok: true, message: "Bloqueio libertado." };
 }

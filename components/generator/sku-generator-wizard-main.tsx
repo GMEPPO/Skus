@@ -6,8 +6,8 @@ import { ArrowRight, CheckCircle2, ImagePlus, Search, Sparkles, X } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { generateSkuAction, type GenerateSkuActionResult } from "@/lib/sku-actions";
-import { generateSkuSecureAction } from "@/lib/sku-secure-actions";
+import { generateSkuAction } from "@/lib/sku-actions";
+import { completeSkuNormalizationSecureAction, generateSkuSecureAction } from "@/lib/sku-secure-actions";
 import type { GeneratorCatalog, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import {
   buildDesignation,
@@ -22,7 +22,22 @@ import {
 
 type Selections = Record<string, string>;
 type SearchByLevel = Record<string, string>;
-type GeneratedSkuModalData = Extract<GenerateSkuActionResult, { ok: true }>;
+type GeneratedSkuModalData = {
+  ok: true;
+  message: string;
+  generatedCode: string;
+  generatedCodeCompact: string;
+  productImageUrl?: string;
+  designationPt: string;
+  designationEs: string;
+  designationEn: string;
+  unitsPerBox?: number;
+  unitsPerBoxStatus?: "real" | "estimated";
+  multiples?: number;
+  multiplesStatus?: "real" | "estimated";
+  weight?: number;
+  weightStatus?: "real" | "estimated";
+};
 
 function isRequiredLevel(level: GeneratorLevel) {
   return level.fieldType !== "extra";
@@ -46,12 +61,25 @@ function buildSecureSelectionsPayload(catalog: GeneratorCatalog, selections: Sel
 export function SkuGeneratorWizardMain({
   catalog,
   secureGenerationV2Enabled = false,
+  normalizationV2Enabled = false,
   categoryId = null,
+  normalizationTarget = null,
+  onClearNormalization,
+  onNormalizationComplete,
 }: {
   catalog: GeneratorCatalog;
   /** When true, calls generate_sku_secure (requires categoryId + level selections). Default OFF. */
   secureGenerationV2Enabled?: boolean;
+  normalizationV2Enabled?: boolean;
   categoryId?: string | null;
+  normalizationTarget?: {
+    id: string;
+    legacyCode: string | null;
+    legacyDesignation: string | null;
+    sourceDesignationPt: string | null;
+  } | null;
+  onClearNormalization?: () => void;
+  onNormalizationComplete?: () => void;
 }) {
   const [selections, setSelections] = useState<Selections>({});
   const [searchByLevel, setSearchByLevel] = useState<SearchByLevel>({});
@@ -69,7 +97,10 @@ export function SkuGeneratorWizardMain({
   const [secureRequestId, setSecureRequestId] = useState(() => crypto.randomUUID());
   const secureRequestIdRef = useRef(secureRequestId);
   const requestBoundPayloadKeyRef = useRef<string | null>(null);
+  const [normalizationCompleted, setNormalizationCompleted] = useState(false);
 
+  const isNormalizationMode = Boolean(normalizationTarget);
+  const usesSecurePayload = secureGenerationV2Enabled || isNormalizationMode;
   const requiredLevels = useMemo(() => catalog.levels.filter(isRequiredLevel), [catalog.levels]);
   const requiredCompletedCount = requiredLevels.filter((level) => selections[level.id] && !isEmptySelection(selections[level.id])).length;
   const selectedCount = Object.keys(selections).filter((key) => selections[key]).length;
@@ -84,14 +115,19 @@ export function SkuGeneratorWizardMain({
   const hasAllMeasurements = Boolean(unitsPerBox && multiples && weight);
   const hasPartialMeasurements = hasAnyMeasurements && !hasAllMeasurements;
   const measurementError = hasPartialMeasurements
-    ? "As medidas devem ser enviadas em conjunto: quantidade por caixa, multiplos e peso."
+    ? isNormalizationMode
+      ? "As medidas devem ser enviadas em conjunto ou deixadas todas vazias."
+      : "As medidas devem ser enviadas em conjunto: quantidade por caixa, multiplos e peso."
     : null;
+  const measurementsValid = isNormalizationMode ? !hasPartialMeasurements : hasAllMeasurements;
+  const needsCategoryId = secureGenerationV2Enabled || isNormalizationMode;
   const canSubmit =
     catalog.levels.length > 0 &&
     requiredCompletedCount === requiredLevels.length &&
     !isDesignationTooLong &&
-    hasAllMeasurements &&
-    (!secureGenerationV2Enabled || Boolean(categoryId));
+    measurementsValid &&
+    (!needsCategoryId || Boolean(categoryId)) &&
+    (!isNormalizationMode || normalizationV2Enabled);
 
   useEffect(() => {
     return () => {
@@ -112,6 +148,7 @@ export function SkuGeneratorWizardMain({
   ) {
     return JSON.stringify({
       categoryId,
+      normalizationId: normalizationTarget?.id ?? null,
       selections: nextSelections,
       unitsPerBox: nextUnitsPerBox,
       unitsPerBoxStatus: nextUnitsPerBoxStatus,
@@ -123,7 +160,7 @@ export function SkuGeneratorWizardMain({
   }
 
   function bindOrRenewRequestIdForPayload(payloadKey: string): string {
-    if (!secureGenerationV2Enabled) {
+    if (!usesSecurePayload) {
       return secureRequestIdRef.current;
     }
     if (requestBoundPayloadKeyRef.current === null) {
@@ -176,6 +213,61 @@ export function SkuGeneratorWizardMain({
     setIsSubmitting(true);
     setSubmitError(null);
     const formData = new FormData(event.currentTarget);
+
+    if (isNormalizationMode && normalizationTarget) {
+      if (!normalizationV2Enabled) {
+        setSubmitError("Normalizacao V2 desativada (feature flag OFF).");
+        setIsSubmitting(false);
+        return;
+      }
+
+      formData.set("normalizationId", normalizationTarget.id);
+      formData.set("categoryId", categoryId ?? "");
+      formData.set("selectionsJson", JSON.stringify(buildSecureSelectionsPayload(catalog, selections)));
+      formData.set("requestId", bindOrRenewRequestIdForPayload(buildSecurePayloadKey()));
+
+      if (hasAllMeasurements) {
+        formData.set(
+          "measuresJson",
+          JSON.stringify({
+            unitsPerBox: Number(unitsPerBox),
+            unitsPerBoxStatus: unitsPerBoxStatus,
+            multiples: Number(multiples),
+            multiplesStatus: multiplesStatus,
+            weight: Number(weight),
+            weightStatus: weightStatus,
+          }),
+        );
+      }
+
+      const completeResult = await completeSkuNormalizationSecureAction(formData);
+      if (!completeResult.ok) {
+        setSubmitError(completeResult.message);
+        setModalData(null);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const data = completeResult.data;
+      setModalData({
+        ok: true,
+        message: completeResult.message,
+        generatedCode: String(data.generatedCode ?? ""),
+        generatedCodeCompact: String(data.generatedCode ?? "").replaceAll("-", ""),
+        designationPt: String(data.designationPt ?? ""),
+        designationEs: String(data.designationEs ?? ""),
+        designationEn: String(data.designationEn ?? ""),
+        unitsPerBox: hasAllMeasurements ? Number(unitsPerBox) : undefined,
+        unitsPerBoxStatus: hasAllMeasurements ? unitsPerBoxStatus : undefined,
+        multiples: hasAllMeasurements ? Number(multiples) : undefined,
+        multiplesStatus: hasAllMeasurements ? multiplesStatus : undefined,
+        weight: hasAllMeasurements ? Number(weight) : undefined,
+        weightStatus: hasAllMeasurements ? weightStatus : undefined,
+      });
+      setNormalizationCompleted(true);
+      setIsSubmitting(false);
+      return;
+    }
 
     if (secureGenerationV2Enabled) {
       if (!categoryId) {
@@ -258,10 +350,44 @@ export function SkuGeneratorWizardMain({
     setProductImageName("");
   }
 
+  function closeResultModal() {
+    if (normalizationCompleted) {
+      setNormalizationCompleted(false);
+      onNormalizationComplete?.();
+    }
+    setModalData(null);
+  }
+
   return (
     <div className="space-y-6">
+      {isNormalizationMode && normalizationTarget ? (
+        <Card className="space-y-3 border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-300">A normalizar</p>
+              <p className="mt-1 font-mono text-lg text-slate-50">{normalizationTarget.legacyCode ?? "—"}</p>
+              <p className="mt-1 text-sm text-slate-300">
+                {normalizationTarget.legacyDesignation ??
+                  normalizationTarget.sourceDesignationPt ??
+                  "Sem designacao legacy"}
+              </p>
+            </div>
+            {onClearNormalization ? (
+              <Button type="button" variant="outline" className="h-9 px-3" onClick={onClearNormalization}>
+                Cancelar normalizacao
+              </Button>
+            ) : null}
+          </div>
+          {!normalizationV2Enabled ? (
+            <p className="text-sm text-amber-200">
+              Ativa `NEXT_PUBLIC_SKUS_NORMALIZATION_V2=true` para concluir este registo.
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
       <form onSubmit={handleSubmit} className="space-y-6">
-        {secureGenerationV2Enabled ? (
+        {usesSecurePayload ? (
           <>
             <input type="hidden" name="categoryId" value={categoryId ?? ""} />
             <input type="hidden" name="requestId" value={secureRequestId} />
@@ -454,7 +580,7 @@ export function SkuGeneratorWizardMain({
                       type="number"
                       min="0.01"
                       step="0.01"
-                      required
+                      required={!isNormalizationMode}
                       value={unitsPerBox}
                       onChange={(event) => setUnitsPerBox(event.target.value)}
                       onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
@@ -489,7 +615,7 @@ export function SkuGeneratorWizardMain({
                       type="number"
                       min="0.01"
                       step="0.01"
-                      required
+                      required={!isNormalizationMode}
                       value={multiples}
                       onChange={(event) => setMultiples(event.target.value)}
                       onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
@@ -524,7 +650,7 @@ export function SkuGeneratorWizardMain({
                       type="number"
                       min="0.01"
                       step="0.01"
-                      required
+                      required={!isNormalizationMode}
                       value={weight}
                       onChange={(event) => setWeight(event.target.value)}
                       onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
@@ -620,7 +746,11 @@ export function SkuGeneratorWizardMain({
               ) : null}
             </div>
             <Button type="submit" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "A guardar..." : "Gerar SKU"}
+              {isSubmitting
+                ? "A guardar..."
+                : isNormalizationMode
+                  ? "Concluir normalizacao"
+                  : "Gerar SKU"}
             </Button>
           </div>
         </div>
@@ -639,7 +769,7 @@ export function SkuGeneratorWizardMain({
               <h3 className="text-lg font-semibold text-slate-50">
                 {modalData.message?.includes("reutilizado") ? "SKU reutilizado" : "SKU gerado com sucesso"}
               </h3>
-              <Button type="button" variant="outline" onClick={() => setModalData(null)}>
+              <Button type="button" variant="outline" onClick={closeResultModal}>
                 Fechar
               </Button>
             </div>
