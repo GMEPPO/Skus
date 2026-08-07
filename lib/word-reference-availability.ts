@@ -17,8 +17,6 @@ export type ThreeCharReferenceAvailability = {
   available: number;
   capacity: number;
   used: number;
-  levels: number;
-  poolPerLevel: number;
 };
 
 export function isThreeCharCatalogReference(code: string | null | undefined): boolean {
@@ -30,26 +28,14 @@ export function isThreeCharCatalogReference(code: string | null | undefined): bo
   );
 }
 
-export function computeThreeCharReferenceAvailability(input: {
-  levelIds: string[];
-  usedByLevel: Map<string, Set<string>>;
-}): ThreeCharReferenceAvailability {
-  const poolPerLevel = USABLE_THREE_CHAR_REFERENCE_POOL;
-  let used = 0;
-  let available = 0;
-
-  for (const levelId of input.levelIds) {
-    const levelUsed = input.usedByLevel.get(levelId)?.size ?? 0;
-    used += levelUsed;
-    available += poolPerLevel - levelUsed;
-  }
+export function computeThreeCharReferenceAvailability(usedReferences: Iterable<string>): ThreeCharReferenceAvailability {
+  const used = new Set(usedReferences).size;
+  const capacity = USABLE_THREE_CHAR_REFERENCE_POOL;
 
   return {
-    available,
-    capacity: input.levelIds.length * poolPerLevel,
+    available: Math.max(capacity - used, 0),
+    capacity,
     used,
-    levels: input.levelIds.length,
-    poolPerLevel,
   };
 }
 
@@ -70,11 +56,13 @@ export async function getThreeCharReferenceAvailability(
 
   if (levelsError) throw new Error(levelsError.message);
 
-  const levelIds = (levels ?? [])
-    .filter((level) => !isSizeReferenceScope(fieldTypeCodeFromRelation(level.skus_field_types)))
-    .map((level) => String(level.id));
+  const eligibleLevelIds = new Set(
+    (levels ?? [])
+      .filter((level) => !isSizeReferenceScope(fieldTypeCodeFromRelation(level.skus_field_types)))
+      .map((level) => String(level.id)),
+  );
 
-  const usedByLevel = new Map<string, Set<string>>();
+  const usedReferences = new Set<string>();
   const pageSize = 1000;
   let offset = 0;
 
@@ -91,19 +79,17 @@ export async function getThreeCharReferenceAvailability(
     const page = words ?? [];
     for (const word of page) {
       const levelId = word.category_level_id ? String(word.category_level_id) : null;
-      if (!levelId || !levelIds.includes(levelId)) continue;
+      if (!levelId || !eligibleLevelIds.has(levelId)) continue;
 
       const referenceCode = normalizeWordReferenceCode(word.reference_code);
       if (!isThreeCharCatalogReference(referenceCode)) continue;
 
-      const bucket = usedByLevel.get(levelId) ?? new Set<string>();
-      bucket.add(referenceCode);
-      usedByLevel.set(levelId, bucket);
+      usedReferences.add(referenceCode);
     }
 
     if (page.length < pageSize) break;
     offset += pageSize;
   }
 
-  return computeThreeCharReferenceAvailability({ levelIds, usedByLevel });
+  return computeThreeCharReferenceAvailability(usedReferences);
 }

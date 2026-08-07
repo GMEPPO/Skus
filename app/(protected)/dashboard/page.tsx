@@ -19,7 +19,7 @@ export default async function DashboardPage() {
       label: "Referencias 3 chars disponiveis",
       value: formatCounter(summary.availableThreeCharReferences),
       icon: Hash,
-      hint: `${formatCounter(summary.threeCharReferencesUsed)} ocupadas de ${formatCounter(summary.threeCharReferenceCapacity)} (${summary.threeCharReferenceLevels} niveis, A-Z 0-9)`,
+      hint: `${formatCounter(summary.threeCharReferencesUsed)} unicas ocupadas de ${formatCounter(summary.threeCharReferenceCapacity)} (A-Z 0-9, todos os niveis)`,
     },
     { label: "Utilizadores ativos", value: formatCounter(summary.activeUsers), icon: ShieldCheck },
   ];

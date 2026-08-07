@@ -17,7 +17,6 @@ export interface DashboardSummary {
   availableThreeCharReferences: number;
   threeCharReferenceCapacity: number;
   threeCharReferencesUsed: number;
-  threeCharReferenceLevels: number;
 }
 
 export interface WordListItem {
