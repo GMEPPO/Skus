@@ -1,6 +1,7 @@
 import type { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 
 export const EMPTY_WORD_REFERENCE_CODE = "000";
+export const SIZE_FIELD_TYPE_CODE = "size";
 
 export function normalizeWordReferenceCode(code: string | null | undefined): string {
   return String(code ?? "")
@@ -12,6 +13,10 @@ export function isEmptyWordReferenceCode(code: string | null | undefined): boole
   return normalizeWordReferenceCode(code) === EMPTY_WORD_REFERENCE_CODE;
 }
 
+export function isSizeReferenceScope(fieldTypeCode: string | null | undefined): boolean {
+  return fieldTypeCode === SIZE_FIELD_TYPE_CODE;
+}
+
 export type WordReferenceConflict = {
   wordId: string;
   label: string;
@@ -19,21 +24,115 @@ export type WordReferenceConflict = {
   levelLabel: string;
 };
 
+export type WordReferenceScope = {
+  fieldTypeId?: string | null;
+  categoryLevelId?: string | null;
+  fieldTypeCode?: string | null;
+};
+
 type ServiceSupabase = NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>;
+
+type WordRowForScope = {
+  default_field_type_id?: string | null;
+  category_level_id?: string | null;
+  skus_field_types?:
+    | { code?: string | null }
+    | Array<{ code?: string | null }>
+    | null;
+  skus_category_levels?:
+    | {
+        legacy_field_type_id?: string | null;
+        skus_field_types?:
+          | { code?: string | null }
+          | Array<{ code?: string | null }>
+          | null;
+      }
+    | Array<{
+        legacy_field_type_id?: string | null;
+        skus_field_types?:
+          | { code?: string | null }
+          | Array<{ code?: string | null }>
+          | null;
+      }>
+    | null;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function fieldTypeCodeFromRelation(
+  relation: { code?: string | null } | Array<{ code?: string | null }> | null | undefined,
+): string | null {
+  const row = firstRelation(relation);
+  return row?.code ? String(row.code) : null;
+}
+
+export function resolveWordFieldTypeCodeFromRow(word: WordRowForScope): string | null {
+  const direct = fieldTypeCodeFromRelation(word.skus_field_types);
+  if (direct) return direct;
+
+  const level = firstRelation(word.skus_category_levels);
+  const fromLevel = fieldTypeCodeFromRelation(level?.skus_field_types);
+  if (fromLevel) return fromLevel;
+
+  return null;
+}
+
+export async function resolveFieldTypeCode(
+  supabase: ServiceSupabase,
+  scope: WordReferenceScope,
+): Promise<string | null> {
+  if (scope.fieldTypeCode) {
+    return scope.fieldTypeCode;
+  }
+
+  if (scope.fieldTypeId) {
+    const { data, error } = await supabase
+      .from("skus_field_types")
+      .select("code")
+      .eq("id", scope.fieldTypeId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.code ? String(data.code) : null;
+  }
+
+  if (scope.categoryLevelId) {
+    const { data, error } = await supabase
+      .from("skus_category_levels")
+      .select("skus_field_types:legacy_field_type_id(code)")
+      .eq("id", scope.categoryLevelId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return fieldTypeCodeFromRelation(
+      data?.skus_field_types as { code?: string | null } | Array<{ code?: string | null }> | null,
+    );
+  }
+
+  return null;
+}
 
 export async function findWordReferenceConflict(
   supabase: ServiceSupabase,
   referenceCode: string,
-  options?: { excludeWordId?: string },
+  options?: WordReferenceScope & { excludeWordId?: string },
 ): Promise<WordReferenceConflict | null> {
   const normalized = normalizeWordReferenceCode(referenceCode);
   if (!normalized || isEmptyWordReferenceCode(normalized)) {
     return null;
   }
 
+  const candidateFieldTypeCode = await resolveFieldTypeCode(supabase, options ?? {});
+  if (isSizeReferenceScope(candidateFieldTypeCode)) {
+    return null;
+  }
+
   let query = supabase
     .from("skus_words")
-    .select("id, label, reference_code, skus_category_levels(label)")
+    .select(
+      "id, label, reference_code, default_field_type_id, category_level_id, skus_field_types(code), skus_category_levels(label, skus_field_types:legacy_field_type_id(code))",
+    )
     .eq("is_active", true)
     .eq("reference_code", normalized);
 
@@ -41,25 +140,37 @@ export async function findWordReferenceConflict(
     query = query.neq("id", options.excludeWordId);
   }
 
-  const { data, error } = await query.limit(1).maybeSingle();
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
-  if (!data) return null;
+  if (!data?.length) return null;
 
-  const levelRelation = data.skus_category_levels as { label?: string } | { label?: string }[] | null;
-  const levelLabel = Array.isArray(levelRelation)
-    ? String(levelRelation[0]?.label ?? "Sem nivel")
-    : String(levelRelation?.label ?? "Sem nivel");
+  for (const row of data) {
+    const fieldTypeCode = resolveWordFieldTypeCodeFromRow(row as WordRowForScope);
+    if (isSizeReferenceScope(fieldTypeCode)) {
+      continue;
+    }
 
-  return {
-    wordId: String(data.id),
-    label: String(data.label ?? ""),
-    referenceCode: String(data.reference_code ?? normalized),
-    levelLabel,
-  };
+    const levelRelation = (row as WordRowForScope).skus_category_levels as
+      | { label?: string }
+      | Array<{ label?: string }>
+      | null;
+    const levelLabel = Array.isArray(levelRelation)
+      ? String(levelRelation[0]?.label ?? "Sem nivel")
+      : String(levelRelation?.label ?? "Sem nivel");
+
+    return {
+      wordId: String(row.id),
+      label: String(row.label ?? ""),
+      referenceCode: String(row.reference_code ?? normalized),
+      levelLabel,
+    };
+  }
+
+  return null;
 }
 
 export function formatWordReferenceConflictMessage(conflict: WordReferenceConflict): string {
-  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" (${conflict.levelLabel}). As referencias devem ser unicas em todos os niveis (excepto 000).`;
+  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" (${conflict.levelLabel}). As referencias devem ser unicas entre palavras activas (excepto 000 e tamanhos gr/ml).`;
 }
 
 export type DesignationLengthWarning = {

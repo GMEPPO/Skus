@@ -1,23 +1,9 @@
--- Corrige referencias duplicadas detectadas em diagnose_duplicate_word_references.sql.
--- Mantem a referencia mais representativa em cada grupo; renomeia as restantes.
+-- Corrige referencias duplicadas (excepto tamanho/gr/ml, que podem partilhar referencia).
 -- REVISAR antes de executar: SKUs ja gerados conservam o codigo antigo no historico.
 -- Apos executar, voltar a correr diagnose_duplicate_word_references.sql (0 linhas)
 -- e depois 20260807100000_skus_words_global_reference_uniqueness.sql
 
 begin;
-
--- Tamanho: gr vs ml
-update public.skus_words set reference_code = '30G', updated_at = now()
-where id = 'f8554012-d4fa-4e60-97a3-695204637205'; -- 30gr
-
-update public.skus_words set reference_code = '30M', updated_at = now()
-where id = '6920148a-6bd5-4796-8d93-d2567b3bb833'; -- 30ml
-
-update public.skus_words set reference_code = '40G', updated_at = now()
-where id = 'ef5f73df-bd02-4a61-821e-23dcf5a6b340'; -- 40gr
-
-update public.skus_words set reference_code = '40M', updated_at = now()
-where id = '9534333b-99b0-41c8-8619-6d11315ca317'; -- 40ml
 
 -- ALE: mantem ALE em BENAMOR ALECRIM
 update public.skus_words set reference_code = 'ALO', updated_at = now()
@@ -75,13 +61,23 @@ where id = 'fac116be-e29f-40d3-ae76-cad9c43ca006'; -- Sabonete Esfoliante
 
 commit;
 
--- Verificacao: deve devolver 0 linhas
+-- Verificacao: deve devolver 0 linhas (30/40 gr/ml podem repetir-se).
+with word_scopes as (
+  select
+    w.reference_code,
+    coalesce(ft_direct.code, ft_level.code, '') as field_type_code
+  from public.skus_words w
+  left join public.skus_category_levels cl on cl.id = w.category_level_id
+  left join public.skus_field_types ft_direct on ft_direct.id = w.default_field_type_id
+  left join public.skus_field_types ft_level on ft_level.id = cl.legacy_field_type_id
+  where w.is_active = true
+    and upper(btrim(w.reference_code)) <> '000'
+    and coalesce(ft_direct.code, ft_level.code, '') <> 'size'
+)
 select
-  upper(btrim(w.reference_code)) as referencia,
+  upper(btrim(reference_code)) as referencia,
   count(*) as total
-from public.skus_words w
-where w.is_active = true
-  and upper(btrim(w.reference_code)) <> '000'
+from word_scopes
 group by 1
 having count(*) > 1
 order by total desc, referencia;

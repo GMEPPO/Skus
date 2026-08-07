@@ -72,6 +72,7 @@ export function WordForm({
 }) {
   const [label, setLabel] = useState(initialValues.label);
   const [referenceCode, setReferenceCode] = useState(initialValues.referenceCode);
+  const [fieldTypeId, setFieldTypeId] = useState(initialValues.fieldTypeId);
   const [designationPt, setDesignationPt] = useState(initialValues.designationPt);
   const [designationEs, setDesignationEs] = useState(initialValues.designationEs);
   const [designationEn, setDesignationEn] = useState(initialValues.designationEn);
@@ -88,6 +89,12 @@ export function WordForm({
     [designationEn, designationEs, designationPt, label],
   );
 
+  const selectedFieldType = useMemo(
+    () => fieldTypes.find((fieldType) => fieldType.id === fieldTypeId) ?? null,
+    [fieldTypeId, fieldTypes],
+  );
+  const isSizeFieldType = selectedFieldType?.code === "size";
+
   useEffect(() => {
     const normalized = referenceCode.trim().toUpperCase();
     if (!normalized) {
@@ -102,10 +109,16 @@ export function WordForm({
       return;
     }
 
+    if (isSizeFieldType) {
+      setReferenceMessage("Tamanhos (gr/ml) podem partilhar a mesma referencia (ex.: 30gr e 30ml).");
+      setReferenceAvailable(true);
+      return;
+    }
+
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setCheckingReference(true);
-      const result = await checkWordReferenceCodeAction(normalized, initialValues.wordId);
+      const result = await checkWordReferenceCodeAction(normalized, initialValues.wordId, fieldTypeId || undefined);
       if (cancelled) return;
 
       if (!result.ok) {
@@ -113,7 +126,7 @@ export function WordForm({
         setReferenceMessage(result.message);
       } else if (result.available) {
         setReferenceAvailable(true);
-        setReferenceMessage("Referencia disponivel em todos os niveis.");
+        setReferenceMessage("Referencia disponivel (unica entre palavras activas, excepto tamanhos).");
       } else {
         setReferenceAvailable(false);
         setReferenceMessage(result.message);
@@ -125,7 +138,7 @@ export function WordForm({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [initialValues.wordId, referenceCode]);
+  }, [fieldTypeId, initialValues.wordId, isSizeFieldType, referenceCode]);
 
   const canSubmit = referenceAvailable !== false;
 
@@ -169,7 +182,8 @@ export function WordForm({
         <select
           name="fieldTypeId"
           required
-          defaultValue={initialValues.fieldTypeId}
+          value={fieldTypeId}
+          onChange={(event) => setFieldTypeId(event.target.value)}
           className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
         >
           <option value="">Selecionar...</option>

@@ -268,7 +268,10 @@ export async function createWordAction(formData: FormData) {
   const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
   if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
     try {
-      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode);
+      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
+        fieldTypeId: defaultFieldTypeId,
+        categoryLevelId,
+      });
       if (conflict) {
         redirect(
           `/catalog/words-manage?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
@@ -353,7 +356,11 @@ export async function updateWordAction(formData: FormData) {
   const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
   if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
     try {
-      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, { excludeWordId: wordId });
+      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
+        excludeWordId: wordId,
+        fieldTypeId: defaultFieldTypeId,
+        categoryLevelId,
+      });
       if (conflict) {
         redirect(
           `/catalog/words-manage/${wordId}?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
@@ -443,7 +450,7 @@ export async function reactivateWordAction(formData: FormData) {
 
   const { data: word, error: wordError } = await supabase
     .from("skus_words")
-    .select("reference_code")
+    .select("reference_code, default_field_type_id, category_level_id")
     .eq("id", parsed.data.wordId)
     .maybeSingle();
 
@@ -456,6 +463,8 @@ export async function reactivateWordAction(formData: FormData) {
     try {
       const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
         excludeWordId: parsed.data.wordId,
+        fieldTypeId: word.default_field_type_id ? String(word.default_field_type_id) : null,
+        categoryLevelId: word.category_level_id ? String(word.category_level_id) : null,
       });
       if (conflict) {
         redirect(

@@ -3,7 +3,9 @@ import {
   collectDesignationLengthWarnings,
   formatWordReferenceConflictMessage,
   isEmptyWordReferenceCode,
+  isSizeReferenceScope,
   normalizeWordReferenceCode,
+  resolveWordFieldTypeCodeFromRow,
 } from "@/lib/word-reference-validation";
 
 describe("word reference validation", () => {
@@ -14,6 +16,19 @@ describe("word reference validation", () => {
   it("000 e reservado para vazio", () => {
     expect(isEmptyWordReferenceCode("000")).toBe(true);
     expect(isEmptyWordReferenceCode("FRA")).toBe(false);
+  });
+
+  it("identifica nivel tamanho/gr/ml", () => {
+    expect(isSizeReferenceScope("size")).toBe(true);
+    expect(isSizeReferenceScope("brand")).toBe(false);
+  });
+
+  it("resolve codigo de field type a partir da palavra", () => {
+    expect(
+      resolveWordFieldTypeCodeFromRow({
+        skus_field_types: { code: "size" },
+      }),
+    ).toBe("size");
   });
 
   it("formata mensagem de conflito global", () => {

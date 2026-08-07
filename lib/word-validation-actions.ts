@@ -6,12 +6,15 @@ import {
   collectDesignationLengthWarnings,
   findWordReferenceConflict,
   formatWordReferenceConflictMessage,
+  isSizeReferenceScope,
   normalizeWordReferenceCode,
+  resolveFieldTypeCode,
 } from "@/lib/word-reference-validation";
 
 export async function checkWordReferenceCodeAction(
   referenceCode: string,
   excludeWordId?: string,
+  fieldTypeId?: string,
 ): Promise<
   | { ok: true; available: true }
   | { ok: true; available: false; message: string; conflictLabel: string; conflictLevel: string }
@@ -34,7 +37,12 @@ export async function checkWordReferenceCodeAction(
   }
 
   try {
-    const conflict = await findWordReferenceConflict(supabase, normalized, { excludeWordId });
+    const fieldTypeCode = await resolveFieldTypeCode(supabase, { fieldTypeId });
+    if (isSizeReferenceScope(fieldTypeCode)) {
+      return { ok: true, available: true };
+    }
+
+    const conflict = await findWordReferenceConflict(supabase, normalized, { excludeWordId, fieldTypeId });
     if (!conflict) {
       return { ok: true, available: true };
     }
