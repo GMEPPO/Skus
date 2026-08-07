@@ -3,6 +3,8 @@ import { normalizeSkuReference } from "@/lib/sku-reference-uniqueness";
 
 type ServiceSupabase = NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>;
 
+const REFERENCE_LOOKUP_PAGE_SIZE = 1000;
+
 export function findDuplicateSkuReferencesWithinList(references: Array<string | null | undefined>): string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
@@ -17,6 +19,59 @@ export function findDuplicateSkuReferencesWithinList(references: Array<string | 
   return [...duplicates];
 }
 
+async function collectTakenReferencesFromGenerations(
+  supabase: ServiceSupabase,
+  wantedSet: Set<string>,
+  taken: Set<string>,
+) {
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("skus_sku_generations")
+      .select("generated_code")
+      .range(offset, offset + REFERENCE_LOOKUP_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+
+    const page = data ?? [];
+    for (const row of page) {
+      const normalized = normalizeSkuReference(String(row.generated_code ?? ""));
+      if (normalized && wantedSet.has(normalized)) taken.add(normalized);
+    }
+
+    if (page.length < REFERENCE_LOOKUP_PAGE_SIZE) break;
+    offset += REFERENCE_LOOKUP_PAGE_SIZE;
+  }
+}
+
+async function collectTakenReferencesFromCompletedNormalizations(
+  supabase: ServiceSupabase,
+  wantedSet: Set<string>,
+  taken: Set<string>,
+) {
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("skus_code_normalizations")
+      .select("final_new_code, source_new_code")
+      .eq("normalization_status", "completed")
+      .range(offset, offset + REFERENCE_LOOKUP_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+
+    const page = data ?? [];
+    for (const row of page) {
+      const normalized = normalizeSkuReference(String(row.final_new_code ?? row.source_new_code ?? ""));
+      if (normalized && wantedSet.has(normalized)) taken.add(normalized);
+    }
+
+    if (page.length < REFERENCE_LOOKUP_PAGE_SIZE) break;
+    offset += REFERENCE_LOOKUP_PAGE_SIZE;
+  }
+}
+
 export async function findTakenSkuReferences(
   supabase: ServiceSupabase,
   references: Array<string | null | undefined>,
@@ -24,28 +79,11 @@ export async function findTakenSkuReferences(
   const wanted = [...new Set(references.map(normalizeSkuReference).filter(Boolean))];
   if (wanted.length === 0) return [];
 
+  const wantedSet = new Set(wanted);
   const taken = new Set<string>();
 
-  const { data: generations, error: generationsError } = await supabase
-    .from("skus_sku_generations")
-    .select("generated_code");
-  if (generationsError) throw new Error(generationsError.message);
-
-  for (const row of generations ?? []) {
-    const normalized = normalizeSkuReference(String(row.generated_code ?? ""));
-    if (wanted.includes(normalized)) taken.add(normalized);
-  }
-
-  const { data: completed, error: completedError } = await supabase
-    .from("skus_code_normalizations")
-    .select("final_new_code, source_new_code")
-    .eq("normalization_status", "completed");
-  if (completedError) throw new Error(completedError.message);
-
-  for (const row of completed ?? []) {
-    const normalized = normalizeSkuReference(String(row.final_new_code ?? row.source_new_code ?? ""));
-    if (wanted.includes(normalized)) taken.add(normalized);
-  }
+  await collectTakenReferencesFromGenerations(supabase, wantedSet, taken);
+  await collectTakenReferencesFromCompletedNormalizations(supabase, wantedSet, taken);
 
   return [...taken];
 }

@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import {
   clearPendingImportQueue,
+  insertNormalizationRowsResilient,
   partitionImportRowsForLoad,
+  releaseBatchFileSha256,
   type SkippedImportRow,
 } from "@/lib/normalization-import-load";
 import {
@@ -71,9 +73,15 @@ function collectCompletedReferenceCodes(rows: ReturnType<typeof parseNormalizati
     .filter((code): code is string => Boolean(code));
 }
 
-function buildSuccessMessage(loadedRows: number, skippedRows: SkippedImportRow[], summary: ReturnType<typeof summarizeImportRows>) {
+function buildSuccessMessage(
+  loadedRows: number,
+  skippedRows: SkippedImportRow[],
+  summary: ReturnType<typeof summarizeImportRows>,
+  replacedPrevious: boolean,
+) {
   const skippedSuffix = skippedRows.length > 0 ? `, ${skippedRows.length} nao carregada(s)` : "";
-  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes, ${summary.completedRows} OK2)${skippedSuffix}. A lista anterior foi substituida.`;
+  const replaceSuffix = replacedPrevious ? " A lista anterior foi substituida." : " A lista anterior foi mantida.";
+  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes, ${summary.completedRows} OK2)${skippedSuffix}.${replaceSuffix}`;
 }
 
 export async function importNormalizationBatchAction(formData: FormData): Promise<ImportNormalizationBatchResult> {
@@ -113,16 +121,6 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     return { ok: false, code: "config_error", message: "Supabase service role nao configurado." };
   }
 
-  try {
-    await clearPendingImportQueue(supabase);
-  } catch {
-    return {
-      ok: false,
-      code: "clear_failed",
-      message: "Nao foi possivel limpar a lista anterior de normalizacao.",
-    };
-  }
-
   const categoryIdRaw = formData.get("categoryId");
   const categoryId = typeof categoryIdRaw === "string" && categoryIdRaw.length > 0 ? categoryIdRaw : null;
 
@@ -139,22 +137,29 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     };
   }
 
-  const { rowsToLoad, skippedRows } = partitionImportRowsForLoad(parsed.rows, takenReferences);
+  const { rowsToLoad, skippedRows: preSkippedRows } = partitionImportRowsForLoad(parsed.rows, takenReferences);
 
   if (rowsToLoad.length === 0) {
-    await runNormalizationImportMaintenance();
-    revalidatePath("/generator");
-
     return {
       ok: true,
-      message: `Import concluido: nenhuma linha carregada, ${skippedRows.length} nao carregada(s). A lista anterior foi substituida.`,
+      message: `Import concluido: nenhuma linha carregada, ${preSkippedRows.length} nao carregada(s). A lista anterior foi mantida.`,
       batchId: "",
       fileName: file.name,
       totalRows: parsed.rows.length,
       loadedRows: 0,
       pendingRows: 0,
-      invalidRows: skippedRows.length,
-      skippedRows,
+      invalidRows: preSkippedRows.length,
+      skippedRows: preSkippedRows,
+    };
+  }
+
+  try {
+    await releaseBatchFileSha256(supabase, fileSha256);
+  } catch {
+    return {
+      ok: false,
+      code: "batch_sha_release_failed",
+      message: "Nao foi possivel preparar o batch de importacao.",
     };
   }
 
@@ -177,34 +182,101 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     .single();
 
   if (batchError || !batch) {
-    return { ok: false, code: "batch_insert_failed", message: "Nao foi possivel criar o batch de importacao." };
+    return {
+      ok: false,
+      code: "batch_insert_failed",
+      message: batchError?.message
+        ? `Nao foi possivel criar o batch de importacao: ${batchError.message}`
+        : "Nao foi possivel criar o batch de importacao.",
+    };
   }
 
-  const normalizationRows = rowsToLoad.map((row) => buildInsertRow(batch.id, row, categoryId));
+  const insertAttempts = rowsToLoad.map((row) => ({
+    sourceRowNumber: row.sourceRowNumber,
+    legacyCode: row.legacyCode,
+    payload: buildInsertRow(batch.id, row, categoryId),
+  }));
 
-  const chunkSize = 100;
-  for (let offset = 0; offset < normalizationRows.length; offset += chunkSize) {
-    const chunk = normalizationRows.slice(offset, offset + chunkSize);
-    const { error: rowsError } = await supabase.from("skus_code_normalizations").insert(chunk);
-    if (rowsError) {
-      await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
-      await supabase.from("skus_normalization_import_batches").delete().eq("id", batch.id);
-      return { ok: false, code: "rows_insert_failed", message: "Falha ao gravar linhas do Excel." };
-    }
+  let insertedCount = 0;
+  let insertSkippedRows: SkippedImportRow[] = [];
+
+  try {
+    const insertResult = await insertNormalizationRowsResilient(supabase, insertAttempts);
+    insertedCount = insertResult.insertedCount;
+    insertSkippedRows = insertResult.skippedRows;
+  } catch {
+    await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
+    await supabase.from("skus_normalization_import_batches").delete().eq("id", batch.id);
+    return {
+      ok: false,
+      code: "rows_insert_failed",
+      message: "Falha ao gravar linhas do Excel.",
+    };
   }
+
+  const allSkippedRows = [...preSkippedRows, ...insertSkippedRows];
+
+  if (insertedCount === 0) {
+    await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
+    await supabase.from("skus_normalization_import_batches").delete().eq("id", batch.id);
+
+    return {
+      ok: true,
+      message: `Import concluido: nenhuma linha carregada, ${allSkippedRows.length} nao carregada(s). A lista anterior foi mantida.`,
+      batchId: "",
+      fileName: file.name,
+      totalRows: parsed.rows.length,
+      loadedRows: 0,
+      pendingRows: 0,
+      invalidRows: allSkippedRows.length,
+      skippedRows: allSkippedRows,
+    };
+  }
+
+  try {
+    await clearPendingImportQueue(supabase, { excludeBatchId: batch.id });
+  } catch {
+    await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
+    await supabase.from("skus_normalization_import_batches").delete().eq("id", batch.id);
+    return {
+      ok: false,
+      code: "clear_failed",
+      message: "Linhas gravadas mas nao foi possivel substituir a lista anterior. Tenta novamente.",
+    };
+  }
+
+  const loadedSummary = summarizeImportRows(
+    rowsToLoad.filter(
+      (row) =>
+        !insertSkippedRows.some(
+          (skipped) =>
+            skipped.sourceRowNumber === row.sourceRowNumber && skipped.legacyCode === row.legacyCode,
+        ),
+    ),
+  );
+
+  await supabase
+    .from("skus_normalization_import_batches")
+    .update({
+      total_rows: loadedSummary.totalRows,
+      pending_rows: loadedSummary.pendingRows,
+      completed_rows: loadedSummary.completedRows,
+      invalid_rows: loadedSummary.invalidRows,
+    })
+    .eq("id", batch.id);
 
   await runNormalizationImportMaintenance();
   revalidatePath("/generator");
 
   return {
     ok: true,
-    message: buildSuccessMessage(rowsToLoad.length, skippedRows, summary),
+    message: buildSuccessMessage(insertedCount, allSkippedRows, loadedSummary, true),
     batchId: batch.id,
     fileName: file.name,
     totalRows: parsed.rows.length,
-    loadedRows: rowsToLoad.length,
-    pendingRows: summary.pendingRows,
-    invalidRows: skippedRows.length,
-    skippedRows,
+    loadedRows: insertedCount,
+    pendingRows: loadedSummary.pendingRows,
+    invalidRows: allSkippedRows.length,
+    skippedRows: allSkippedRows,
   };
 }

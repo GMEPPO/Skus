@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ParsedNormalizationImportRow } from "@/lib/normalization-import-parser";
 import {
   formatImportSkipReason,
+  mapNormalizationInsertError,
   partitionImportRowsForLoad,
 } from "@/lib/normalization-import-load";
 
@@ -27,6 +28,15 @@ describe("normalization import load", () => {
   it("formatImportSkipReason traduz codigos conhecidos", () => {
     expect(formatImportSkipReason("MISSING_LEGACY_CODE")).toBe("Falta referencia antiga");
     expect(formatImportSkipReason(null, "Motivo custom")).toBe("Motivo custom");
+  });
+
+  it("mapNormalizationInsertError traduz duplicados de referencia", () => {
+    expect(mapNormalizationInsertError("sku_reference_duplicate")).toBe(
+      "Referencia nova ja existe no historico de codigos",
+    );
+    expect(mapNormalizationInsertError("duplicate key value violates unique constraint")).toBe(
+      "Erro ao gravar linha na base de dados",
+    );
   });
 
   it("partitionImportRowsForLoad separa invalidas e duplicadas", () => {
