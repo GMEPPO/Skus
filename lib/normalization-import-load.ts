@@ -73,6 +73,12 @@ export function mapNormalizationInsertError(
     return "Numero de linha duplicado no Excel";
   }
 
+  if (combined.includes("permission denied") && combined.includes("skus_private")) {
+    return options?.isOk2
+      ? "OK2 nao concluido: falta permissao na base de dados (aplicar migracao apply_ok2_import_grants.sql)"
+      : "Falta permissao na base de dados para concluir normalizacao";
+  }
+
   const trimmed = `${message} ${details ?? ""}`.trim();
   if (trimmed.length > 0 && trimmed.length <= 180) {
     return options?.isOk2 ? `OK2 nao concluido: ${trimmed}` : trimmed;
