@@ -1,24 +1,7 @@
--- Corrige referencias duplicadas entre palavras distintas (alinhado com WS1 + regra de unicidade).
--- Tamanhos gr/ml/kg/l podem partilhar referencia; cada outra palavra deve ser unica.
+-- Corrige duplicados no MESMO nivel (WS1). Duplicados entre niveles distintos sao permitidos.
 -- Ordem: sync_dictionary_ws1_(1).sql -> este script -> diagnose -> migracao indice.
 
 begin;
-
--- Embalagem / marca / extra (cruzados)
-update public.skus_words set reference_code = 'ALO', updated_at = now()
-where normalized_label = 'allegro' and is_active = true;
-
-update public.skus_words set reference_code = 'AGD', updated_at = now()
-where normalized_label = 'algodão' and is_active = true;
-
-update public.skus_words set reference_code = 'PRC', updated_at = now()
-where normalized_label = 'perricone' and is_active = true;
-
-update public.skus_words set reference_code = 'PCB', updated_at = now()
-where normalized_label = 'policarbonato' and is_active = true;
-
-update public.skus_words set reference_code = 'PPN', updated_at = now()
-where normalized_label = 'polipropileno' and is_active = true;
 
 -- Formato (ECO x3)
 update public.skus_words set reference_code = 'GEF', updated_at = now()
@@ -38,7 +21,7 @@ where normalized_label = 'loção mão corpo' and is_active = true;
 update public.skus_words set reference_code = 'GMC', updated_at = now()
 where normalized_label = 'gel mãos corpo' and is_active = true;
 
--- Produto (PER x3 + marca)
+-- Produto (PER x3 no mesmo nivel; PERRICONE e marca noutro nivel mantem PER)
 update public.skus_words set reference_code = 'COL', updated_at = now()
 where normalized_label = 'colonia' and is_active = true;
 

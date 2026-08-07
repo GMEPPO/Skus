@@ -121,6 +121,28 @@ export async function resolveFieldTypeCode(
   return null;
 }
 
+export async function resolveCategoryLevelId(
+  supabase: ServiceSupabase,
+  scope: WordReferenceScope,
+): Promise<string | null> {
+  if (scope.categoryLevelId) {
+    return scope.categoryLevelId;
+  }
+
+  if (scope.fieldTypeId) {
+    const { data, error } = await supabase
+      .from("skus_category_levels")
+      .select("id")
+      .eq("legacy_field_type_id", scope.fieldTypeId)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.id ? String(data.id) : null;
+  }
+
+  return null;
+}
+
 export async function findWordReferenceConflict(
   supabase: ServiceSupabase,
   referenceCode: string,
@@ -136,6 +158,11 @@ export async function findWordReferenceConflict(
     return null;
   }
 
+  const categoryLevelId = await resolveCategoryLevelId(supabase, options ?? {});
+  if (!categoryLevelId) {
+    return null;
+  }
+
   const candidateLabel =
     options?.normalizedLabel ??
     (options?.wordLabel ? normalizeWordLabel(options.wordLabel) : null);
@@ -143,10 +170,11 @@ export async function findWordReferenceConflict(
   let query = supabase
     .from("skus_words")
     .select(
-      "id, label, normalized_label, reference_code, default_field_type_id, category_level_id, skus_field_types(code), skus_category_levels(label, skus_field_types:legacy_field_type_id(code))",
+      "id, label, normalized_label, reference_code, category_level_id, skus_category_levels(label)",
     )
     .eq("is_active", true)
-    .eq("reference_code", normalized);
+    .eq("reference_code", normalized)
+    .eq("category_level_id", categoryLevelId);
 
   if (options?.excludeWordId) {
     query = query.neq("id", options.excludeWordId);
@@ -162,15 +190,7 @@ export async function findWordReferenceConflict(
       continue;
     }
 
-    const fieldTypeCode = resolveWordFieldTypeCodeFromRow(row as WordRowForScope);
-    if (isSizeReferenceScope(fieldTypeCode)) {
-      continue;
-    }
-
-    const levelRelation = (row as WordRowForScope).skus_category_levels as
-      | { label?: string }
-      | Array<{ label?: string }>
-      | null;
+    const levelRelation = row.skus_category_levels as { label?: string } | { label?: string }[] | null;
     const levelLabel = Array.isArray(levelRelation)
       ? String(levelRelation[0]?.label ?? "Sem nivel")
       : String(levelRelation?.label ?? "Sem nivel");
@@ -187,7 +207,7 @@ export async function findWordReferenceConflict(
 }
 
 export function formatWordReferenceConflictMessage(conflict: WordReferenceConflict): string {
-  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" (${conflict.levelLabel}). Cada palavra deve ter referencia unica (excepto 000 e tamanhos gr/ml/kg/l).`;
+  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" no mesmo nivel (${conflict.levelLabel}). No mesmo nivel cada palavra deve ter referencia unica (excepto 000 e tamanhos gr/ml/kg/l).`;
 }
 
 export type DesignationLengthWarning = {

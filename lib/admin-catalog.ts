@@ -300,7 +300,7 @@ export async function createWordAction(formData: FormData) {
   if (insertResult.error) {
     const message =
       insertResult.error.code === "23505"
-        ? encodeURIComponent("Referencia ja existente noutra palavra activa.")
+        ? encodeURIComponent("Referencia ja existente noutra palavra do mesmo nivel.")
         : "Nao+foi+possivel+criar+a+palavra";
     redirect(`/catalog/words-manage?status=error&message=${message}`);
   }
@@ -393,7 +393,7 @@ export async function updateWordAction(formData: FormData) {
   if (updateResult.error) {
     const message =
       updateResult.error.code === "23505"
-        ? encodeURIComponent("Referencia ja existente noutra palavra activa.")
+        ? encodeURIComponent("Referencia ja existente noutra palavra do mesmo nivel.")
         : "Nao+foi+possivel+editar+a+palavra";
     redirect(`/catalog/words-manage/${wordId}?status=error&message=${message}`);
   }

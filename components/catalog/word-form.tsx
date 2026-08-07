@@ -131,7 +131,7 @@ export function WordForm({
         setReferenceMessage(result.message);
       } else if (result.available) {
         setReferenceAvailable(true);
-        setReferenceMessage("Referencia disponivel para esta palavra (unica por palavra distinta, excepto tamanhos).");
+        setReferenceMessage("Referencia disponivel neste nivel (pode repetir-se noutros niveis).");
       } else {
         setReferenceAvailable(false);
         setReferenceMessage(result.message);
