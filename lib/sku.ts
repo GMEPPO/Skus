@@ -194,3 +194,43 @@ export function buildSkuCodeExamplePatterns(
   return patterns;
 }
 
+export type SelectedWordDesignationWarning = {
+  levelLabel: string;
+  wordLabel: string;
+  locale: "pt" | "es" | "en";
+  length: number;
+};
+
+export function collectSelectedWordDesignationWarnings(
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+): SelectedWordDesignationWarning[] {
+  const warnings: SelectedWordDesignationWarning[] = [];
+
+  for (const level of catalog.levels) {
+    const selectedId = selections[level.id];
+    if (!selectedId || isEmptySelection(selectedId)) continue;
+    const word = level.options.find((option) => option.id === selectedId);
+    if (!word || isEmptyReferenceWord(word)) continue;
+
+    const entries: Array<{ locale: "pt" | "es" | "en"; value: string }> = [
+      { locale: "pt", value: word.designationPt || word.designation || word.label },
+      { locale: "es", value: word.designationEs || word.designation || word.label },
+      { locale: "en", value: word.designationEn || word.designation || word.label },
+    ];
+
+    for (const entry of entries) {
+      if (entry.value.trim().length > MAX_DESIGNATION_LENGTH) {
+        warnings.push({
+          levelLabel: level.label,
+          wordLabel: word.label,
+          locale: entry.locale,
+          length: entry.value.trim().length,
+        });
+      }
+    }
+  }
+
+  return warnings;
+}
+

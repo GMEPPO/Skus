@@ -16,6 +16,7 @@ import {
   buildEmptySelectionId,
   buildSkuCodeExamplePatterns,
   buildSkuPreview,
+  collectSelectedWordDesignationWarnings,
   filterGeneratorWords,
   getAvailableOptions,
   isEmptyReferenceWord,
@@ -139,6 +140,10 @@ export function SkuGeneratorWizardMain({
   const designationLength = designation.length;
   const isDesignationTooLong = designationLength > MAX_DESIGNATION_LENGTH;
   const skuPreview = buildSkuPreview(catalog, selections);
+  const wordDesignationWarnings = useMemo(
+    () => collectSelectedWordDesignationWarnings(catalog, selections),
+    [catalog, selections],
+  );
   const hasAnyMeasurements = Boolean(unitsPerBox || multiples || weight);
   const hasAllMeasurements = Boolean(unitsPerBox && multiples && weight);
   const hasPartialMeasurements = hasAnyMeasurements && !hasAllMeasurements;
@@ -843,6 +848,20 @@ export function SkuGeneratorWizardMain({
                   Ainda nao existem codigos criados com esta combinacao de palavras.
                 </p>
               )}
+            </div>
+          ) : null}
+
+          {wordDesignationWarnings.length > 0 ? (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 shadow-xl shadow-black/20 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Avisos de designacao</p>
+              <ul className="mt-3 space-y-2 text-xs text-amber-100/90">
+                {wordDesignationWarnings.map((warning) => (
+                  <li key={`${warning.levelLabel}-${warning.wordLabel}-${warning.locale}`}>
+                    {warning.wordLabel} ({warning.levelLabel}) — {warning.locale.toUpperCase()}: {warning.length}/
+                    {MAX_DESIGNATION_LENGTH} caracteres
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
         </div>

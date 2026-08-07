@@ -6,6 +6,12 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import type { WordListItem } from "@/lib/types";
+import {
+  findWordReferenceConflict,
+  formatWordReferenceConflictMessage,
+  isEmptyWordReferenceCode,
+  normalizeWordReferenceCode,
+} from "@/lib/word-reference-validation";
 
 const GLOBAL_LEVEL_CODES = ["brand", "format", "product", "size", "packaging", "extra"] as const;
 
@@ -259,25 +265,24 @@ export async function createWordAction(formData: FormData) {
     redirect("/catalog/words-manage?status=error&message=Falta+nivel+ou+field+type");
   }
 
-  // Advertir conflictos de reference_code en el mismo nivel (sin índice unique aún)
-  if (categoryLevelId) {
-    const { data: conflict } = await supabase
-      .from("skus_words")
-      .select("id")
-      .eq("category_level_id", categoryLevelId)
-      .eq("reference_code", referenceCode)
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    if (conflict) {
-      redirect("/catalog/words-manage?status=error&message=Codigo+de+referencia+ja+existe+neste+nivel");
+  const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
+  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
+    try {
+      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode);
+      if (conflict) {
+        redirect(
+          `/catalog/words-manage?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
+        );
+      }
+    } catch {
+      redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+validar+a+referencia");
     }
   }
 
   const insertResult = await supabase.from("skus_words").insert({
     label,
     normalized_label: normalizeLabel(label),
-    reference_code: referenceCode,
+    reference_code: normalizedReferenceCode,
     default_field_type_id: defaultFieldTypeId,
     category_level_id: categoryLevelId,
     designation: designationPt,
@@ -289,7 +294,11 @@ export async function createWordAction(formData: FormData) {
   });
 
   if (insertResult.error) {
-    redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+criar+a+palavra");
+    const message =
+      insertResult.error.code === "23505"
+        ? encodeURIComponent("Referencia ja existente noutra palavra activa.")
+        : "Nao+foi+possivel+criar+a+palavra";
+    redirect(`/catalog/words-manage?status=error&message=${message}`);
   }
 
   revalidateCatalog();
@@ -341,12 +350,26 @@ export async function updateWordAction(formData: FormData) {
     }
   }
 
+  const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
+  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
+    try {
+      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, { excludeWordId: wordId });
+      if (conflict) {
+        redirect(
+          `/catalog/words-manage/${wordId}?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
+        );
+      }
+    } catch {
+      redirect(`/catalog/words-manage/${wordId}?status=error&message=Nao+foi+possivel+validar+a+referencia`);
+    }
+  }
+
   const updateResult = await supabase
     .from("skus_words")
     .update({
       label,
       normalized_label: normalizeLabel(label),
-      reference_code: referenceCode,
+      reference_code: normalizedReferenceCode,
       default_field_type_id: defaultFieldTypeId,
       ...(categoryLevelId ? { category_level_id: categoryLevelId } : {}),
       designation: designationPt,
@@ -359,7 +382,11 @@ export async function updateWordAction(formData: FormData) {
     .eq("id", wordId);
 
   if (updateResult.error) {
-    redirect(`/catalog/words-manage/${wordId}?status=error&message=Nao+foi+possivel+editar+a+palavra`);
+    const message =
+      updateResult.error.code === "23505"
+        ? encodeURIComponent("Referencia ja existente noutra palavra activa.")
+        : "Nao+foi+possivel+editar+a+palavra";
+    redirect(`/catalog/words-manage/${wordId}?status=error&message=${message}`);
   }
 
   revalidateCatalog();
@@ -412,6 +439,32 @@ export async function reactivateWordAction(formData: FormData) {
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
     redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
+  }
+
+  const { data: word, error: wordError } = await supabase
+    .from("skus_words")
+    .select("reference_code")
+    .eq("id", parsed.data.wordId)
+    .maybeSingle();
+
+  if (wordError || !word) {
+    redirect("/catalog/words-manage?status=error&message=Palavra+invalida");
+  }
+
+  const normalizedReferenceCode = normalizeWordReferenceCode(String(word.reference_code ?? ""));
+  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
+    try {
+      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
+        excludeWordId: parsed.data.wordId,
+      });
+      if (conflict) {
+        redirect(
+          `/catalog/words-manage?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
+        );
+      }
+    } catch {
+      redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+validar+a+referencia");
+    }
   }
 
   const { error } = await supabase
