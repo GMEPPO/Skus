@@ -81,12 +81,12 @@ function toGeneratorWord(word: WordListItem): GeneratorWord {
 
 const generatorCatalog: GeneratorCatalog = {
   levels: [
-    { id: "ft-brand", order: 1, fieldType: "brand", label: "Familia/Marca", options: words.filter((word) => word.fieldTypeId === "ft-brand").map(toGeneratorWord) },
-    { id: "ft-format", order: 2, fieldType: "format", label: "Formato", options: words.filter((word) => word.fieldTypeId === "ft-format").map(toGeneratorWord) },
-    { id: "ft-product", order: 3, fieldType: "product", label: "Produto", options: words.filter((word) => word.fieldTypeId === "ft-product").map(toGeneratorWord) },
-    { id: "ft-size", order: 4, fieldType: "size", label: "Tamanho/Gramaje", options: words.filter((word) => word.fieldTypeId === "ft-size").map(toGeneratorWord) },
-    { id: "ft-packaging", order: 5, fieldType: "packaging", label: "Embalagem", options: words.filter((word) => word.fieldTypeId === "ft-packaging").map(toGeneratorWord) },
-    { id: "ft-extra", order: 6, fieldType: "extra", label: "Extra", options: [] },
+    { id: "ft-brand", order: 1, fieldType: "brand", fieldTypeId: "ft-brand", label: "Familia/Marca", options: words.filter((word) => word.fieldTypeId === "ft-brand").map(toGeneratorWord) },
+    { id: "ft-format", order: 2, fieldType: "format", fieldTypeId: "ft-format", label: "Formato", options: words.filter((word) => word.fieldTypeId === "ft-format").map(toGeneratorWord) },
+    { id: "ft-product", order: 3, fieldType: "product", fieldTypeId: "ft-product", label: "Produto", options: words.filter((word) => word.fieldTypeId === "ft-product").map(toGeneratorWord) },
+    { id: "ft-size", order: 4, fieldType: "size", fieldTypeId: "ft-size", label: "Tamanho/Gramaje", options: words.filter((word) => word.fieldTypeId === "ft-size").map(toGeneratorWord) },
+    { id: "ft-packaging", order: 5, fieldType: "packaging", fieldTypeId: "ft-packaging", label: "Embalagem", options: words.filter((word) => word.fieldTypeId === "ft-packaging").map(toGeneratorWord) },
+    { id: "ft-extra", order: 6, fieldType: "extra", fieldTypeId: "ft-extra", label: "Extra", options: [] },
   ],
 };
 

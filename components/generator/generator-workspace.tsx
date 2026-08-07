@@ -4,8 +4,10 @@ import { useCallback, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NormalizationHistoryModal } from "@/components/generator/normalization-history-modal";
 import { NormalizationPendingSidebar } from "@/components/generator/normalization-pending-sidebar";
+import { WordHistoryModal } from "@/components/generator/word-history-modal";
 import { SkuGeneratorWizardMain } from "@/components/generator/sku-generator-wizard-main";
 import { fetchGeneratorCatalogAction } from "@/lib/generator-catalog-actions";
+import type { FieldTypeOption } from "@/lib/admin-catalog";
 import {
   claimNormalizationForGeneratorAction,
   releaseNormalizationAction,
@@ -18,12 +20,14 @@ export function GeneratorWorkspace({
   categories,
   initialCategoryId,
   initialCatalog,
+  fieldTypes,
   secureGenerationV2Enabled,
   normalizationV2Enabled,
 }: {
   categories: CategoryOption[];
   initialCategoryId: string;
   initialCatalog: GeneratorCatalog;
+  fieldTypes: FieldTypeOption[];
   secureGenerationV2Enabled: boolean;
   normalizationV2Enabled: boolean;
 }) {
@@ -38,9 +42,21 @@ export function GeneratorWorkspace({
   const [sidebarError, setSidebarError] = useState<string | null>(null);
   const [isChangingCategory, setIsChangingCategory] = useState(false);
   const [queueRefreshToken, setQueueRefreshToken] = useState(0);
+  const [wordRefreshToken, setWordRefreshToken] = useState(0);
+  const [autoSelectWord, setAutoSelectWord] = useState<{ levelId: string; wordId: string } | null>(null);
 
   const bumpWizard = useCallback(() => setWizardKey((value) => value + 1), []);
   const refreshNormalizationLists = useCallback(() => setQueueRefreshToken((value) => value + 1), []);
+  const refreshWordLists = useCallback(() => setWordRefreshToken((value) => value + 1), []);
+
+  async function handleWordCreated(levelId: string, wordId: string) {
+    const result = await fetchGeneratorCatalogAction(categoryId);
+    if (!result.ok) return;
+
+    setCatalog(result.catalog);
+    setAutoSelectWord({ levelId, wordId });
+    refreshWordLists();
+  }
 
   async function handleCategoryChange(nextCategoryId: string) {
     if (nextCategoryId === categoryId || isChangingCategory) return;
@@ -130,6 +146,7 @@ export function GeneratorWorkspace({
 
       <div className="min-w-0 flex-1 space-y-4">
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <WordHistoryModal refreshToken={wordRefreshToken} />
           <NormalizationHistoryModal refreshToken={queueRefreshToken} />
         </div>
 
@@ -167,6 +184,10 @@ export function GeneratorWorkspace({
             <SkuGeneratorWizardMain
               key={wizardKey}
               catalog={catalog}
+              fieldTypes={fieldTypes}
+              autoSelectWord={autoSelectWord}
+              onAutoSelectWordApplied={() => setAutoSelectWord(null)}
+              onWordCreated={handleWordCreated}
               secureGenerationV2Enabled={secureGenerationV2Enabled}
               normalizationV2Enabled={normalizationV2Enabled}
               categoryId={categoryId}

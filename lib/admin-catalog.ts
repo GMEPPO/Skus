@@ -210,102 +210,11 @@ function revalidateCatalog() {
 
 export async function createWordAction(formData: FormData) {
   "use server";
-  await requireRole("editor");
-
-  const parsed = createWordSchema.safeParse({
-    label: formData.get("label"),
-    referenceCode: formData.get("referenceCode"),
-    categoryLevelId: formData.get("categoryLevelId") || undefined,
-    fieldTypeId: formData.get("fieldTypeId") || undefined,
-    designationPt: formData.get("designationPt"),
-    designationEs: formData.get("designationEs"),
-    designationEn: formData.get("designationEn"),
-    includeInDesignation: formData.get("includeInDesignation") === "on",
-  });
-
-  if (!parsed.success) {
-    redirect("/catalog/words-manage?status=error&message=Dados+invalidos+na+nova+palavra");
+  const { createWordFromGeneratorAction } = await import("@/lib/word-catalog-actions");
+  const result = await createWordFromGeneratorAction(formData);
+  if (!result.ok) {
+    redirect(`/catalog/words-manage?status=error&message=${encodeURIComponent(result.message)}`);
   }
-
-  const supabase = createSupabaseServiceServerClient();
-  if (!supabase) {
-    redirect("/catalog/words-manage?status=error&message=Supabase+service+role+nao+configurada");
-  }
-
-  const { label, referenceCode, designationPt, designationEs, designationEn, includeInDesignation } =
-    parsed.data;
-
-  let categoryLevelId = parsed.data.categoryLevelId ?? null;
-  let defaultFieldTypeId = parsed.data.fieldTypeId ?? null;
-
-  if (categoryLevelId) {
-    const { data: level, error: levelErr } = await supabase
-      .from("skus_category_levels")
-      .select("id, legacy_field_type_id, is_enabled")
-      .eq("id", categoryLevelId)
-      .maybeSingle();
-    if (levelErr || !level) {
-      redirect("/catalog/words-manage?status=error&message=Nivel+invalido");
-    }
-    if (!defaultFieldTypeId) {
-      defaultFieldTypeId = level.legacy_field_type_id ? String(level.legacy_field_type_id) : null;
-    }
-  } else if (defaultFieldTypeId) {
-    // Compat UI legacy: resolver nivel Cosmética por legacy_field_type_id
-    const { data: level } = await supabase
-      .from("skus_category_levels")
-      .select("id")
-      .eq("legacy_field_type_id", defaultFieldTypeId)
-      .limit(1)
-      .maybeSingle();
-    categoryLevelId = level?.id ? String(level.id) : null;
-  }
-
-  if (!categoryLevelId && !defaultFieldTypeId) {
-    redirect("/catalog/words-manage?status=error&message=Falta+nivel+ou+field+type");
-  }
-
-  const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
-  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
-    try {
-      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
-        fieldTypeId: defaultFieldTypeId,
-        categoryLevelId,
-        wordLabel: label,
-      });
-      if (conflict) {
-        redirect(
-          `/catalog/words-manage?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
-        );
-      }
-    } catch {
-      redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+validar+a+referencia");
-    }
-  }
-
-  const insertResult = await supabase.from("skus_words").insert({
-    label,
-    normalized_label: normalizeLabel(label),
-    reference_code: normalizedReferenceCode,
-    default_field_type_id: defaultFieldTypeId,
-    category_level_id: categoryLevelId,
-    designation: designationPt,
-    designation_pt: designationPt,
-    designation_es: designationEs,
-    designation_en: designationEn,
-    include_in_designation: includeInDesignation,
-    is_active: true,
-  });
-
-  if (insertResult.error) {
-    const message =
-      insertResult.error.code === "23505"
-        ? encodeURIComponent("Referencia ja existente noutra palavra do mesmo nivel.")
-        : "Nao+foi+possivel+criar+a+palavra";
-    redirect(`/catalog/words-manage?status=error&message=${message}`);
-  }
-
-  revalidateCatalog();
   redirect("/catalog/words-manage?status=success&message=Palavra+criada+com+sucesso");
 }
 

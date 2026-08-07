@@ -1,6 +1,7 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GeneratorWorkspace } from "@/components/generator/generator-workspace";
 import { getCategories, getGeneratorCatalogForCategory } from "@/lib/category-catalog";
+import { getFieldTypeOptions } from "@/lib/admin-catalog";
 import { mapCategoryCatalogToGeneratorCatalog } from "@/lib/generator-catalog-mapper";
 import { requireRole } from "@/lib/auth";
 import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
@@ -21,6 +22,7 @@ export default async function GeneratorPage({
   const secureGenerationV2Enabled = isSecureGenerationV2Enabled();
   const normalizationV2Enabled = isNormalizationV2Enabled();
   const categories = await getCategories();
+  const fieldTypes = await getFieldTypeOptions();
   const preferredCategory = categories.find((category) => category.slug === "cosmetica") ?? categories[0] ?? null;
   const categoryCatalog = preferredCategory ? await getGeneratorCatalogForCategory(preferredCategory.id) : null;
 
@@ -68,6 +70,7 @@ export default async function GeneratorPage({
         categories={categories.map((category) => ({ id: category.id, name: category.name, slug: category.slug }))}
         initialCategoryId={preferredCategory.id}
         initialCatalog={catalog}
+        fieldTypes={fieldTypes}
         secureGenerationV2Enabled={secureGenerationV2Enabled}
         normalizationV2Enabled={normalizationV2Enabled}
       />

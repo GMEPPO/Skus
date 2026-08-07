@@ -89,6 +89,7 @@ export async function getGeneratorCatalog(): Promise<GeneratorCatalog> {
     id: fieldType.id,
     order: index + 1,
     fieldType: fieldType.code,
+    fieldTypeId: fieldType.id,
     label: LEVEL_LABELS[fieldType.code] ?? fieldType.name,
     options: sortWords(
       words

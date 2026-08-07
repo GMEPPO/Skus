@@ -1,8 +1,7 @@
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WordCatalogList } from "@/components/catalog/word-catalog-list";
-import { WordForm } from "@/components/catalog/word-form";
 import {
-  createWordAction,
   deleteWordAction,
   getFieldTypeOptions,
   getWordsCatalog,
@@ -30,7 +29,11 @@ export default async function CatalogWordsManagePage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Biblioteca</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Cria e gere palavras globais por nivel. O gerador usa diretamente esta biblioteca.
+          Consulta e edita palavras existentes. Para criar novas palavras usa o botao + em cada nivel no{" "}
+          <Link href="/generator" className="text-amber-300 hover:underline">
+            Gerador SKU
+          </Link>
+          .
         </p>
       </div>
 
@@ -39,31 +42,6 @@ export default async function CatalogWordsManagePage({
           {searchParams.message}
         </div>
       ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Nova palavra</CardTitle>
-          <CardDescription>
-            Cada palavra pertence a um dos seis niveis: marca, formato, produto, tamanho, embalagem ou extra.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <WordForm
-            action={createWordAction}
-            submitLabel="Guardar palavra"
-            fieldTypes={fieldTypes}
-            initialValues={{
-              label: "",
-              referenceCode: "",
-              fieldTypeId: "",
-              designationPt: "",
-              designationEs: "",
-              designationEn: "",
-              includeInDesignation: true,
-            }}
-          />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>

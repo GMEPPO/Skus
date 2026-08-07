@@ -7,6 +7,7 @@ export function mapCategoryCatalogToGeneratorCatalog(categoryCatalog: GeneratorC
       id: level.id,
       order: index + 1,
       fieldType: level.key,
+      fieldTypeId: level.legacyFieldTypeId,
       label: level.label,
       options: level.options.map((option) => ({
         id: option.id,

@@ -48,8 +48,18 @@ export interface GeneratorLevel {
   id: string;
   order: number;
   fieldType: string;
+  fieldTypeId: string | null;
   label: string;
   options: GeneratorWord[];
+}
+
+export interface WordHistoryItem {
+  id: string;
+  label: string;
+  referenceCode: string;
+  fieldTypeLabel: string;
+  designationPt: string;
+  createdAt: string;
 }
 
 export interface GeneratorCatalog {

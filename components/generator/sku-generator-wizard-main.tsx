@@ -2,11 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ArrowRight, CheckCircle2, ImagePlus, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, ImagePlus, Plus, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { WordCreateModal } from "@/components/generator/word-create-modal";
 import { generateSkuAction } from "@/lib/sku-actions";
+import type { FieldTypeOption } from "@/lib/admin-catalog";
 import { fetchSkuCodeExamplesAction, type SkuCodeExample } from "@/lib/generator-code-examples-actions";
 import { completeSkuNormalizationSecureAction, generateSkuSecureAction } from "@/lib/sku-secure-actions";
 import type { GeneratorCatalog, GeneratorLevel, GeneratorWord } from "@/lib/types";
@@ -86,6 +88,10 @@ export function SkuGeneratorWizardMain({
   secureGenerationV2Enabled = false,
   normalizationV2Enabled = false,
   categoryId = null,
+  fieldTypes = [],
+  autoSelectWord = null,
+  onAutoSelectWordApplied,
+  onWordCreated,
   normalizationTarget = null,
   onClearNormalization,
   onNormalizationComplete,
@@ -95,6 +101,10 @@ export function SkuGeneratorWizardMain({
   secureGenerationV2Enabled?: boolean;
   normalizationV2Enabled?: boolean;
   categoryId?: string | null;
+  fieldTypes?: FieldTypeOption[];
+  autoSelectWord?: { levelId: string; wordId: string } | null;
+  onAutoSelectWordApplied?: () => void;
+  onWordCreated?: (levelId: string, wordId: string) => void;
   normalizationTarget?: {
     id: string;
     legacyCode: string | null;
@@ -125,6 +135,7 @@ export function SkuGeneratorWizardMain({
   const [normalizationCompleted, setNormalizationCompleted] = useState(false);
   const [codeExamples, setCodeExamples] = useState<SkuCodeExample[]>([]);
   const [codeExamplesLoading, setCodeExamplesLoading] = useState(false);
+  const [wordCreateLevel, setWordCreateLevel] = useState<GeneratorLevel | null>(null);
 
   const isNormalizationMode = Boolean(normalizationTarget);
   const usesSecurePayload = secureGenerationV2Enabled || isNormalizationMode;
@@ -236,6 +247,22 @@ export function SkuGeneratorWizardMain({
     setSecureRequestId(nextRequestId);
     return nextRequestId;
   }
+
+  useEffect(() => {
+    if (!autoSelectWord) return;
+
+    const level = catalog.levels.find((entry) => entry.id === autoSelectWord.levelId);
+    const word = level?.options.find((option) => option.id === autoSelectWord.wordId);
+    if (!level || !word) return;
+
+    setSelections((current) => {
+      const nextSelections = { ...current, [level.id]: word.id };
+      bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
+      return nextSelections;
+    });
+    setSelectionOrder((current) => [...current.filter((id) => id !== level.id), level.id]);
+    onAutoSelectWordApplied?.();
+  }, [autoSelectWord, catalog, onAutoSelectWordApplied]);
 
   if (catalog.levels.length === 0) {
     return (
@@ -446,6 +473,7 @@ export function SkuGeneratorWizardMain({
   }
 
   return (
+    <>
     <div className="space-y-6">
       {isNormalizationMode && normalizationTarget ? (
         <Card className="space-y-3 border-amber-500/30 bg-amber-500/5 p-4">
@@ -512,16 +540,30 @@ export function SkuGeneratorWizardMain({
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Nivel {level.order}</p>
                       <h3 className="text-lg font-semibold text-slate-50">{level.label}</h3>
                     </div>
-                    {selectedId ? (
-                      <Badge variant="success">
-                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                        preenchido
-                      </Badge>
-                    ) : isRequiredLevel(level) ? (
-                      <Badge>ativo</Badge>
-                    ) : (
-                      <Badge variant="outline">opcional</Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {selectedId ? (
+                        <Badge variant="success">
+                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                          preenchido
+                        </Badge>
+                      ) : isRequiredLevel(level) ? (
+                        <Badge>ativo</Badge>
+                      ) : (
+                        <Badge variant="outline">opcional</Badge>
+                      )}
+                      {fieldTypes.length > 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          title={`Criar palavra em ${level.label}`}
+                          aria-label={`Criar palavra em ${level.label}`}
+                          onClick={() => setWordCreateLevel(level)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
 
                   {selectedId ? (
@@ -986,6 +1028,17 @@ export function SkuGeneratorWizardMain({
         </div>
       ) : null}
     </div>
+
+    <WordCreateModal
+      open={Boolean(wordCreateLevel)}
+      level={wordCreateLevel}
+      fieldTypes={fieldTypes}
+      onClose={() => setWordCreateLevel(null)}
+      onCreated={(wordId, levelId) => {
+        onWordCreated?.(levelId, wordId);
+      }}
+    />
+    </>
   );
 }
 
