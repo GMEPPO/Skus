@@ -10,7 +10,7 @@ describe("word reference availability", () => {
   it("identifica referencias de 3 caracteres validas", () => {
     expect(isThreeCharCatalogReference("ALG")).toBe(true);
     expect(isThreeCharCatalogReference("020")).toBe(true);
-    expect(isThreeCharCatalogReference("A&B")).toBe(true);
+    expect(isThreeCharCatalogReference("A&B")).toBe(false);
     expect(isThreeCharCatalogReference("000")).toBe(false);
     expect(isThreeCharCatalogReference("AL")).toBe(false);
     expect(isThreeCharCatalogReference("ALGX")).toBe(false);
@@ -27,11 +27,11 @@ describe("word reference availability", () => {
       usedByLevel,
     });
 
-    expect(THREE_CHAR_REFERENCE_POOL_SIZE).toBe(54872);
-    expect(USABLE_THREE_CHAR_REFERENCE_POOL).toBe(54871);
+    expect(THREE_CHAR_REFERENCE_POOL_SIZE).toBe(46656);
+    expect(USABLE_THREE_CHAR_REFERENCE_POOL).toBe(46655);
     expect(summary.levels).toBe(3);
     expect(summary.used).toBe(3);
-    expect(summary.capacity).toBe(54871 * 3);
-    expect(summary.available).toBe(54871 * 3 - 3);
+    expect(summary.capacity).toBe(46655 * 3);
+    expect(summary.available).toBe(46655 * 3 - 3);
   });
 });

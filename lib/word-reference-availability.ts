@@ -5,11 +5,11 @@ import {
   normalizeWordReferenceCode,
 } from "@/lib/word-reference-validation";
 
-export const WORD_REFERENCE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789&.";
+export const WORD_REFERENCE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 export const THREE_CHAR_REFERENCE_POOL_SIZE = WORD_REFERENCE_ALPHABET.length ** 3;
 export const USABLE_THREE_CHAR_REFERENCE_POOL = THREE_CHAR_REFERENCE_POOL_SIZE - 1;
 
-const THREE_CHAR_REFERENCE_PATTERN = /^[A-Z0-9&.]{3}$/;
+const THREE_CHAR_REFERENCE_PATTERN = /^[A-Z0-9]{3}$/;
 
 type ServiceSupabase = NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>;
 
