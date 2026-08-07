@@ -57,6 +57,7 @@ async function collectTakenReferencesFromCompletedNormalizations(
       .from("skus_code_normalizations")
       .select("final_new_code, source_new_code")
       .eq("normalization_status", "completed")
+      .not("generation_id", "is", null)
       .range(offset, offset + REFERENCE_LOOKUP_PAGE_SIZE - 1);
 
     if (error) throw new Error(error.message);

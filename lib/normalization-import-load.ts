@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ParsedNormalizationImportRow } from "@/lib/normalization-import-parser";
+import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import type { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import { normalizeSkuReference } from "@/lib/sku-reference-uniqueness";
 
@@ -26,6 +27,7 @@ type NormalizationInsertPayload = Record<string, unknown>;
 export type NormalizationInsertAttempt = {
   sourceRowNumber: number;
   legacyCode: string | null;
+  isOk2: boolean;
   payload: NormalizationInsertPayload;
 };
 
@@ -40,14 +42,23 @@ export function formatImportSkipReason(importIssue: string | null, customReason?
   return "Linha invalida";
 }
 
-export function mapNormalizationInsertError(message: string, details?: string | null): string {
-  const combined = `${message} ${details ?? ""}`.toLowerCase();
-
-  if (
+export function mapNormalizationInsertError(
+  message: string,
+  details?: string | null,
+  code?: string | null,
+  options?: { isOk2?: boolean },
+): string {
+  const combined = `${message} ${details ?? ""} ${code ?? ""}`.toLowerCase();
+  const isDuplicateReference =
     combined.includes("sku_reference_duplicate") ||
-    combined.includes("skus_code_normalizations_completed_ref_uidx")
-  ) {
-    return "Referencia nova ja existe no historico de codigos";
+    combined.includes("skus_code_normalizations_completed_ref_uidx") ||
+    code === "23505" ||
+    code === "P0001";
+
+  if (isDuplicateReference) {
+    return options?.isOk2
+      ? "Referencia OK2 ja existe no historico (import anterior ou normalizacao concluida)"
+      : "Referencia nova ja existe no historico de codigos";
   }
 
   if (combined.includes("skus_normalization_import_batches_sha_unique")) {
@@ -126,11 +137,13 @@ export function partitionImportRowsForLoad(
           if (loadedOk2References.has(normalizedRef)) {
             continue;
           }
-        } else if (takenReferences.has(normalizedRef)) {
+        } else         if (takenReferences.has(normalizedRef)) {
           skippedRows.push({
             sourceRowNumber: row.sourceRowNumber,
             legacyCode,
-            reason: "Referencia nova ja existe no historico de codigos",
+            reason: isOk2SourceStatus(row.sourceStatus)
+              ? "Referencia OK2 ja existe no historico de normalizados"
+              : "Referencia nova ja existe no historico de codigos",
           });
           continue;
         }
@@ -233,7 +246,9 @@ export async function insertNormalizationRowsResilient(
         skippedRows.push({
           sourceRowNumber: row.sourceRowNumber,
           legacyCode: row.legacyCode,
-          reason: mapNormalizationInsertError(rowError.message, rowError.details),
+          reason: mapNormalizationInsertError(rowError.message, rowError.details, rowError.code, {
+            isOk2: row.isOk2,
+          }),
         });
         continue;
       }

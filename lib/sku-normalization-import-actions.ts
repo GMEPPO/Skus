@@ -126,6 +126,16 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     return { ok: false, code: "config_error", message: "Supabase service role nao configurado." };
   }
 
+  try {
+    await clearPendingImportQueue(supabase);
+  } catch {
+    return {
+      ok: false,
+      code: "clear_failed",
+      message: "Nao foi possivel limpar a lista anterior de normalizacao.",
+    };
+  }
+
   const categoryIdRaw = formData.get("categoryId");
   const categoryId = typeof categoryIdRaw === "string" && categoryIdRaw.length > 0 ? categoryIdRaw : null;
 
@@ -204,6 +214,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
   const insertAttempts = rowsToLoad.map((row) => ({
     sourceRowNumber: row.sourceRowNumber,
     legacyCode: row.legacyCode,
+    isOk2: row.normalizationStatus === "completed",
     payload: buildInsertRow(batch.id, row, categoryId),
   }));
 
@@ -232,7 +243,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
 
     return {
       ok: true,
-      message: `Import concluido: nenhuma linha carregada, ${allSkippedRows.length} nao carregada(s). A lista anterior foi mantida.`,
+      message: `Import concluido: nenhuma linha carregada, ${allSkippedRows.length} nao carregada(s). A lista anterior foi limpa.`,
       batchId: "",
       fileName: file.name,
       totalRows: parsed.rows.length,
@@ -241,18 +252,6 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       invalidRows: allSkippedRows.length,
       skippedRows: allSkippedRows,
       ok2DuplicateReviewRows,
-    };
-  }
-
-  try {
-    await clearPendingImportQueue(supabase, { excludeBatchId: batch.id });
-  } catch {
-    await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
-    await supabase.from("skus_normalization_import_batches").delete().eq("id", batch.id);
-    return {
-      ok: false,
-      code: "clear_failed",
-      message: "Linhas gravadas mas nao foi possivel substituir a lista anterior. Tenta novamente.",
     };
   }
 

@@ -34,6 +34,9 @@ describe("normalization import load", () => {
     expect(mapNormalizationInsertError("sku_reference_duplicate")).toBe(
       "Referencia nova ja existe no historico de codigos",
     );
+    expect(mapNormalizationInsertError("", null, "23505", { isOk2: true })).toBe(
+      "Referencia OK2 ja existe no historico (import anterior ou normalizacao concluida)",
+    );
     expect(mapNormalizationInsertError("duplicate key value violates unique constraint")).toBe(
       "Erro ao gravar linha na base de dados",
     );
@@ -72,7 +75,7 @@ describe("normalization import load", () => {
     expect(rowsToLoad.map((row) => row.sourceRowNumber)).toEqual([2, 4, 7]);
     expect(skippedRows).toEqual([
       { sourceRowNumber: 3, legacyCode: null, reason: "Falta referencia antiga" },
-      { sourceRowNumber: 6, legacyCode: "LEG-D", reason: "Referencia nova ja existe no historico de codigos" },
+      { sourceRowNumber: 6, legacyCode: "LEG-D", reason: "Referencia OK2 ja existe no historico de normalizados" },
     ]);
     expect(ok2DuplicateReviewRows).toEqual([
       {
