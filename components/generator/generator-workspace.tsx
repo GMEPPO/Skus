@@ -124,8 +124,6 @@ export function GeneratorWorkspace({
         onToggle={() => setSidebarOpen((open) => !open)}
         isLoadingId={isLoadingNormId}
         sidebarError={sidebarError}
-        categories={categories}
-        defaultCategoryId={categoryId}
         onImportSuccess={refreshNormalizationLists}
         refreshToken={queueRefreshToken}
       />
