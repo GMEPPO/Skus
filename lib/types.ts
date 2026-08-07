@@ -14,6 +14,10 @@ export interface DashboardSummary {
   words: number;
   generatedSkus: number;
   activeUsers: number;
+  availableThreeCharReferences: number;
+  threeCharReferenceCapacity: number;
+  threeCharReferencesUsed: number;
+  threeCharReferenceLevels: number;
 }
 
 export interface WordListItem {

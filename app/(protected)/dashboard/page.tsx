@@ -1,17 +1,27 @@
-import { BarChart3, ShieldCheck, Tags } from "lucide-react";
+import { BarChart3, Hash, ShieldCheck, Tags } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardSummary, getRecentSkuGenerations } from "@/lib/data";
+
+function formatCounter(value: number): string {
+  return new Intl.NumberFormat("pt-PT").format(value);
+}
 
 export default async function DashboardPage() {
   const summary = await getDashboardSummary();
   const recent = await getRecentSkuGenerations();
 
   const items = [
-    { label: "Marcas ativas", value: summary.activeBrands, icon: Tags },
-    { label: "Palavras no catalogo", value: summary.words, icon: Tags },
-    { label: "SKUs gerados", value: summary.generatedSkus, icon: BarChart3 },
-    { label: "Utilizadores ativos", value: summary.activeUsers, icon: ShieldCheck },
+    { label: "Marcas ativas", value: formatCounter(summary.activeBrands), icon: Tags },
+    { label: "Palavras no catalogo", value: formatCounter(summary.words), icon: Tags },
+    { label: "SKUs gerados", value: formatCounter(summary.generatedSkus), icon: BarChart3 },
+    {
+      label: "Referencias 3 chars disponiveis",
+      value: formatCounter(summary.availableThreeCharReferences),
+      icon: Hash,
+      hint: `${formatCounter(summary.threeCharReferencesUsed)} ocupadas de ${formatCounter(summary.threeCharReferenceCapacity)} (${summary.threeCharReferenceLevels} niveis, A-Z 0-9 & .)`,
+    },
+    { label: "Utilizadores ativos", value: formatCounter(summary.activeUsers), icon: ShieldCheck },
   ];
 
   return (
@@ -23,7 +33,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -34,6 +44,9 @@ export default async function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-semibold text-slate-50">{item.value}</div>
+                {"hint" in item && item.hint ? (
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">{item.hint}</p>
+                ) : null}
               </CardContent>
             </Card>
           );

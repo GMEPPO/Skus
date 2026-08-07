@@ -7,6 +7,11 @@ import type {
   RecentSkuGeneration,
   WordListItem,
 } from "@/lib/types";
+import {
+  computeThreeCharReferenceAvailability,
+  getThreeCharReferenceAvailability,
+  isThreeCharCatalogReference,
+} from "@/lib/word-reference-availability";
 
 type SupabaseRoleRelation = { code?: string | null } | Array<{ code?: string | null }> | null;
 type SupabaseProfileRelation = { name?: string | null } | Array<{ name?: string | null }> | null;
@@ -94,10 +99,48 @@ const recentSkuGenerations: RecentSkuGeneration[] = [
   { id: "sku-1", generatedCode: "ALG-SOL-SAB-020-CXA-000", designation: "ALG OCEAN SPA Sabonete 20g Caixa Cartao", createdAtLabel: "ha 12 min", unitsPerBox: 24, unitsPerBoxStatus: "real", multiples: 6, multiplesStatus: "real", weight: 12.5, weightStatus: "estimated" },
 ];
 
+const demoThreeCharReferenceLevels = ["brand", "format", "product", "packaging", "extra"];
+
+function buildDemoThreeCharReferenceAvailability() {
+  const usedByLevel = new Map<string, Set<string>>();
+
+  for (const word of words) {
+    if (word.fieldTypeId === "ft-size") continue;
+    if (!isThreeCharCatalogReference(word.referenceCode)) continue;
+
+    const levelKey = word.fieldTypeId.replace(/^ft-/, "");
+    const bucket = usedByLevel.get(levelKey) ?? new Set<string>();
+    bucket.add(word.referenceCode.toUpperCase());
+    usedByLevel.set(levelKey, bucket);
+  }
+
+  return computeThreeCharReferenceAvailability({
+    levelIds: demoThreeCharReferenceLevels,
+    usedByLevel,
+  });
+}
+
+function toDashboardReferenceSummary(
+  availability: Awaited<ReturnType<typeof getThreeCharReferenceAvailability>>,
+): Pick<
+  DashboardSummary,
+  | "availableThreeCharReferences"
+  | "threeCharReferenceCapacity"
+  | "threeCharReferencesUsed"
+  | "threeCharReferenceLevels"
+> {
+  return {
+    availableThreeCharReferences: availability.available,
+    threeCharReferenceCapacity: availability.capacity,
+    threeCharReferencesUsed: availability.used,
+    threeCharReferenceLevels: availability.levels,
+  };
+}
+
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   const supabase = createSupabaseServiceServerClient();
   if (supabase) {
-    const [brandsResult, wordsResult, skusResult, usersResult] = await Promise.all([
+    const [brandsResult, wordsResult, skusResult, usersResult, referenceAvailability] = await Promise.all([
       supabase
         .from("skus_words")
         .select("id, skus_field_types!inner(code)", { count: "exact", head: true })
@@ -106,6 +149,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       supabase.from("skus_words").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("skus_sku_generations").select("id", { count: "exact", head: true }),
       supabase.from("skus_profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
+      getThreeCharReferenceAvailability(supabase),
     ]);
 
     return {
@@ -113,14 +157,18 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       words: wordsResult.count ?? 0,
       generatedSkus: skusResult.count ?? 0,
       activeUsers: usersResult.count ?? 0,
+      ...toDashboardReferenceSummary(referenceAvailability),
     };
   }
+
+  const referenceAvailability = buildDemoThreeCharReferenceAvailability();
 
   return {
     activeBrands: words.filter((word) => word.fieldTypeId === "ft-brand").length,
     words: words.length,
     generatedSkus: recentSkuGenerations.length,
     activeUsers: users.filter((user) => user.isActive).length,
+    ...toDashboardReferenceSummary(referenceAvailability),
   };
 }
 
