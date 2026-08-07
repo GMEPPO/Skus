@@ -5,6 +5,7 @@ import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { importNormalizationBatchAction } from "@/lib/sku-normalization-import-actions";
+import type { SkippedImportRow } from "@/lib/normalization-import-load";
 
 export function NormalizationImportForm({
   categories,
@@ -21,6 +22,7 @@ export function NormalizationImportForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  const [skippedRows, setSkippedRows] = useState<SkippedImportRow[]>([]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,6 +31,7 @@ export function NormalizationImportForm({
     setIsSubmitting(true);
     setMessage(null);
     setIsError(false);
+    setSkippedRows([]);
 
     const formData = new FormData(event.currentTarget);
     const result = await importNormalizationBatchAction(formData);
@@ -41,6 +44,7 @@ export function NormalizationImportForm({
     }
 
     setMessage(result.message);
+    setSkippedRows(result.skippedRows);
     formRef.current?.reset();
     setIsSubmitting(false);
     onSuccess?.();
@@ -53,7 +57,8 @@ export function NormalizationImportForm({
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Importar Excel</p>
           <p className="mt-1 text-sm text-slate-400">
             Carrega a primeira folha com colunas como Referencia_antiga, Designacao_antiga, Referencia_nova,
-            Designacao_nova_pt/es/en (ou Designacao_PT/ES/EN), Estado e Observacoes.
+            Designacao_nova_pt/es/en (ou Designacao_PT/ES/EN), Estado e Observacoes. Cada import substitui a
+            lista anterior de codigos a normalizar.
           </p>
         </div>
       ) : null}
@@ -85,19 +90,6 @@ export function NormalizationImportForm({
         />
       </label>
 
-      <label className="flex items-start gap-2 text-xs text-slate-400">
-        <input
-          name="updateDesignations"
-          type="checkbox"
-          value="true"
-          className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-950"
-        />
-        <span>
-          Atualizar designacoes PT/ES/EN em falta se o ficheiro ja foi importado. Nunca duplica referencias
-          existentes.
-        </span>
-      </label>
-
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={isSubmitting} className="h-8 gap-2 px-3 text-xs">
           <Upload className="h-3.5 w-3.5" />
@@ -107,6 +99,32 @@ export function NormalizationImportForm({
       </div>
 
       {message ? <p className={`text-xs ${isError ? "text-red-300" : "text-emerald-300"}`}>{message}</p> : null}
+
+      {skippedRows.length > 0 ? (
+        <div className="space-y-2 border-t border-slate-800 pt-3">
+          <p className="text-xs font-medium text-amber-300">Linhas nao carregadas ({skippedRows.length})</p>
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-800">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-900 text-slate-400">
+                <tr>
+                  <th className="px-2 py-1.5 font-medium">Linha</th>
+                  <th className="px-2 py-1.5 font-medium">Referencia antiga</th>
+                  <th className="px-2 py-1.5 font-medium">Motivo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-300">
+                {skippedRows.map((row) => (
+                  <tr key={`${row.sourceRowNumber}-${row.legacyCode ?? "empty"}`}>
+                    <td className="px-2 py-1.5 tabular-nums">{row.sourceRowNumber}</td>
+                    <td className="px-2 py-1.5">{row.legacyCode ?? "—"}</td>
+                    <td className="px-2 py-1.5 text-slate-400">{row.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 

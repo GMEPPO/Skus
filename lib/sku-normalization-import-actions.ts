@@ -3,22 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import {
+  clearPendingImportQueue,
+  partitionImportRowsForLoad,
+  type SkippedImportRow,
+} from "@/lib/normalization-import-load";
+import {
   NORMALIZATION_IMPORT_MAX_BYTES,
   parseNormalizationWorkbook,
   sha256Buffer,
   summarizeImportRows,
 } from "@/lib/normalization-import-parser";
-import {
-  buildMissingDesignationPatch,
-  mapExistingDesignationRow,
-  splitImportRowsByExistingLegacyCodes,
-} from "@/lib/normalization-import-sync";
 import { runNormalizationImportMaintenance } from "@/lib/normalization-data";
-import {
-  findDuplicateSkuReferencesWithinList,
-  findTakenSkuReferences,
-  formatTakenSkuReferenceMessage,
-} from "@/lib/sku-reference-uniqueness-data";
+import { findTakenSkuReferences } from "@/lib/sku-reference-uniqueness-data";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 
 export type ImportNormalizationBatchResult =
@@ -28,80 +24,18 @@ export type ImportNormalizationBatchResult =
       batchId: string;
       fileName: string;
       totalRows: number;
+      loadedRows: number;
       pendingRows: number;
       invalidRows: number;
+      skippedRows: SkippedImportRow[];
     }
   | { ok: false; message: string; code?: string };
 
 const ALLOWED_EXTENSIONS = [".xlsx", ".xls"];
-const EXISTING_LOOKUP_CHUNK = 200;
 
 function isAllowedExcelName(fileName: string) {
   const lower = fileName.toLowerCase();
   return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
-
-async function fetchExistingByLegacyCodes(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  legacyCodes: string[],
-) {
-  const existingByLegacyCode = new Map<string, ReturnType<typeof mapExistingDesignationRow>>();
-
-  for (let offset = 0; offset < legacyCodes.length; offset += EXISTING_LOOKUP_CHUNK) {
-    const chunk = legacyCodes.slice(offset, offset + EXISTING_LOOKUP_CHUNK);
-    const { data, error } = await supabase
-      .from("skus_code_normalizations")
-      .select(
-        "legacy_code, normalization_status, source_designation_pt, source_designation_es, source_designation_en, final_designation_pt, final_designation_es, final_designation_en",
-      )
-      .in("legacy_code", chunk);
-
-    if (error) throw new Error(error.message);
-
-    for (const row of data ?? []) {
-      const mapped = mapExistingDesignationRow(row as Record<string, unknown>);
-      if (!mapped.legacyCode) continue;
-      existingByLegacyCode.set(mapped.legacyCode, mapped);
-    }
-  }
-
-  return existingByLegacyCode;
-}
-
-async function syncMissingDesignationsFromImport(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  parsed: ReturnType<typeof parseNormalizationWorkbook>,
-) {
-  const legacyCodes = [...new Set(parsed.rows.map((row) => row.legacyCode).filter(Boolean) as string[])];
-  if (legacyCodes.length === 0) {
-    return { updatedRows: 0, skippedRows: 0 };
-  }
-
-  const existingByLegacyCode = await fetchExistingByLegacyCodes(supabase, legacyCodes);
-  let updatedRows = 0;
-  let skippedRows = 0;
-
-  for (const row of parsed.rows) {
-    if (!row.legacyCode) continue;
-    const existing = existingByLegacyCode.get(row.legacyCode);
-    if (!existing) continue;
-
-    const patch = buildMissingDesignationPatch(existing, row);
-    if (Object.keys(patch).length === 0) {
-      skippedRows += 1;
-      continue;
-    }
-
-    const { error, count } = await supabase
-      .from("skus_code_normalizations")
-      .update(patch, { count: "exact" })
-      .eq("legacy_code", row.legacyCode);
-
-    if (error) throw new Error(error.message);
-    updatedRows += count ?? 0;
-  }
-
-  return { updatedRows, skippedRows };
 }
 
 function buildInsertRow(
@@ -131,34 +65,15 @@ function buildInsertRow(
   };
 }
 
-function collectImportReferenceCodes(rows: ReturnType<typeof parseNormalizationWorkbook>["rows"]) {
+function collectCompletedReferenceCodes(rows: ReturnType<typeof parseNormalizationWorkbook>["rows"]) {
   return rows
     .map((row) => (row.normalizationStatus === "completed" ? row.sourceNewCode : null))
     .filter((code): code is string => Boolean(code));
 }
 
-async function validateImportReferenceUniqueness(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
-  rows: ReturnType<typeof parseNormalizationWorkbook>["rows"],
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const referenceCodes = collectImportReferenceCodes(rows);
-  const withinBatchDupes = findDuplicateSkuReferencesWithinList(referenceCodes);
-  if (withinBatchDupes.length > 0) {
-    return {
-      ok: false,
-      message: `${formatTakenSkuReferenceMessage(withinBatchDupes)} O Excel contem referencias novas duplicadas entre si.`,
-    };
-  }
-
-  const takenReferences = await findTakenSkuReferences(supabase, referenceCodes);
-  if (takenReferences.length > 0) {
-    return {
-      ok: false,
-      message: formatTakenSkuReferenceMessage(takenReferences),
-    };
-  }
-
-  return { ok: true };
+function buildSuccessMessage(loadedRows: number, skippedRows: SkippedImportRow[], summary: ReturnType<typeof summarizeImportRows>) {
+  const skippedSuffix = skippedRows.length > 0 ? `, ${skippedRows.length} nao carregada(s)` : "";
+  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes, ${summary.completedRows} OK2)${skippedSuffix}. A lista anterior foi substituida.`;
 }
 
 export async function importNormalizationBatchAction(formData: FormData): Promise<ImportNormalizationBatchResult> {
@@ -198,97 +113,52 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     return { ok: false, code: "config_error", message: "Supabase service role nao configurado." };
   }
 
-  const existingBatch = await supabase
-    .from("skus_normalization_import_batches")
-    .select("id, file_name")
-    .eq("file_sha256", fileSha256)
-    .maybeSingle();
-
-  if (existingBatch.error) {
-    return { ok: false, code: "db_error", message: "Nao foi possivel validar duplicados do import." };
-  }
-
-  if (existingBatch.data) {
-    const updateDesignations = formData.get("updateDesignations") === "true";
-    if (!updateDesignations) {
-      return {
-        ok: false,
-        code: "duplicate_file",
-        message: `Este ficheiro ja foi importado (${existingBatch.data.file_name}). Marca "Atualizar designacoes" para preencher PT/ES/EN em falta sem duplicar referencias.`,
-      };
-    }
-
-    try {
-      const { updatedRows, skippedRows } = await syncMissingDesignationsFromImport(supabase, parsed);
-      await runNormalizationImportMaintenance();
-      revalidatePath("/generator");
-
-      return {
-        ok: true,
-        message: `Designacoes sincronizadas: ${updatedRows} registo(s) actualizado(s), ${skippedRows} ja completos. Nenhuma referencia duplicada.`,
-        batchId: existingBatch.data.id,
-        fileName: existingBatch.data.file_name,
-        totalRows: parsed.rows.length,
-        pendingRows: 0,
-        invalidRows: 0,
-      };
-    } catch {
-      return {
-        ok: false,
-        code: "update_failed",
-        message: "Nao foi possivel atualizar as designacoes do ficheiro importado.",
-      };
-    }
+  try {
+    await clearPendingImportQueue(supabase);
+  } catch {
+    return {
+      ok: false,
+      code: "clear_failed",
+      message: "Nao foi possivel limpar a lista anterior de normalizacao.",
+    };
   }
 
   const categoryIdRaw = formData.get("categoryId");
   const categoryId = typeof categoryIdRaw === "string" && categoryIdRaw.length > 0 ? categoryIdRaw : null;
 
-  const legacyCodes = [...new Set(parsed.rows.map((row) => row.legacyCode).filter(Boolean) as string[])];
-  const existingByLegacyCode = await fetchExistingByLegacyCodes(supabase, legacyCodes);
-  const { rowsToInsert, rowsToSync } = splitImportRowsByExistingLegacyCodes(
-    parsed.rows,
-    new Set(existingByLegacyCode.keys()),
-  );
-
-  let syncedExistingRows = 0;
-  let skippedExistingRows = 0;
-
-  if (rowsToSync.length > 0) {
-    try {
-      const syncResult = await syncMissingDesignationsFromImport(supabase, { ...parsed, rows: rowsToSync });
-      syncedExistingRows = syncResult.updatedRows;
-      skippedExistingRows = syncResult.skippedRows;
-    } catch {
-      return {
-        ok: false,
-        code: "sync_failed",
-        message: "Nao foi possivel sincronizar designacoes de referencias ja existentes.",
-      };
-    }
+  const referenceCodes = collectCompletedReferenceCodes(parsed.rows);
+  let takenReferences: Set<string>;
+  try {
+    const takenList = await findTakenSkuReferences(supabase, referenceCodes);
+    takenReferences = new Set(takenList);
+  } catch {
+    return {
+      ok: false,
+      code: "reference_check_failed",
+      message: "Nao foi possivel validar referencias novas no historico.",
+    };
   }
 
-  if (rowsToInsert.length === 0) {
+  const { rowsToLoad, skippedRows } = partitionImportRowsForLoad(parsed.rows, takenReferences);
+
+  if (rowsToLoad.length === 0) {
     await runNormalizationImportMaintenance();
     revalidatePath("/generator");
 
     return {
       ok: true,
-      message: `Nenhuma referencia nova. ${syncedExistingRows} registo(s) actualizado(s), ${skippedExistingRows} ja completos. Nenhuma duplicacao criada.`,
+      message: `Import concluido: nenhuma linha carregada, ${skippedRows.length} nao carregada(s). A lista anterior foi substituida.`,
       batchId: "",
       fileName: file.name,
       totalRows: parsed.rows.length,
+      loadedRows: 0,
       pendingRows: 0,
-      invalidRows: parsed.rows.filter((row) => row.normalizationStatus === "cancelled").length,
+      invalidRows: skippedRows.length,
+      skippedRows,
     };
   }
 
-  const referenceValidation = await validateImportReferenceUniqueness(supabase, rowsToInsert);
-  if (!referenceValidation.ok) {
-    return { ok: false, code: "duplicate_reference", message: referenceValidation.message };
-  }
-
-  const summary = summarizeImportRows(rowsToInsert);
+  const summary = summarizeImportRows(rowsToLoad);
 
   const { data: batch, error: batchError } = await supabase
     .from("skus_normalization_import_batches")
@@ -310,7 +180,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     return { ok: false, code: "batch_insert_failed", message: "Nao foi possivel criar o batch de importacao." };
   }
 
-  const normalizationRows = rowsToInsert.map((row) => buildInsertRow(batch.id, row, categoryId));
+  const normalizationRows = rowsToLoad.map((row) => buildInsertRow(batch.id, row, categoryId));
 
   const chunkSize = 100;
   for (let offset = 0; offset < normalizationRows.length; offset += chunkSize) {
@@ -324,21 +194,17 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
   }
 
   await runNormalizationImportMaintenance();
-
   revalidatePath("/generator");
-
-  const syncSuffix =
-    rowsToSync.length > 0
-      ? ` ${syncedExistingRows} existente(s) actualizado(s), ${skippedExistingRows} ignorado(s) (sem duplicar).`
-      : "";
 
   return {
     ok: true,
-    message: `Import concluido: ${summary.pendingRows} novos pendentes, ${summary.completedRows} novos OK2, ${summary.invalidRows} invalidas.${syncSuffix}`,
+    message: buildSuccessMessage(rowsToLoad.length, skippedRows, summary),
     batchId: batch.id,
     fileName: file.name,
     totalRows: parsed.rows.length,
+    loadedRows: rowsToLoad.length,
     pendingRows: summary.pendingRows,
-    invalidRows: summary.invalidRows,
+    invalidRows: skippedRows.length,
+    skippedRows,
   };
 }
