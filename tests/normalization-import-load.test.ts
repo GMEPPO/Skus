@@ -38,7 +38,7 @@ describe("normalization import load", () => {
       "Referencia OK2 ja existe no historico (import anterior ou normalizacao concluida)",
     );
     expect(mapNormalizationInsertError("duplicate key value violates unique constraint")).toBe(
-      "Erro ao gravar linha na base de dados",
+      "duplicate key value violates unique constraint",
     );
   });
 

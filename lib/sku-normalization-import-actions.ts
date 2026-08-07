@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import {
   clearPendingImportQueue,
+  completeImportedOk2RowsForBatch,
   insertNormalizationRowsResilient,
   partitionImportRowsForLoad,
   releaseBatchFileSha256,
@@ -16,6 +17,7 @@ import {
   sha256Buffer,
   summarizeImportRows,
 } from "@/lib/normalization-import-parser";
+import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import { runNormalizationImportMaintenance } from "@/lib/normalization-data";
 import { findTakenSkuReferences } from "@/lib/sku-reference-uniqueness-data";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
@@ -42,11 +44,17 @@ function isAllowedExcelName(fileName: string) {
   return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
+function isImportedOk2Row(row: ReturnType<typeof parseNormalizationWorkbook>["rows"][number]) {
+  return row.normalizationStatus === "completed" && isOk2SourceStatus(row.sourceStatus);
+}
+
 function buildInsertRow(
   batchId: string,
   row: ReturnType<typeof parseNormalizationWorkbook>["rows"][number],
   categoryId: string | null,
 ) {
+  const storeOk2AsPending = isImportedOk2Row(row);
+
   return {
     import_batch_id: batchId,
     source_row_number: row.sourceRowNumber,
@@ -58,14 +66,18 @@ function buildInsertRow(
     source_designation_en: row.sourceDesignationEn,
     source_status: row.sourceStatus,
     source_observations: row.sourceObservations,
-    normalization_status: row.normalizationStatus,
+    normalization_status: storeOk2AsPending ? "pending" : row.normalizationStatus,
     import_issue: row.importIssue,
     category_id: categoryId,
-    final_new_code: row.normalizationStatus === "completed" ? row.sourceNewCode : null,
-    final_designation_pt: row.normalizationStatus === "completed" ? row.sourceDesignationPt : null,
-    final_designation_es: row.normalizationStatus === "completed" ? row.sourceDesignationEs : null,
-    final_designation_en: row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
-    completed_at: row.normalizationStatus === "completed" ? new Date().toISOString() : null,
+    final_new_code: !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceNewCode : null,
+    final_designation_pt:
+      !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceDesignationPt : null,
+    final_designation_es:
+      !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceDesignationEs : null,
+    final_designation_en:
+      !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
+    completed_at:
+      !storeOk2AsPending && row.normalizationStatus === "completed" ? new Date().toISOString() : null,
   };
 }
 
@@ -214,7 +226,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
   const insertAttempts = rowsToLoad.map((row) => ({
     sourceRowNumber: row.sourceRowNumber,
     legacyCode: row.legacyCode,
-    isOk2: row.normalizationStatus === "completed",
+    isOk2: isOk2SourceStatus(row.sourceStatus),
     payload: buildInsertRow(batch.id, row, categoryId),
   }));
 
@@ -235,7 +247,14 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     };
   }
 
-  const allSkippedRows = [...preSkippedRows, ...insertSkippedRows];
+  let ok2CompleteSkippedRows: SkippedImportRow[] = [];
+  try {
+    ok2CompleteSkippedRows = await completeImportedOk2RowsForBatch(supabase, batch.id);
+  } catch {
+    ok2CompleteSkippedRows = [];
+  }
+
+  const allSkippedRows = [...preSkippedRows, ...insertSkippedRows, ...ok2CompleteSkippedRows];
 
   if (insertedCount === 0) {
     await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
@@ -261,9 +280,14 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
         !insertSkippedRows.some(
           (skipped) =>
             skipped.sourceRowNumber === row.sourceRowNumber && skipped.legacyCode === row.legacyCode,
+        ) &&
+        !ok2CompleteSkippedRows.some(
+          (skipped) =>
+            skipped.sourceRowNumber === row.sourceRowNumber && skipped.legacyCode === row.legacyCode,
         ),
     ),
   );
+  loadedSummary.pendingRows += ok2CompleteSkippedRows.length;
 
   await supabase
     .from("skus_normalization_import_batches")

@@ -113,7 +113,7 @@ async function reconcileImportedOk2Rows(supabase: NonNullable<ReturnType<typeof 
   const completedAt = new Date().toISOString();
   for (const row of (pendingOk2 ?? []) as NormalizationFieldRow[]) {
     const sourceDesignation = pickSourceDesignation(row);
-    await supabase
+    const { error: updateError } = await supabase
       .from("skus_code_normalizations")
       .update({
         normalization_status: "completed",
@@ -124,6 +124,10 @@ async function reconcileImportedOk2Rows(supabase: NonNullable<ReturnType<typeof 
         final_designation_en: row.final_designation_en ?? row.source_designation_en,
       })
       .eq("id", row.id);
+
+    if (updateError) {
+      console.warn("[reconcileImportedOk2Rows] failed to complete OK2 row", row.id, updateError.message);
+    }
   }
 }
 
