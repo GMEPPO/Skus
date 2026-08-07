@@ -110,7 +110,7 @@ export function WordForm({
     }
 
     if (isSizeFieldType) {
-      setReferenceMessage("Tamanhos (gr/ml) podem partilhar a mesma referencia (ex.: 30gr e 30ml).");
+      setReferenceMessage("Tamanhos (gr/ml/kg/l) podem partilhar a mesma referencia (ex.: 30gr e 30ml).");
       setReferenceAvailable(true);
       return;
     }
@@ -118,7 +118,12 @@ export function WordForm({
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setCheckingReference(true);
-      const result = await checkWordReferenceCodeAction(normalized, initialValues.wordId, fieldTypeId || undefined);
+      const result = await checkWordReferenceCodeAction(
+        normalized,
+        initialValues.wordId,
+        fieldTypeId || undefined,
+        label.trim() || undefined,
+      );
       if (cancelled) return;
 
       if (!result.ok) {
@@ -126,7 +131,7 @@ export function WordForm({
         setReferenceMessage(result.message);
       } else if (result.available) {
         setReferenceAvailable(true);
-        setReferenceMessage("Referencia disponivel (unica entre palavras activas, excepto tamanhos).");
+        setReferenceMessage("Referencia disponivel para esta palavra (unica por palavra distinta, excepto tamanhos).");
       } else {
         setReferenceAvailable(false);
         setReferenceMessage(result.message);
@@ -138,7 +143,7 @@ export function WordForm({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [fieldTypeId, initialValues.wordId, isSizeFieldType, referenceCode]);
+  }, [fieldTypeId, initialValues.wordId, isSizeFieldType, label, referenceCode]);
 
   const canSubmit = referenceAvailable !== false;
 

@@ -1,4 +1,4 @@
--- Referencias activas unicas entre palavras (excepto 000 e nivel tamanho/gr/ml).
+-- Referencias activas: uma referencia por palavra distinta (excepto 000 e tamanhos gr/ml/kg/l).
 -- Executar diagnose_duplicate_word_references.sql antes se a migracao falhar.
 
 create schema if not exists skus_private;

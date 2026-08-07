@@ -61,10 +61,11 @@ where id = 'fac116be-e29f-40d3-ae76-cad9c43ca006'; -- Sabonete Esfoliante
 
 commit;
 
--- Verificacao: deve devolver 0 linhas (30/40 gr/ml podem repetir-se).
+-- Verificacao: deve devolver 0 linhas (30/40 gr/ml podem repetir-se entre tamanhos).
 with word_scopes as (
   select
     w.reference_code,
+    w.normalized_label,
     coalesce(ft_direct.code, ft_level.code, '') as field_type_code
   from public.skus_words w
   left join public.skus_category_levels cl on cl.id = w.category_level_id
@@ -76,8 +77,8 @@ with word_scopes as (
 )
 select
   upper(btrim(reference_code)) as referencia,
-  count(*) as total
+  count(distinct normalized_label) as palavras_distintas
 from word_scopes
 group by 1
-having count(*) > 1
-order by total desc, referencia;
+having count(distinct normalized_label) > 1
+order by palavras_distintas desc, referencia;

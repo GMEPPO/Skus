@@ -17,6 +17,12 @@ export function isSizeReferenceScope(fieldTypeCode: string | null | undefined): 
   return fieldTypeCode === SIZE_FIELD_TYPE_CODE;
 }
 
+export function normalizeWordLabel(label: string | null | undefined): string {
+  return String(label ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 export type WordReferenceConflict = {
   wordId: string;
   label: string;
@@ -33,6 +39,8 @@ export type WordReferenceScope = {
 type ServiceSupabase = NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>;
 
 type WordRowForScope = {
+  normalized_label?: string | null;
+  label?: string | null;
   default_field_type_id?: string | null;
   category_level_id?: string | null;
   skus_field_types?:
@@ -116,7 +124,7 @@ export async function resolveFieldTypeCode(
 export async function findWordReferenceConflict(
   supabase: ServiceSupabase,
   referenceCode: string,
-  options?: WordReferenceScope & { excludeWordId?: string },
+  options?: WordReferenceScope & { excludeWordId?: string; wordLabel?: string; normalizedLabel?: string },
 ): Promise<WordReferenceConflict | null> {
   const normalized = normalizeWordReferenceCode(referenceCode);
   if (!normalized || isEmptyWordReferenceCode(normalized)) {
@@ -128,10 +136,14 @@ export async function findWordReferenceConflict(
     return null;
   }
 
+  const candidateLabel =
+    options?.normalizedLabel ??
+    (options?.wordLabel ? normalizeWordLabel(options.wordLabel) : null);
+
   let query = supabase
     .from("skus_words")
     .select(
-      "id, label, reference_code, default_field_type_id, category_level_id, skus_field_types(code), skus_category_levels(label, skus_field_types:legacy_field_type_id(code))",
+      "id, label, normalized_label, reference_code, default_field_type_id, category_level_id, skus_field_types(code), skus_category_levels(label, skus_field_types:legacy_field_type_id(code))",
     )
     .eq("is_active", true)
     .eq("reference_code", normalized);
@@ -145,6 +157,11 @@ export async function findWordReferenceConflict(
   if (!data?.length) return null;
 
   for (const row of data) {
+    const rowLabel = String(row.normalized_label ?? normalizeWordLabel(row.label ?? ""));
+    if (candidateLabel && rowLabel === candidateLabel) {
+      continue;
+    }
+
     const fieldTypeCode = resolveWordFieldTypeCodeFromRow(row as WordRowForScope);
     if (isSizeReferenceScope(fieldTypeCode)) {
       continue;
@@ -170,7 +187,7 @@ export async function findWordReferenceConflict(
 }
 
 export function formatWordReferenceConflictMessage(conflict: WordReferenceConflict): string {
-  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" (${conflict.levelLabel}). As referencias devem ser unicas entre palavras activas (excepto 000 e tamanhos gr/ml).`;
+  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" (${conflict.levelLabel}). Cada palavra deve ter referencia unica (excepto 000 e tamanhos gr/ml/kg/l).`;
 }
 
 export type DesignationLengthWarning = {

@@ -15,6 +15,7 @@ export async function checkWordReferenceCodeAction(
   referenceCode: string,
   excludeWordId?: string,
   fieldTypeId?: string,
+  wordLabel?: string,
 ): Promise<
   | { ok: true; available: true }
   | { ok: true; available: false; message: string; conflictLabel: string; conflictLevel: string }
@@ -42,7 +43,11 @@ export async function checkWordReferenceCodeAction(
       return { ok: true, available: true };
     }
 
-    const conflict = await findWordReferenceConflict(supabase, normalized, { excludeWordId, fieldTypeId });
+    const conflict = await findWordReferenceConflict(supabase, normalized, {
+      excludeWordId,
+      fieldTypeId,
+      wordLabel,
+    });
     if (!conflict) {
       return { ok: true, available: true };
     }

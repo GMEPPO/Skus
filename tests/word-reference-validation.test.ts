@@ -4,6 +4,7 @@ import {
   formatWordReferenceConflictMessage,
   isEmptyWordReferenceCode,
   isSizeReferenceScope,
+  normalizeWordLabel,
   normalizeWordReferenceCode,
   resolveWordFieldTypeCodeFromRow,
 } from "@/lib/word-reference-validation";
@@ -18,7 +19,11 @@ describe("word reference validation", () => {
     expect(isEmptyWordReferenceCode("FRA")).toBe(false);
   });
 
-  it("identifica nivel tamanho/gr/ml", () => {
+  it("normaliza labels de palavra", () => {
+    expect(normalizeWordLabel(" Sabonete ")).toBe("sabonete");
+  });
+
+  it("identifica nivel tamanho/gr/ml/kg/l", () => {
     expect(isSizeReferenceScope("size")).toBe(true);
     expect(isSizeReferenceScope("brand")).toBe(false);
   });

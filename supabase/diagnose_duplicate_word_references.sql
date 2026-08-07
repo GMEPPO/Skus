@@ -1,9 +1,10 @@
--- Duplicados de referencia entre palavras activas (excepto 000 e tamanho/gr/ml).
+-- Duplicados: mesma referencia usada por palavras distintas (excepto 000 e tamanho gr/ml/kg/l).
 
 with word_scopes as (
   select
     w.id,
     w.label,
+    w.normalized_label,
     w.reference_code,
     coalesce(cl.label, 'sem nivel') as nivel,
     coalesce(ft_direct.code, ft_level.code, '') as field_type_code
@@ -14,27 +15,28 @@ with word_scopes as (
   where w.is_active = true
     and upper(btrim(w.reference_code)) <> '000'
 ),
-blocking_duplicates as (
+blocking as (
   select *
   from word_scopes
   where field_type_code <> 'size'
 )
 select
   upper(btrim(reference_code)) as referencia,
-  count(*) as total,
-  array_agg(label order by label) as palavras,
-  array_agg(nivel order by label) as niveles
-from blocking_duplicates
+  count(distinct normalized_label) as palavras_distintas,
+  array_agg(distinct label order by label) as palavras,
+  array_agg(distinct nivel order by nivel) as niveles
+from blocking
 group by 1
-having count(*) > 1
-order by total desc, referencia;
+having count(distinct normalized_label) > 1
+order by palavras_distintas desc, referencia;
 
--- Detalle fila a fila (usar para corregir cada duplicado antes da migracao).
+-- Detalle fila a fila.
 
 with word_scopes as (
   select
     w.id,
     w.label,
+    w.normalized_label,
     w.reference_code,
     coalesce(cl.label, 'sem nivel') as nivel,
     coalesce(ft_direct.name, ft_level.name, 'sem tipo') as tipo_campo,
@@ -51,7 +53,7 @@ duplicate_refs as (
   from word_scopes
   where field_type_code <> 'size'
   group by 1
-  having count(*) > 1
+  having count(distinct normalized_label) > 1
 )
 select
   upper(btrim(ws.reference_code)) as referencia,

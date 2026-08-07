@@ -271,6 +271,7 @@ export async function createWordAction(formData: FormData) {
       const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
         fieldTypeId: defaultFieldTypeId,
         categoryLevelId,
+        wordLabel: label,
       });
       if (conflict) {
         redirect(
@@ -360,6 +361,7 @@ export async function updateWordAction(formData: FormData) {
         excludeWordId: wordId,
         fieldTypeId: defaultFieldTypeId,
         categoryLevelId,
+        wordLabel: label,
       });
       if (conflict) {
         redirect(
@@ -450,7 +452,7 @@ export async function reactivateWordAction(formData: FormData) {
 
   const { data: word, error: wordError } = await supabase
     .from("skus_words")
-    .select("reference_code, default_field_type_id, category_level_id")
+    .select("reference_code, label, default_field_type_id, category_level_id")
     .eq("id", parsed.data.wordId)
     .maybeSingle();
 
@@ -465,6 +467,7 @@ export async function reactivateWordAction(formData: FormData) {
         excludeWordId: parsed.data.wordId,
         fieldTypeId: word.default_field_type_id ? String(word.default_field_type_id) : null,
         categoryLevelId: word.category_level_id ? String(word.category_level_id) : null,
+        wordLabel: String(word.label ?? ""),
       });
       if (conflict) {
         redirect(
