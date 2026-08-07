@@ -11,20 +11,37 @@ const PRODUCT_IMAGE_BUCKET = "sku-product-images";
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-const generateSkuSchema = z.object({
-  generatedCode: z.string().trim().min(3),
-  designation: z.string().trim().min(1),
-  designationPt: z.string().trim().min(1),
-  designationEs: z.string().trim().min(1),
-  designationEn: z.string().trim().min(1),
-  selectionSnapshot: z.string().trim().min(2),
-  unitsPerBox: z.coerce.number().positive(),
-  unitsPerBoxStatus: z.enum(["real", "estimated"]),
-  multiples: z.coerce.number().positive(),
-  multiplesStatus: z.enum(["real", "estimated"]),
-  weight: z.coerce.number().positive(),
-  weightStatus: z.enum(["real", "estimated"]),
-});
+const generateSkuSchema = z
+  .object({
+    generatedCode: z.string().trim().min(3),
+    designation: z.string().trim().min(1),
+    designationPt: z.string().trim().min(1),
+    designationEs: z.string().trim().min(1),
+    designationEn: z.string().trim().min(1),
+    selectionSnapshot: z.string().trim().min(2),
+    requireLogisticsData: z.enum(["on", "off"]).default("on"),
+    unitsPerBox: z.coerce.number().positive().optional(),
+    unitsPerBoxStatus: z.enum(["real", "estimated"]).optional(),
+    multiples: z.coerce.number().positive().optional(),
+    multiplesStatus: z.enum(["real", "estimated"]).optional(),
+    weight: z.coerce.number().positive().optional(),
+    weightStatus: z.enum(["real", "estimated"]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.requireLogisticsData === "off") {
+      return;
+    }
+    if (
+      data.unitsPerBox == null ||
+      data.multiples == null ||
+      data.weight == null ||
+      !data.unitsPerBoxStatus ||
+      !data.multiplesStatus ||
+      !data.weightStatus
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid_payload" });
+    }
+  });
 
 export type GenerateSkuActionResult =
   | {
@@ -36,12 +53,12 @@ export type GenerateSkuActionResult =
       designationPt: string;
       designationEs: string;
       designationEn: string;
-      unitsPerBox: number;
-      unitsPerBoxStatus: "real" | "estimated";
-      multiples: number;
-      multiplesStatus: "real" | "estimated";
-      weight: number;
-      weightStatus: "real" | "estimated";
+      unitsPerBox?: number;
+      unitsPerBoxStatus?: "real" | "estimated";
+      multiples?: number;
+      multiplesStatus?: "real" | "estimated";
+      weight?: number;
+      weightStatus?: "real" | "estimated";
     }
   | { ok: false; message: string };
 
@@ -65,6 +82,8 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     };
   }
 
+  const requireLogisticsData = formData.get("requireLogisticsData") !== "off" ? "on" : "off";
+
   const parsed = generateSkuSchema.safeParse({
     generatedCode: formData.get("generatedCode"),
     designation: formData.get("designation"),
@@ -72,12 +91,13 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
     selectionSnapshot: formData.get("selectionSnapshot"),
-    unitsPerBox: formData.get("unitsPerBox"),
-    unitsPerBoxStatus: formData.get("unitsPerBoxStatus"),
-    multiples: formData.get("multiples"),
-    multiplesStatus: formData.get("multiplesStatus"),
-    weight: formData.get("weight"),
-    weightStatus: formData.get("weightStatus"),
+    requireLogisticsData,
+    unitsPerBox: requireLogisticsData === "on" ? formData.get("unitsPerBox") : undefined,
+    unitsPerBoxStatus: requireLogisticsData === "on" ? formData.get("unitsPerBoxStatus") : undefined,
+    multiples: requireLogisticsData === "on" ? formData.get("multiples") : undefined,
+    multiplesStatus: requireLogisticsData === "on" ? formData.get("multiplesStatus") : undefined,
+    weight: requireLogisticsData === "on" ? formData.get("weight") : undefined,
+    weightStatus: requireLogisticsData === "on" ? formData.get("weightStatus") : undefined,
   });
 
   if (!parsed.success) {
@@ -156,12 +176,12 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
       sequence_value: sequenceValue,
       prefix_snapshot: parsed.data.generatedCode,
       selection_snapshot: JSON.parse(parsed.data.selectionSnapshot),
-      units_per_box: parsed.data.unitsPerBox,
-      units_per_box_status: parsed.data.unitsPerBoxStatus,
-      multiples: parsed.data.multiples,
-      multiples_status: parsed.data.multiplesStatus,
-      weight: parsed.data.weight,
-      weight_status: parsed.data.weightStatus,
+      units_per_box: parsed.data.unitsPerBox ?? null,
+      units_per_box_status: parsed.data.unitsPerBoxStatus ?? null,
+      multiples: parsed.data.multiples ?? null,
+      multiples_status: parsed.data.multiplesStatus ?? null,
+      weight: parsed.data.weight ?? null,
+      weight_status: parsed.data.weightStatus ?? null,
       generated_by: generatedBy,
     })
     .select("id")
@@ -174,26 +194,33 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     return { ok: false, message: "Nao foi possivel guardar o SKU." };
   }
 
-  await supabase.from("skus_sku_generation_measurement_history").insert([
-    {
-      sku_generation_id: insertResult.data.id,
-      field_name: "units_per_box",
-      new_value_numeric: parsed.data.unitsPerBox,
-      new_value_status: parsed.data.unitsPerBoxStatus,
-    },
-    {
-      sku_generation_id: insertResult.data.id,
-      field_name: "multiples",
-      new_value_numeric: parsed.data.multiples,
-      new_value_status: parsed.data.multiplesStatus,
-    },
-    {
-      sku_generation_id: insertResult.data.id,
-      field_name: "weight",
-      new_value_numeric: parsed.data.weight,
-      new_value_status: parsed.data.weightStatus,
-    },
-  ]);
+  if (
+    parsed.data.requireLogisticsData === "on" &&
+    parsed.data.unitsPerBox != null &&
+    parsed.data.multiples != null &&
+    parsed.data.weight != null
+  ) {
+    await supabase.from("skus_sku_generation_measurement_history").insert([
+      {
+        sku_generation_id: insertResult.data.id,
+        field_name: "units_per_box",
+        new_value_numeric: parsed.data.unitsPerBox,
+        new_value_status: parsed.data.unitsPerBoxStatus,
+      },
+      {
+        sku_generation_id: insertResult.data.id,
+        field_name: "multiples",
+        new_value_numeric: parsed.data.multiples,
+        new_value_status: parsed.data.multiplesStatus,
+      },
+      {
+        sku_generation_id: insertResult.data.id,
+        field_name: "weight",
+        new_value_numeric: parsed.data.weight,
+        new_value_status: parsed.data.weightStatus,
+      },
+    ]);
+  }
 
   revalidatePath("/generator");
   revalidatePath("/sku-history");

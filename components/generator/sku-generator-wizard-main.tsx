@@ -113,6 +113,7 @@ export function SkuGeneratorWizardMain({
   const [multiplesStatus, setMultiplesStatus] = useState<"real" | "estimated">("estimated");
   const [weight, setWeight] = useState("");
   const [weightStatus, setWeightStatus] = useState<"real" | "estimated">("estimated");
+  const [logisticsRequired, setLogisticsRequired] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [modalData, setModalData] = useState<GeneratedSkuModalData | null>(null);
@@ -146,13 +147,11 @@ export function SkuGeneratorWizardMain({
   );
   const hasAnyMeasurements = Boolean(unitsPerBox || multiples || weight);
   const hasAllMeasurements = Boolean(unitsPerBox && multiples && weight);
-  const hasPartialMeasurements = hasAnyMeasurements && !hasAllMeasurements;
+  const hasPartialMeasurements = logisticsRequired && hasAnyMeasurements && !hasAllMeasurements;
   const measurementError = hasPartialMeasurements
-    ? isNormalizationMode
-      ? "As medidas devem ser enviadas em conjunto ou deixadas todas vazias."
-      : "As medidas devem ser enviadas em conjunto: quantidade por caixa, multiplos e peso."
+    ? "As medidas devem ser enviadas em conjunto: quantidade por caixa, multiplos e peso."
     : null;
-  const measurementsValid = isNormalizationMode ? !hasPartialMeasurements : hasAllMeasurements;
+  const measurementsValid = !logisticsRequired || hasAllMeasurements;
   const needsCategoryId = secureGenerationV2Enabled || isNormalizationMode;
   const canSubmit =
     catalog.levels.length > 0 &&
@@ -277,6 +276,17 @@ export function SkuGeneratorWizardMain({
     setIsSubmitting(true);
     setSubmitError(null);
     const formData = new FormData(event.currentTarget);
+    formData.set("requireLogisticsData", logisticsRequired ? "on" : "off");
+
+    if (!logisticsRequired) {
+      formData.delete("unitsPerBox");
+      formData.delete("unitsPerBoxStatus");
+      formData.delete("multiples");
+      formData.delete("multiplesStatus");
+      formData.delete("weight");
+      formData.delete("weightStatus");
+      formData.delete("requestId");
+    }
 
     if (isNormalizationMode && normalizationTarget) {
       if (!normalizationV2Enabled) {
@@ -288,9 +298,10 @@ export function SkuGeneratorWizardMain({
       formData.set("normalizationId", normalizationTarget.id);
       formData.set("categoryId", categoryId ?? "");
       formData.set("selectionsJson", JSON.stringify(buildSecureSelectionsPayload(catalog, selections)));
-      formData.set("requestId", bindOrRenewRequestIdForPayload(buildSecurePayloadKey()));
+      formData.set("requireLogisticsData", logisticsRequired ? "on" : "off");
 
-      if (hasAllMeasurements) {
+      if (logisticsRequired && hasAllMeasurements) {
+        formData.set("requestId", bindOrRenewRequestIdForPayload(buildSecurePayloadKey()));
         formData.set(
           "measuresJson",
           JSON.stringify({
@@ -321,12 +332,12 @@ export function SkuGeneratorWizardMain({
         designationPt: String(data.designationPt ?? ""),
         designationEs: String(data.designationEs ?? ""),
         designationEn: String(data.designationEn ?? ""),
-        unitsPerBox: hasAllMeasurements ? Number(unitsPerBox) : undefined,
-        unitsPerBoxStatus: hasAllMeasurements ? unitsPerBoxStatus : undefined,
-        multiples: hasAllMeasurements ? Number(multiples) : undefined,
-        multiplesStatus: hasAllMeasurements ? multiplesStatus : undefined,
-        weight: hasAllMeasurements ? Number(weight) : undefined,
-        weightStatus: hasAllMeasurements ? weightStatus : undefined,
+        unitsPerBox: logisticsRequired && hasAllMeasurements ? Number(unitsPerBox) : undefined,
+        unitsPerBoxStatus: logisticsRequired && hasAllMeasurements ? unitsPerBoxStatus : undefined,
+        multiples: logisticsRequired && hasAllMeasurements ? Number(multiples) : undefined,
+        multiplesStatus: logisticsRequired && hasAllMeasurements ? multiplesStatus : undefined,
+        weight: logisticsRequired && hasAllMeasurements ? Number(weight) : undefined,
+        weightStatus: logisticsRequired && hasAllMeasurements ? weightStatus : undefined,
       });
       setNormalizationCompleted(true);
       setIsSubmitting(false);
@@ -342,8 +353,20 @@ export function SkuGeneratorWizardMain({
 
       formData.set("categoryId", categoryId);
       formData.set("selectionsJson", JSON.stringify(buildSecureSelectionsPayload(catalog, selections)));
-      const requestIdForSubmit = bindOrRenewRequestIdForPayload(buildSecurePayloadKey());
-      formData.set("requestId", requestIdForSubmit);
+      formData.set("requireLogisticsData", logisticsRequired ? "on" : "off");
+
+      if (logisticsRequired) {
+        const requestIdForSubmit = bindOrRenewRequestIdForPayload(buildSecurePayloadKey());
+        formData.set("requestId", requestIdForSubmit);
+      } else {
+        formData.delete("requestId");
+        formData.delete("unitsPerBox");
+        formData.delete("unitsPerBoxStatus");
+        formData.delete("multiples");
+        formData.delete("multiplesStatus");
+        formData.delete("weight");
+        formData.delete("weightStatus");
+      }
 
       const secureResult = await generateSkuSecureAction(formData);
       if (!secureResult.ok) {
@@ -630,12 +653,38 @@ export function SkuGeneratorWizardMain({
             <Card className="space-y-4 p-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Dados logisticos</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  Estes campos sao obrigatorios e cada um pode ser marcado como real ou estimado.
-                </p>
+                <label className="mt-3 flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={logisticsRequired}
+                    onChange={(event) => {
+                      const next = event.target.checked;
+                      setLogisticsRequired(next);
+                      if (!next) {
+                        setUnitsPerBox("");
+                        setMultiples("");
+                        setWeight("");
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-amber-400 focus:ring-amber-400"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-slate-100">Incluir dados logisticos neste codigo</p>
+                    <p className="text-xs text-slate-400">
+                      Desmarca para gerar o SKU sem quantidade por caixa, multiplos ou peso.
+                    </p>
+                  </div>
+                </label>
+                {logisticsRequired ? (
+                  <p className="mt-2 text-sm text-slate-400">
+                    Estes campos sao obrigatorios e cada um pode ser marcado como real ou estimado.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">Dados logisticos opcionais para este codigo.</p>
+                )}
                 {measurementError ? <p className="mt-2 text-sm text-amber-300">{measurementError}</p> : null}
               </div>
-              <div className="grid gap-4">
+              <div className={`grid gap-4 ${logisticsRequired ? "" : "pointer-events-none opacity-50"}`}>
                 <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                   <label className="space-y-2">
                     <span className="text-sm text-slate-300">Quantidade por caixa</span>
@@ -644,7 +693,7 @@ export function SkuGeneratorWizardMain({
                       type="number"
                       min="0.01"
                       step="0.01"
-                      required={!isNormalizationMode}
+                      required={logisticsRequired && !isNormalizationMode}
                       value={unitsPerBox}
                       onChange={(event) => setUnitsPerBox(event.target.value)}
                       onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
@@ -679,7 +728,7 @@ export function SkuGeneratorWizardMain({
                       type="number"
                       min="0.01"
                       step="0.01"
-                      required={!isNormalizationMode}
+                      required={logisticsRequired && !isNormalizationMode}
                       value={multiples}
                       onChange={(event) => setMultiples(event.target.value)}
                       onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
@@ -714,7 +763,7 @@ export function SkuGeneratorWizardMain({
                       type="number"
                       min="0.01"
                       step="0.01"
-                      required={!isNormalizationMode}
+                      required={logisticsRequired && !isNormalizationMode}
                       value={weight}
                       onChange={(event) => setWeight(event.target.value)}
                       onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}

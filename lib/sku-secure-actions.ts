@@ -8,17 +8,39 @@ import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/sku
 
 const measureStatusSchema = z.enum(["real", "estimated"]);
 
-const generateSecureSchema = z.object({
-  categoryId: z.string().uuid(),
-  selectionsJson: z.string().min(2),
-  requestId: z.string().uuid(),
-  unitsPerBox: z.coerce.number().positive(),
-  unitsPerBoxStatus: measureStatusSchema,
-  multiples: z.coerce.number().positive(),
-  multiplesStatus: measureStatusSchema,
-  weight: z.coerce.number().positive(),
-  weightStatus: measureStatusSchema,
-});
+function isLogisticsRequired(formData: FormData): boolean {
+  return formData.get("requireLogisticsData") !== "off";
+}
+
+const generateSecureSchema = z
+  .object({
+    categoryId: z.string().uuid(),
+    selectionsJson: z.string().min(2),
+    requireLogisticsData: z.enum(["on", "off"]).default("on"),
+    requestId: z.string().uuid().optional(),
+    unitsPerBox: z.coerce.number().positive().optional(),
+    unitsPerBoxStatus: measureStatusSchema.optional(),
+    multiples: z.coerce.number().positive().optional(),
+    multiplesStatus: measureStatusSchema.optional(),
+    weight: z.coerce.number().positive().optional(),
+    weightStatus: measureStatusSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.requireLogisticsData === "off") {
+      return;
+    }
+    if (
+      !data.requestId ||
+      data.unitsPerBox == null ||
+      data.multiples == null ||
+      data.weight == null ||
+      !data.unitsPerBoxStatus ||
+      !data.multiplesStatus ||
+      !data.weightStatus
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid_payload" });
+    }
+  });
 
 export type GenerateSkuSecureActionResult =
   | {
@@ -33,13 +55,13 @@ export type GenerateSkuSecureActionResult =
       designationEn: string;
       snapshotVersion: number;
       selectionFingerprint: string;
-      unitsPerBox: number;
-      unitsPerBoxStatus: "real" | "estimated";
-      multiples: number;
-      multiplesStatus: "real" | "estimated";
-      weight: number;
-      weightStatus: "real" | "estimated";
-      requestId: string;
+      unitsPerBox?: number;
+      unitsPerBoxStatus?: "real" | "estimated";
+      multiples?: number;
+      multiplesStatus?: "real" | "estimated";
+      weight?: number;
+      weightStatus?: "real" | "estimated";
+      requestId?: string;
     }
   | { ok: false; message: string; code?: string };
 
@@ -83,16 +105,19 @@ export async function generateSkuSecureAction(formData: FormData): Promise<Gener
     };
   }
 
+  const requireLogisticsData = isLogisticsRequired(formData) ? "on" : "off";
+
   const parsed = generateSecureSchema.safeParse({
     categoryId: formData.get("categoryId"),
     selectionsJson: formData.get("selectionsJson"),
-    requestId: formData.get("requestId") || randomUUID(),
-    unitsPerBox: formData.get("unitsPerBox"),
-    unitsPerBoxStatus: formData.get("unitsPerBoxStatus"),
-    multiples: formData.get("multiples"),
-    multiplesStatus: formData.get("multiplesStatus"),
-    weight: formData.get("weight"),
-    weightStatus: formData.get("weightStatus"),
+    requireLogisticsData,
+    requestId: requireLogisticsData === "on" ? formData.get("requestId") || randomUUID() : undefined,
+    unitsPerBox: requireLogisticsData === "on" ? formData.get("unitsPerBox") : undefined,
+    unitsPerBoxStatus: requireLogisticsData === "on" ? formData.get("unitsPerBoxStatus") : undefined,
+    multiples: requireLogisticsData === "on" ? formData.get("multiples") : undefined,
+    multiplesStatus: requireLogisticsData === "on" ? formData.get("multiplesStatus") : undefined,
+    weight: requireLogisticsData === "on" ? formData.get("weight") : undefined,
+    weightStatus: requireLogisticsData === "on" ? formData.get("weightStatus") : undefined,
   });
 
   if (!parsed.success) {
@@ -120,19 +145,23 @@ export async function generateSkuSecureAction(formData: FormData): Promise<Gener
     return { ok: false, code: "not_authenticated", message: RPC_ERROR_MESSAGES.not_authenticated };
   }
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     categoryId: parsed.data.categoryId,
     selections,
-    requestId: parsed.data.requestId,
-    measures: {
+    requireLogisticsData: parsed.data.requireLogisticsData,
+  };
+
+  if (parsed.data.requireLogisticsData === "on") {
+    payload.requestId = parsed.data.requestId;
+    payload.measures = {
       unitsPerBox: parsed.data.unitsPerBox,
       unitsPerBoxStatus: parsed.data.unitsPerBoxStatus,
       multiples: parsed.data.multiples,
       multiplesStatus: parsed.data.multiplesStatus,
       weight: parsed.data.weight,
       weightStatus: parsed.data.weightStatus,
-    },
-  };
+    };
+  }
 
   const { data, error } = await supabase.rpc("generate_sku_secure", { p_payload: payload });
   if (error || !data) {
