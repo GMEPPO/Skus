@@ -7,6 +7,7 @@ import {
   insertNormalizationRowsResilient,
   partitionImportRowsForLoad,
   releaseBatchFileSha256,
+  type Ok2DuplicateReviewRow,
   type SkippedImportRow,
 } from "@/lib/normalization-import-load";
 import {
@@ -30,6 +31,7 @@ export type ImportNormalizationBatchResult =
       pendingRows: number;
       invalidRows: number;
       skippedRows: SkippedImportRow[];
+      ok2DuplicateReviewRows: Ok2DuplicateReviewRow[];
     }
   | { ok: false; message: string; code?: string };
 
@@ -76,12 +78,15 @@ function collectCompletedReferenceCodes(rows: ReturnType<typeof parseNormalizati
 function buildSuccessMessage(
   loadedRows: number,
   skippedRows: SkippedImportRow[],
+  ok2DuplicateReviewRows: Ok2DuplicateReviewRow[],
   summary: ReturnType<typeof summarizeImportRows>,
   replacedPrevious: boolean,
 ) {
   const skippedSuffix = skippedRows.length > 0 ? `, ${skippedRows.length} nao carregada(s)` : "";
+  const reviewSuffix =
+    ok2DuplicateReviewRows.length > 0 ? `, ${ok2DuplicateReviewRows.length} OK2 duplicado(s) para rever` : "";
   const replaceSuffix = replacedPrevious ? " A lista anterior foi substituida." : " A lista anterior foi mantida.";
-  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes, ${summary.completedRows} OK2)${skippedSuffix}.${replaceSuffix}`;
+  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes, ${summary.completedRows} OK2)${skippedSuffix}${reviewSuffix}.${replaceSuffix}`;
 }
 
 export async function importNormalizationBatchAction(formData: FormData): Promise<ImportNormalizationBatchResult> {
@@ -137,7 +142,11 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     };
   }
 
-  const { rowsToLoad, skippedRows: preSkippedRows } = partitionImportRowsForLoad(parsed.rows, takenReferences);
+  const {
+    rowsToLoad,
+    skippedRows: preSkippedRows,
+    ok2DuplicateReviewRows,
+  } = partitionImportRowsForLoad(parsed.rows, takenReferences);
 
   if (rowsToLoad.length === 0) {
     return {
@@ -150,6 +159,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       pendingRows: 0,
       invalidRows: preSkippedRows.length,
       skippedRows: preSkippedRows,
+      ok2DuplicateReviewRows,
     };
   }
 
@@ -230,6 +240,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       pendingRows: 0,
       invalidRows: allSkippedRows.length,
       skippedRows: allSkippedRows,
+      ok2DuplicateReviewRows,
     };
   }
 
@@ -270,7 +281,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
 
   return {
     ok: true,
-    message: buildSuccessMessage(insertedCount, allSkippedRows, loadedSummary, true),
+    message: buildSuccessMessage(insertedCount, allSkippedRows, ok2DuplicateReviewRows, loadedSummary, true),
     batchId: batch.id,
     fileName: file.name,
     totalRows: parsed.rows.length,
@@ -278,5 +289,6 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     pendingRows: loadedSummary.pendingRows,
     invalidRows: allSkippedRows.length,
     skippedRows: allSkippedRows,
+    ok2DuplicateReviewRows,
   };
 }

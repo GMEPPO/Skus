@@ -11,6 +11,16 @@ export type SkippedImportRow = {
   reason: string;
 };
 
+export type Ok2DuplicateReviewRow = {
+  sourceRowNumber: number;
+  legacyCode: string | null;
+  sourceNewCode: string | null;
+  reason: string;
+};
+
+const OK2_DUPLICATE_REVIEW_REASON =
+  "Referencia nova OK2 duplicada no Excel - rever manualmente antes de usar";
+
 type NormalizationInsertPayload = Record<string, unknown>;
 
 export type NormalizationInsertAttempt = {
@@ -55,14 +65,32 @@ export function mapNormalizationInsertError(message: string, details?: string | 
   return "Erro ao gravar linha na base de dados";
 }
 
+function collectDuplicateOk2ReferenceKeys(rows: ParsedNormalizationImportRow[]): Set<string> {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    if (row.normalizationStatus !== "completed" || !row.sourceNewCode) continue;
+    const normalizedRef = normalizeSkuReference(row.sourceNewCode);
+    if (!normalizedRef) continue;
+    counts.set(normalizedRef, (counts.get(normalizedRef) ?? 0) + 1);
+  }
+
+  return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([ref]) => ref));
+}
+
 export function partitionImportRowsForLoad(
   rows: ParsedNormalizationImportRow[],
   takenReferences: Set<string>,
-): { rowsToLoad: ParsedNormalizationImportRow[]; skippedRows: SkippedImportRow[] } {
-  const seenLegacyCodes = new Set<string>();
-  const seenNewReferences = new Set<string>();
+): {
+  rowsToLoad: ParsedNormalizationImportRow[];
+  skippedRows: SkippedImportRow[];
+  ok2DuplicateReviewRows: Ok2DuplicateReviewRow[];
+} {
+  const duplicateOk2References = collectDuplicateOk2ReferenceKeys(rows);
+  const loadedOk2References = new Set<string>();
   const rowsToLoad: ParsedNormalizationImportRow[] = [];
   const skippedRows: SkippedImportRow[] = [];
+  const ok2DuplicateReviewRows: Ok2DuplicateReviewRow[] = [];
 
   for (const row of rows) {
     if (row.normalizationStatus === "cancelled") {
@@ -84,28 +112,21 @@ export function partitionImportRowsForLoad(
       continue;
     }
 
-    if (seenLegacyCodes.has(legacyCode)) {
-      skippedRows.push({
-        sourceRowNumber: row.sourceRowNumber,
-        legacyCode,
-        reason: "Referencia antiga duplicada neste Excel",
-      });
-      continue;
-    }
-    seenLegacyCodes.add(legacyCode);
-
     if (row.normalizationStatus === "completed" && row.sourceNewCode) {
       const normalizedRef = normalizeSkuReference(row.sourceNewCode);
       if (normalizedRef) {
-        if (seenNewReferences.has(normalizedRef)) {
-          skippedRows.push({
+        if (duplicateOk2References.has(normalizedRef)) {
+          ok2DuplicateReviewRows.push({
             sourceRowNumber: row.sourceRowNumber,
             legacyCode,
-            reason: "Referencia nova duplicada neste Excel",
+            sourceNewCode: row.sourceNewCode,
+            reason: OK2_DUPLICATE_REVIEW_REASON,
           });
-          continue;
-        }
-        if (takenReferences.has(normalizedRef)) {
+
+          if (loadedOk2References.has(normalizedRef)) {
+            continue;
+          }
+        } else if (takenReferences.has(normalizedRef)) {
           skippedRows.push({
             sourceRowNumber: row.sourceRowNumber,
             legacyCode,
@@ -113,14 +134,18 @@ export function partitionImportRowsForLoad(
           });
           continue;
         }
-        seenNewReferences.add(normalizedRef);
+
+        if (loadedOk2References.has(normalizedRef)) {
+          continue;
+        }
+        loadedOk2References.add(normalizedRef);
       }
     }
 
     rowsToLoad.push(row);
   }
 
-  return { rowsToLoad, skippedRows };
+  return { rowsToLoad, skippedRows, ok2DuplicateReviewRows };
 }
 
 export async function releaseBatchFileSha256(supabase: ServiceSupabase, fileSha256: string): Promise<void> {
