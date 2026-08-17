@@ -133,6 +133,7 @@ export function SkuGeneratorWizardMain({
   const [secureRequestId, setSecureRequestId] = useState(() => crypto.randomUUID());
   const secureRequestIdRef = useRef(secureRequestId);
   const requestBoundPayloadKeyRef = useRef<string | null>(null);
+  const hideSummaryTimerRef = useRef<number | null>(null);
   const [normalizationCompleted, setNormalizationCompleted] = useState(false);
   const [codeExamples, setCodeExamples] = useState<SkuCodeExample[]>([]);
   const [codeExamplesLoading, setCodeExamplesLoading] = useState(false);
@@ -168,6 +169,40 @@ export function SkuGeneratorWizardMain({
     if (!targetLevel || !expandedLevelIds.has(targetLevel.id)) return;
     levelRefs.current[targetLevel.id]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [activeLevelIndex, catalog.levels, expandedLevelIds]);
+
+  function showFloatingSummary() {
+    if (hideSummaryTimerRef.current) {
+      window.clearTimeout(hideSummaryTimerRef.current);
+      hideSummaryTimerRef.current = null;
+    }
+    setFloatingSummaryVisible(true);
+  }
+
+  function hideFloatingSummaryImmediately() {
+    if (hideSummaryTimerRef.current) {
+      window.clearTimeout(hideSummaryTimerRef.current);
+      hideSummaryTimerRef.current = null;
+    }
+    setFloatingSummaryVisible(false);
+  }
+
+  function scheduleHideFloatingSummary() {
+    if (hideSummaryTimerRef.current) {
+      window.clearTimeout(hideSummaryTimerRef.current);
+    }
+    hideSummaryTimerRef.current = window.setTimeout(() => {
+      setFloatingSummaryVisible(false);
+      hideSummaryTimerRef.current = null;
+    }, 150);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (hideSummaryTimerRef.current) {
+        window.clearTimeout(hideSummaryTimerRef.current);
+      }
+    };
+  }, []);
 
   const designation = buildDesignation(catalog, selections);
   const designationPt = buildDesignationByLocale(catalog, selections, "pt");
@@ -889,6 +924,7 @@ export function SkuGeneratorWizardMain({
           </>
         )}
 
+        <div onMouseEnter={hideFloatingSummaryImmediately}>
         <label className="flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
           <input
             type="checkbox"
@@ -1071,7 +1107,6 @@ export function SkuGeneratorWizardMain({
 
         <div
           className="space-y-3"
-          onMouseEnter={() => setFloatingSummaryVisible(false)}
         >
           {catalog.levels.map((level, levelIndex) => renderLevelPanel(level, levelIndex))}
           {allLevelsCompleted ? (
@@ -1081,34 +1116,27 @@ export function SkuGeneratorWizardMain({
           ) : null}
         </div>
 
-        <div
-          className="pointer-events-none fixed inset-y-16 right-0 z-20 hidden lg:block"
-          aria-hidden
-        >
-          <div
-            className="pointer-events-auto ml-auto h-full w-24 2xl:w-32"
-            onMouseEnter={() => setFloatingSummaryVisible(true)}
-          />
-        </div>
-
-        <div
-          className={[
-            "fixed bottom-4 right-4 z-30 hidden max-h-[calc(100vh-6rem)] w-[min(34rem,calc(100vw-7rem))] space-y-2 overflow-y-auto transition-all duration-200 lg:block",
-            floatingSummaryVisible
-              ? "pointer-events-auto translate-y-0 opacity-100"
-              : "pointer-events-none translate-y-3 opacity-0",
-          ].join(" ")}
-          onMouseEnter={() => setFloatingSummaryVisible(true)}
-          onMouseLeave={() => setFloatingSummaryVisible(false)}
-        >
-          {renderSummaryDock()}
-        </div>
-
-        <div className="sticky bottom-4 z-20 space-y-2 lg:hidden">{renderSummaryDock()}</div>
-
         {submitError ? (
           <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {submitError}
+          </div>
+        ) : null}
+        </div>
+
+        <div
+          className="fixed top-16 right-0 bottom-0 z-40 w-[clamp(3rem,8vw,10rem)]"
+          onMouseEnter={showFloatingSummary}
+          onMouseLeave={scheduleHideFloatingSummary}
+          aria-hidden
+        />
+
+        {floatingSummaryVisible ? (
+          <div
+            className="fixed bottom-4 right-4 z-50 max-h-[calc(100vh-6rem)] w-[min(34rem,calc(100vw-7rem))] space-y-2 overflow-y-auto"
+            onMouseEnter={showFloatingSummary}
+            onMouseLeave={scheduleHideFloatingSummary}
+          >
+            {renderSummaryDock()}
           </div>
         ) : null}
       </form>
