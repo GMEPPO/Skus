@@ -146,7 +146,7 @@ select
   true
 from dictionary d
 cross join brand_level bl
-returning d.label, d.reference_code;
+returning label, reference_code;
 
 commit;
 `;

@@ -119,7 +119,7 @@ select
   true
 from dictionary d
 cross join brand_level bl
-returning d.label, d.reference_code;
+returning label, reference_code;
 
 -- Verificacao rapida pos-carga (executar manualmente se quiser):
 -- select count(*) from public.skus_words w

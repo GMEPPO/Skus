@@ -75,6 +75,6 @@ select
   true
 from dictionary d
 cross join format_level ll
-returning d.label, d.reference_code, d.designation_pt, d.designation_es, d.designation_en;
+returning label, reference_code, designation_pt, designation_es, designation_en;
 
 commit;
