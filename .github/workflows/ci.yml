@@ -17,3 +17,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel production deploy
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK not configured — skipping automatic Vercel deploy."
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK"
+          echo "Vercel deploy hook triggered."
