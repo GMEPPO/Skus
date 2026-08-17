@@ -38,7 +38,7 @@ async function getAuthenticatedClient() {
     return {
       ok: false as const,
       code: "flag_off",
-      message: "Normalizacao V2 desativada (feature flag OFF).",
+      message: "Normalização V2 desativada (funcionalidade desligada).",
     };
   }
 
@@ -88,7 +88,7 @@ export async function claimNormalizationForGeneratorAction(
     return {
       ok: false,
       code: "flag_off",
-      message: "Normalizacao V2 desativada (feature flag OFF).",
+      message: "Normalização V2 desativada (funcionalidade desligada).",
     };
   }
 

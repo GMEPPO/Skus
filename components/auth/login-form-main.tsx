@@ -62,7 +62,7 @@ export function LoginFormMain({
       return;
     }
 
-    setStatus("Credenciais aceites. A abrir o dashboard...");
+    setStatus("Credenciais aceites. A abrir o painel...");
 
     router.push("/dashboard");
     router.refresh();
@@ -87,7 +87,7 @@ export function LoginFormMain({
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-200">Password</span>
+            <span className="text-sm font-medium text-slate-200">Palavra-passe</span>
             <input
               type="password"
               name="password"

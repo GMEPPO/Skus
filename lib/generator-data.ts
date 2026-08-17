@@ -6,7 +6,7 @@ const LEVEL_LABELS: Record<string, string> = {
   brand: "Familia/Marca",
   format: "Formato",
   product: "Produto",
-  size: "Tamanho/Gramaje",
+  size: "Tamanho/Gramagem",
   packaging: "Embalagem",
   extra: "Extra",
 };

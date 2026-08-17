@@ -11,6 +11,7 @@ import {
   getWordsCatalog,
   updateFamilyLevelLabelAction,
 } from "@/lib/admin-catalog";
+import { familyStatusLabel } from "@/lib/pt-labels";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -44,7 +45,7 @@ export default async function FamilyBuilderDetailPage({
             className="mb-3 inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200"
           >
             <ArrowLeft className="h-4 w-4" />
-            Voltar a familias
+            Voltar às famílias
           </Link>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">{family.name}</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-400">
@@ -54,7 +55,7 @@ export default async function FamilyBuilderDetailPage({
         </div>
 
         <div className="flex items-center gap-3">
-          <Badge variant={family.status === "active" ? "success" : "outline"}>{family.status}</Badge>
+          <Badge variant={family.status === "active" ? "success" : "outline"}>{familyStatusLabel(family.status)}</Badge>
           <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
             slug: {family.slug}
           </div>
@@ -70,9 +71,9 @@ export default async function FamilyBuilderDetailPage({
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Resumo da familia</CardTitle>
+            <CardTitle>Resumo da família</CardTitle>
             <CardDescription>
-              O draft controla a configuracao em curso. Quando ainda nao existe, cria-o primeiro.
+              O rascunho controla a configuração em curso. Quando ainda não existe, cria-o primeiro.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -82,9 +83,9 @@ export default async function FamilyBuilderDetailPage({
                 <p className="mt-2 text-sm text-slate-200">{family.description || "Sem descricao"}</p>
               </div>
               <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Draft atual</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Rascunho atual</p>
                 <p className="mt-2 text-sm text-slate-200">
-                  {family.draftTreeVersionId ? "Disponivel para edicao" : "Ainda nao existe"}
+                  {family.draftTreeVersionId ? "Disponível para edição" : "Ainda não existe"}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
@@ -98,12 +99,12 @@ export default async function FamilyBuilderDetailPage({
                 <input type="hidden" name="familyId" value={family.id} />
                 <Button type="submit" className="inline-flex items-center gap-2">
                   <GitBranchPlus className="h-4 w-4" />
-                  Criar draft do builder
+                  Criar rascunho do builder
                 </Button>
               </form>
             ) : (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-                Este draft ja pode receber niveis e palavras.
+                Este rascunho já pode receber níveis e palavras.
               </div>
             )}
           </CardContent>

@@ -130,7 +130,7 @@ function getFallbackFieldTypes(): FieldTypeOption[] {
     { id: "00000000-0000-0000-0000-000000000001", code: "brand", name: "Familia/Marca" },
     { id: "00000000-0000-0000-0000-000000000002", code: "format", name: "Formato" },
     { id: "00000000-0000-0000-0000-000000000003", code: "product", name: "Produto" },
-    { id: "00000000-0000-0000-0000-000000000004", code: "size", name: "Tamanho/Gramaje" },
+    { id: "00000000-0000-0000-0000-000000000004", code: "size", name: "Tamanho/Gramagem" },
     { id: "00000000-0000-0000-0000-000000000005", code: "packaging", name: "Embalagem" },
     { id: "00000000-0000-0000-0000-000000000006", code: "extra", name: "Extra" },
   ];

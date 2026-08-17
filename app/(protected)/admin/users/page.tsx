@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { createAdminUserAction, updateAdminUserAction } from "@/lib/admin-users";
 import { requireAdmin } from "@/lib/auth";
 import { getUsers } from "@/lib/data";
+import { userRoleLabel } from "@/lib/pt-labels";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -74,10 +75,10 @@ export default async function AdminUsersPage({
                 defaultValue="viewer"
                 className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
               >
-                <option value="admin">admin</option>
-                <option value="manager">manager</option>
-                <option value="editor">editor</option>
-                <option value="viewer">viewer</option>
+                <option value="admin">Administrador</option>
+                <option value="manager">Gestor</option>
+                <option value="editor">Editor</option>
+                <option value="viewer">Consulta</option>
               </select>
             </label>
             <label className="space-y-2 md:col-span-2">
@@ -131,10 +132,10 @@ export default async function AdminUsersPage({
                   defaultValue={user.role}
                   className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                 >
-                  <option value="admin">admin</option>
-                  <option value="manager">manager</option>
-                  <option value="editor">editor</option>
-                  <option value="viewer">viewer</option>
+                  <option value="admin">Administrador</option>
+                  <option value="manager">Gestor</option>
+                  <option value="editor">Editor</option>
+                  <option value="viewer">Consulta</option>
                 </select>
               </label>
               <label className="flex items-center gap-2 pt-6 text-sm text-slate-300">

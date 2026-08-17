@@ -101,7 +101,7 @@ export async function generateSkuSecureAction(formData: FormData): Promise<Gener
     return {
       ok: false,
       code: "flag_off",
-      message: "Geracao segura V2 desativada (feature flag OFF).",
+      message: "Geração segura V2 desativada (funcionalidade desligada).",
     };
   }
 
@@ -220,7 +220,7 @@ export async function completeSkuNormalizationSecureAction(
     return {
       ok: false,
       code: "flag_off",
-      message: "Normalizacao segura V2 desativada (feature flag OFF).",
+      message: "Normalização segura V2 desativada (funcionalidade desligada).",
     };
   }
 

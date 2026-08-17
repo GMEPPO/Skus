@@ -318,7 +318,7 @@ export function SkuGeneratorWizardMain({
 
     if (isNormalizationMode && normalizationTarget) {
       if (!normalizationV2Enabled) {
-        setSubmitError("Normalizacao V2 desativada (feature flag OFF).");
+        setSubmitError("Normalização V2 desativada (funcionalidade desligada).");
         setIsSubmitting(false);
         return;
       }
@@ -590,7 +590,7 @@ export function SkuGeneratorWizardMain({
                           [level.id]: event.target.value,
                         }))
                       }
-                      placeholder={`Buscar por palavra, codigo ou designacao em ${level.label}`}
+                      placeholder={`Pesquisar por palavra, código ou designação em ${level.label}`}
                       className="h-full flex-1 bg-transparent outline-none placeholder:text-slate-600"
                     />
                   </label>
@@ -665,11 +665,12 @@ export function SkuGeneratorWizardMain({
                 </p>
               </div>
               <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Preview SKU</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Pré-visualização SKU</p>
                 <p className="mt-2 break-all text-lg font-semibold text-amber-300">{skuPreview}</p>
                 {secureGenerationV2Enabled ? (
                   <p className="mt-2 text-xs text-slate-500">
-                    Preview local apenas para orientacao. O resultado final vem exclusivamente da resposta do RPC.
+                    Pré-visualização local apenas para orientação. O resultado final vem exclusivamente da resposta do
+                    RPC.
                   </p>
                 ) : null}
               </div>
@@ -678,7 +679,7 @@ export function SkuGeneratorWizardMain({
             <Card className="p-4">
               <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-500">Fluxo ativo</p>
               <p className="mb-3 text-sm text-slate-400">
-                {secureGenerationV2Enabled ? "generateSkuSecureAction -> generate_sku_secure" : "generateSkuAction legacy"}
+                {secureGenerationV2Enabled ? "Geração segura (V2)" : "Geração legada"}
               </p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 {catalog.levels.map((level, index) => (
@@ -758,7 +759,7 @@ export function SkuGeneratorWizardMain({
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
                       <option value="estimated">Estimado</option>
-                      <option value="real">Real</option>
+                      <option value="real">Confirmado</option>
                     </select>
                   </label>
                 </div>
@@ -793,7 +794,7 @@ export function SkuGeneratorWizardMain({
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
                       <option value="estimated">Estimado</option>
-                      <option value="real">Real</option>
+                      <option value="real">Confirmado</option>
                     </select>
                   </label>
                 </div>
@@ -828,7 +829,7 @@ export function SkuGeneratorWizardMain({
                       className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                     >
                       <option value="estimated">Estimado</option>
-                      <option value="real">Real</option>
+                      <option value="real">Confirmado</option>
                     </select>
                   </label>
                 </div>
@@ -861,7 +862,7 @@ export function SkuGeneratorWizardMain({
                 {productImagePreviewUrl ? (
                   <div className="rounded-2xl border border-slate-700 bg-slate-950/50 p-3">
                     <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-sm text-slate-300">Preview da imagem</p>
+                      <p className="text-sm text-slate-300">Pré-visualização da imagem</p>
                       <Button
                         type="button"
                         variant="outline"
@@ -877,7 +878,7 @@ export function SkuGeneratorWizardMain({
                     </div>
                     <img
                       src={productImagePreviewUrl}
-                      alt="Preview da imagem do produto"
+                      alt="Pré-visualização da imagem do produto"
                       className="h-56 w-full rounded-xl object-cover"
                     />
                   </div>
@@ -915,7 +916,7 @@ export function SkuGeneratorWizardMain({
           {selectionOrder.length > 0 ? (
             <div className="rounded-2xl border border-slate-700/80 bg-slate-950/95 p-4 shadow-xl shadow-black/20 backdrop-blur">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Codigos semelhantes</p>
-              <p className="mt-1 text-xs text-slate-600">Historico de codigos novos e normalizados</p>
+              <p className="mt-1 text-xs text-slate-600">Histórico de códigos novos e normalizados</p>
               {codeExamplesLoading ? (
                 <p className="mt-3 text-sm text-slate-500">A procurar codigos semelhantes...</p>
               ) : codeExamples.length > 0 ? (
@@ -930,7 +931,7 @@ export function SkuGeneratorWizardMain({
                         <p className="mt-1 line-clamp-2 text-xs text-slate-400">{example.designationPt}</p>
                       ) : null}
                       <p className="mt-1.5 text-[10px] uppercase tracking-[0.16em] text-slate-600">
-                        {example.source === "normalization" ? "Normalizacao" : "Historico"}
+                        {example.source === "normalization" ? "Normalização" : "Histórico"}
                       </p>
                     </li>
                   ))}

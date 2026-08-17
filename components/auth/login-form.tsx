@@ -69,7 +69,7 @@ export function LoginForm({
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-200">Password</span>
+            <span className="text-sm font-medium text-slate-200">Palavra-passe</span>
             <input
               type="password"
               value={password}

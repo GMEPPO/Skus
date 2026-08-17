@@ -6,6 +6,7 @@ import { ArrowRight, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { deleteFamilyAction } from "@/lib/admin-catalog";
+import { familyStatusLabel } from "@/lib/pt-labels";
 
 type FamilyItem = {
   id: string;
@@ -38,7 +39,7 @@ export function FamiliesCreatedList({
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <label className="space-y-2">
-          <span className="text-xs uppercase tracking-wide text-slate-500">Buscar familia</span>
+          <span className="text-xs uppercase tracking-wide text-slate-500">Pesquisar família</span>
           <input
             value={query}
             onChange={(event) => {
@@ -46,7 +47,7 @@ export function FamiliesCreatedList({
               setSelectedFamilyId("");
             }}
             list="families-created-list-options"
-            placeholder="Escribe el nombre de la familia"
+            placeholder="Escreve o nome da família"
             className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
           />
           <datalist id="families-created-list-options">
@@ -56,7 +57,7 @@ export function FamiliesCreatedList({
           </datalist>
         </label>
         <label className="space-y-2">
-          <span className="text-xs uppercase tracking-wide text-slate-500">O seleccionar en lista</span>
+          <span className="text-xs uppercase tracking-wide text-slate-500">Ou selecionar na lista</span>
           <select
             value={selectedFamilyId}
             onChange={(event) => {
@@ -65,7 +66,7 @@ export function FamiliesCreatedList({
             }}
             className="flex h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
           >
-            <option value="">Todas las familias</option>
+            <option value="">Todas as famílias</option>
             {families.map((family) => (
               <option key={family.id} value={family.id}>
                 {family.name}
@@ -85,7 +86,7 @@ export function FamiliesCreatedList({
                   <p className="text-sm text-slate-400">{family.description || "Sem descricao"}</p>
                 </div>
                 <Badge variant={family.status === "active" ? "success" : "outline"}>
-                  {family.status}
+                  {familyStatusLabel(family.status)}
                 </Badge>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -113,7 +114,7 @@ export function FamiliesCreatedList({
                 <form action={deleteFamilyAction}>
                   <input type="hidden" name="familyId" value={family.id} />
                   <Button type="submit" variant="outline" className="h-10 text-red-100 hover:bg-red-500/10">
-                    Eliminar familia
+                    Remover família
                   </Button>
                 </form>
               </div>
@@ -121,7 +122,7 @@ export function FamiliesCreatedList({
           ))
         ) : (
           <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-4 text-sm text-slate-400">
-            No se encontraron familias con ese criterio.
+            Não foram encontradas famílias com esse critério.
           </div>
         )}
       </div>

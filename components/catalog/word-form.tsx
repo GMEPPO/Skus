@@ -321,14 +321,14 @@ export function WordForm({
       <DesignationField
         compact={isModal}
         name="designationEs"
-        label="Designacion ES"
+        label="Designação ES"
         value={designationEs}
         onChange={setDesignationEs}
       />
       <DesignationField
         compact={isModal}
         name="designationEn"
-        label="Designation EN"
+        label="Designação EN"
         value={designationEn}
         onChange={setDesignationEn}
       />

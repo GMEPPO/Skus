@@ -279,7 +279,7 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
         header: "EN",
         cell: ({ row }) => <input value={row.original.designationEn} onChange={(event) => updateRowManually(row.original.rowNumber, "designationEn", event.target.value)} className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100" />,
       },
-      { accessorKey: "status", header: "Status", cell: ({ row }) => <Badge variant={statusVariant(row.original.status)}>{row.original.status}</Badge> },
+      { accessorKey: "status", header: "Estado", cell: ({ row }) => <Badge variant={statusVariant(row.original.status)}>{row.original.status}</Badge> },
       {
         id: "actions",
         header: "Acoes",
@@ -464,7 +464,7 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
               <div className="flex flex-wrap gap-3">
                 <Button type="button" variant="outline" onClick={() => downloadNormalizerTemplate()}>
                   <Download className="mr-2 h-4 w-4" />
-                  Descarregar plantilla
+                  Descarregar modelo
                 </Button>
                 {selectedFile ? <Badge variant="outline">{selectedFile.name} - {(selectedFile.size / 1024).toFixed(1)} KB</Badge> : null}
               </div>
@@ -716,7 +716,7 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
                 <>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Referencia nova</div><div className="mt-2 text-lg font-semibold text-slate-50">{simulatorResult.newReference || "-"}</div></div>
-                    <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Status</div><div className="mt-2"><Badge variant={statusVariant(simulatorResult.status)}>{simulatorResult.status}</Badge></div></div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Estado</div><div className="mt-2"><Badge variant={statusVariant(simulatorResult.status)}>{simulatorResult.status}</Badge></div></div>
                   </div>
                   <div className="grid gap-3 md:grid-cols-3">
                     {[
@@ -785,7 +785,7 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button type="button" variant="outline" onClick={() => setRuleDraft(makeRuleDraft(rule))}>Editar</Button>
                       <Button type="button" variant="outline" onClick={() => void postJson("/api/reference-normalizer/rules", { action: "duplicate", ruleId: rule.id }).then(refreshConfig)}>Duplicar</Button>
-                      <Button type="button" variant="outline" onClick={() => void postJson("/api/reference-normalizer/rules", { action: "delete", ruleId: rule.id }).then(refreshConfig)}>Eliminar</Button>
+                      <Button type="button" variant="outline" onClick={() => void postJson("/api/reference-normalizer/rules", { action: "delete", ruleId: rule.id }).then(refreshConfig)}>Remover</Button>
                     </div>
                   </div>
                 ))}
@@ -847,7 +847,7 @@ export function ReferenceNormalizerWorkspace({ initialConfig }: WorkspaceProps) 
                     <div className="mt-3 text-xs text-slate-500">{entry.detectionAliases.join(", ")}</div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button type="button" variant="outline" onClick={() => setCatalogDraft(makeCatalogDraft(entry))}>Editar</Button>
-                      <Button type="button" variant="outline" onClick={() => void postJson("/api/reference-normalizer/catalog", { action: "delete", entryId: entry.id }).then(refreshConfig)}>Eliminar</Button>
+                      <Button type="button" variant="outline" onClick={() => void postJson("/api/reference-normalizer/catalog", { action: "delete", entryId: entry.id }).then(refreshConfig)}>Remover</Button>
                     </div>
                   </div>
                 ))}

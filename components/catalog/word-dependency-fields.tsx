@@ -59,10 +59,10 @@ export function WordDependencyFields({
       className={`space-y-3 rounded-xl border border-slate-700 bg-slate-950/60 p-4 ${compact ? "" : "md:col-span-2 xl:col-span-3"}`}
     >
       <div>
-        <p className={`${textClass} font-medium text-slate-100`}>Cuando aparece esta palabra</p>
+        <p className={`${textClass} font-medium text-slate-100`}>Quando aparece esta palavra</p>
         <p className="mt-1 text-xs text-slate-400">
-          Elige si la palabra se muestra siempre en su nivel o solo cuando otra palabra de un nivel anterior esta
-          seleccionada.
+          Escolhe se a palavra é mostrada sempre no respetivo nível ou apenas quando outra palavra de um nível
+          anterior está selecionada.
         </p>
       </div>
 
@@ -75,7 +75,7 @@ export function WordDependencyFields({
             checked={visibilityMode === "always"}
             onChange={() => onVisibilityModeChange("always")}
           />
-          Siempre
+          Sempre
         </label>
         <label className={`flex items-center gap-2 ${textClass} text-slate-200`}>
           <input
@@ -92,7 +92,7 @@ export function WordDependencyFields({
       {visibilityMode === "conditional" ? (
         <div className="space-y-3">
           {rules.length === 0 ? (
-            <p className="text-xs text-slate-500">Anade al menos una condicion padre.</p>
+            <p className="text-xs text-slate-500">Adiciona pelo menos uma condição pai.</p>
           ) : null}
 
           {rules.map((rule, index) => {
@@ -142,7 +142,7 @@ export function WordDependencyFields({
           <div className="flex flex-wrap items-center gap-3">
             <Button type="button" variant="outline" className={compact ? "h-8 px-3 text-xs" : undefined} onClick={addRule}>
               <Plus className="mr-1 h-4 w-4" />
-              Anadir condicion
+              Adicionar condição
             </Button>
 
             {rules.length > 1 ? (
@@ -155,7 +155,7 @@ export function WordDependencyFields({
                     checked={parentMatchMode === "any"}
                     onChange={() => onParentMatchModeChange("any")}
                   />
-                  Cualquiera (OR)
+                  Qualquer (OU)
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -165,7 +165,7 @@ export function WordDependencyFields({
                     checked={parentMatchMode === "all"}
                     onChange={() => onParentMatchModeChange("all")}
                   />
-                  Todas (AND)
+                  Todas (E)
                 </label>
               </div>
             ) : null}
@@ -175,7 +175,7 @@ export function WordDependencyFields({
 
       {showHierarchyField ? (
         <label className="block space-y-2">
-          <span className={`${textClass} text-slate-300`}>Grupo jerarquico</span>
+          <span className={`${textClass} text-slate-300`}>Grupo hierárquico</span>
           <select
             value={selectionHierarchy ?? ""}
             onChange={(event) => {
@@ -184,9 +184,9 @@ export function WordDependencyFields({
             }}
             className={`flex w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-slate-100 ${compact ? "h-9 text-xs" : "h-11 text-sm"}`}
           >
-            <option value="">Ninguno</option>
-            <option value="1">1 - Embalaje principal</option>
-            <option value="2">2 - Otros datos (fallback)</option>
+            <option value="">Nenhum</option>
+            <option value="1">1 - Embalagem principal</option>
+            <option value="2">2 - Outros dados (alternativa)</option>
           </select>
         </label>
       ) : null}

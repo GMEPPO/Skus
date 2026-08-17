@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FamilyLevelWordPicker } from "@/components/catalog/family-level-word-picker";
 import { FamiliesCreatedList } from "@/components/catalog/families-created-list";
 import { createFamilyAction, deleteFamilyAction, getFamiliesCatalog, getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
+import { familyStatusLabel } from "@/lib/pt-labels";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -37,9 +38,9 @@ export default async function FamiliesManagePage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Familias e arvores</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Famílias e árvores</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-400">
-          Cria familias novas e prepara a base para o builder visual persistente.
+          Cria famílias novas e prepara a base para o builder visual persistente.
         </p>
       </div>
 
@@ -51,9 +52,9 @@ export default async function FamiliesManagePage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Nova familia</CardTitle>
+          <CardTitle>Nova família</CardTitle>
           <CardDescription>
-            Crias a familia e, se quiseres, ja defines palavras iniciais por nivel. Esta selecao e opcional.
+            Crias a família e, se quiseres, já defines palavras iniciais por nível. Esta seleção é opcional.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -68,21 +69,21 @@ export default async function FamiliesManagePage({
               />
             </label>
             <label className="space-y-2">
-              <span className="text-sm text-slate-300">Nombre ES</span>
+              <span className="text-sm text-slate-300">Nome ES</span>
               <input
                 name="nameEs"
                 required
                 className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Ej: Valera"
+                placeholder="Ex.: Valera"
               />
             </label>
             <label className="space-y-2">
-              <span className="text-sm text-slate-300">Name EN</span>
+              <span className="text-sm text-slate-300">Nome EN</span>
               <input
                 name="nameEn"
                 required
                 className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                placeholder="Ex: Valera"
+                placeholder="Ex.: Valera"
               />
             </label>
             <label className="space-y-2">
@@ -101,9 +102,9 @@ export default async function FamiliesManagePage({
                 defaultValue="draft"
                 className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
               >
-                <option value="draft">draft</option>
-                <option value="active">active</option>
-                <option value="archived">archived</option>
+                <option value="draft">{familyStatusLabel("draft")}</option>
+                <option value="active">{familyStatusLabel("active")}</option>
+                <option value="archived">{familyStatusLabel("archived")}</option>
               </select>
             </label>
             <label className="space-y-2">
@@ -145,7 +146,7 @@ export default async function FamiliesManagePage({
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Familias criadas</CardTitle>
+            <CardTitle>Famílias criadas</CardTitle>
             <CardDescription>
               Cada familia pode depois receber niveis, palavras e relacoes no builder.
             </CardDescription>
@@ -157,7 +158,7 @@ export default async function FamiliesManagePage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Preview do builder</CardTitle>
+            <CardTitle>Pré-visualização do builder</CardTitle>
             <CardDescription>
               A biblioteca ja reflete a biblioteca real. O drag and drop persistente sera o proximo passo.
             </CardDescription>

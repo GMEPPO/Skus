@@ -4,6 +4,7 @@ import { BarChart3, Shield, Tags, Workflow } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import type { AppUser } from "@/lib/types";
 import { canManageUsers, canNormalizeSku } from "@/lib/rbac";
+import { userRoleLabel } from "@/lib/pt-labels";
 
 type NavItem = {
   href: string;
@@ -14,11 +15,11 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/dashboard", label: "Painel", icon: BarChart3 },
   { href: "/generator", label: "Gerador SKU", icon: Workflow },
   { href: "/catalog/words-manage", label: "Biblioteca", icon: Tags },
-  { href: "/sku-history", label: "Historico", icon: BarChart3 },
-  { href: "/admin/users", label: "Admin", icon: Shield, adminOnly: true },
+  { href: "/sku-history", label: "Histórico", icon: BarChart3 },
+  { href: "/admin/users", label: "Administração", icon: Shield, adminOnly: true },
 ];
 
 export function AppShellMain({
@@ -43,8 +44,8 @@ export function AppShellMain({
       <header className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 backdrop-blur">
         <div className="container mx-auto flex min-h-16 flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.28em] text-amber-300">Skus Administrator</p>
-            <p className="text-sm text-slate-400">Administracao de utilizadores, biblioteca global e gerador SKU</p>
+            <p className="text-xs font-medium uppercase tracking-[0.28em] text-amber-300">Administrador de SKUs</p>
+            <p className="text-sm text-slate-400">Administração de utilizadores, biblioteca global e gerador SKU</p>
           </div>
 
           <nav className="flex flex-wrap items-center gap-2">
@@ -65,7 +66,7 @@ export function AppShellMain({
 
           <div className="flex items-center gap-3 text-sm text-slate-300">
             <div className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1">
-              {user.name} - <span className="uppercase text-amber-300">{user.role}</span>
+              {user.name} - <span className="uppercase text-amber-300">{userRoleLabel(user.role)}</span>
             </div>
             <LogoutButton />
           </div>

@@ -7,7 +7,7 @@ export default async function SkuHistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Historico de SKUs</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Histórico de SKUs</h1>
         <p className="mt-2 text-sm text-slate-400">
           Lista de codigos gerados, designacoes finais, snapshot de selecao e dados logisticos.
         </p>
@@ -15,7 +15,7 @@ export default async function SkuHistoryPage() {
       <Card>
         <CardHeader>
           <CardTitle>Registos recentes</CardTitle>
-          <CardDescription>Historico criado pelo gerador global de seis niveis.</CardDescription>
+          <CardDescription>Histórico criado pelo gerador global de seis níveis.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {rows.length > 0 ? (

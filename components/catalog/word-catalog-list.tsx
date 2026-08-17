@@ -52,7 +52,7 @@ export function WordCatalogList({
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar por palavra, codigo ou designacao"
+          placeholder="Pesquisar por palavra, código ou designação"
           className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 pl-9 pr-3 text-sm text-slate-100"
         />
       </label>
@@ -94,7 +94,7 @@ export function WordCatalogList({
                         <form action={deleteAction}>
                           <input type="hidden" name="wordId" value={word.id} />
                           <Button type="submit" variant="outline" className="text-red-100 hover:bg-red-500/10">
-                            Eliminar
+                            Remover
                           </Button>
                         </form>
                       ) : null}

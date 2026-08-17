@@ -121,7 +121,7 @@ export function NormalizationHistoryModal({ refreshToken }: { refreshToken: numb
     <>
       <Button type="button" variant="outline" className="h-9 gap-2 px-3" onClick={() => setOpen(true)}>
         <History className="h-4 w-4" />
-        Historico normalizados ({completedTotal ?? "…"})
+        Histórico normalizados ({completedTotal ?? "…"})
       </Button>
 
       {open ? (
@@ -143,7 +143,7 @@ export function NormalizationHistoryModal({ refreshToken }: { refreshToken: numb
             <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-5 py-4">
               <div>
                 <h2 id="normalization-history-title" className="text-lg font-semibold text-slate-50">
-                  Historico de normalizacao
+                  Histórico de normalização
                 </h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Referencias e designacoes antigas e novas (PT, ES, EN), com categoria. Os filtros pesquisam em todo

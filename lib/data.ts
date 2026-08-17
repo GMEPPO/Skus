@@ -70,7 +70,7 @@ const words: WordListItem[] = [
   { id: "w-alg", label: "ALG OCEAN SPA", referenceCode: "ALG", fieldTypeId: "ft-brand", fieldTypeLabel: "Familia/Marca", designation: "ALG OCEAN SPA", designationPt: "ALG OCEAN SPA", designationEs: "ALG Ocean Spa", designationEn: "ALG Ocean Spa", includeInDesignation: true, ...legacyWordRelations },
   { id: "w-sol", label: "Solido", referenceCode: "SOL", fieldTypeId: "ft-format", fieldTypeLabel: "Formato", designation: "Solido", designationPt: "Solido", designationEs: "Solido", designationEn: "Solid", includeInDesignation: false, ...legacyWordRelations },
   { id: "w-sab", label: "Sabonete", referenceCode: "SAB", fieldTypeId: "ft-product", fieldTypeLabel: "Produto", designation: "Sabonete", designationPt: "Sabonete", designationEs: "Jabon", designationEn: "Soap", includeInDesignation: true, ...legacyWordRelations },
-  { id: "w-020", label: "20g", referenceCode: "020", fieldTypeId: "ft-size", fieldTypeLabel: "Tamanho/Gramaje", designation: "20g", designationPt: "20g", designationEs: "20g", designationEn: "20g", includeInDesignation: true, ...legacyWordRelations },
+  { id: "w-020", label: "20g", referenceCode: "020", fieldTypeId: "ft-size", fieldTypeLabel: "Tamanho/Gramagem", designation: "20g", designationPt: "20g", designationEs: "20g", designationEn: "20g", includeInDesignation: true, ...legacyWordRelations },
   { id: "w-cxa", label: "Caixa Cartao", referenceCode: "CXA", fieldTypeId: "ft-packaging", fieldTypeLabel: "Embalagem", designation: "Caixa Cartao", designationPt: "Caixa Cartao", designationEs: "Caja Carton", designationEn: "Card Box", includeInDesignation: true, ...legacyWordRelations },
 ];
 
@@ -92,7 +92,7 @@ const generatorCatalog: GeneratorCatalog = {
     { id: "ft-brand", order: 1, fieldType: "brand", fieldTypeId: "ft-brand", label: "Familia/Marca", options: words.filter((word) => word.fieldTypeId === "ft-brand").map(toGeneratorWord) },
     { id: "ft-format", order: 2, fieldType: "format", fieldTypeId: "ft-format", label: "Formato", options: words.filter((word) => word.fieldTypeId === "ft-format").map(toGeneratorWord) },
     { id: "ft-product", order: 3, fieldType: "product", fieldTypeId: "ft-product", label: "Produto", options: words.filter((word) => word.fieldTypeId === "ft-product").map(toGeneratorWord) },
-    { id: "ft-size", order: 4, fieldType: "size", fieldTypeId: "ft-size", label: "Tamanho/Gramaje", options: words.filter((word) => word.fieldTypeId === "ft-size").map(toGeneratorWord) },
+    { id: "ft-size", order: 4, fieldType: "size", fieldTypeId: "ft-size", label: "Tamanho/Gramagem", options: words.filter((word) => word.fieldTypeId === "ft-size").map(toGeneratorWord) },
     { id: "ft-packaging", order: 5, fieldType: "packaging", fieldTypeId: "ft-packaging", label: "Embalagem", options: words.filter((word) => word.fieldTypeId === "ft-packaging").map(toGeneratorWord) },
     { id: "ft-extra", order: 6, fieldType: "extra", fieldTypeId: "ft-extra", label: "Extra", options: [] },
   ],
@@ -224,7 +224,7 @@ export async function getRecentSkuGenerations(): Promise<RecentSkuGeneration[]> 
         designation: String(row.designation ?? ""),
         productImageUrl: row.product_image_url ?? undefined,
         createdByName: String(profileRelation?.name ?? "Sem utilizador"),
-        createdAtLabel: row.created_at ? new Date(String(row.created_at)).toLocaleString("es-ES") : "",
+        createdAtLabel: row.created_at ? new Date(String(row.created_at)).toLocaleString("pt-PT") : "",
         unitsPerBox: Number(row.units_per_box ?? 0),
         unitsPerBoxStatus: (row.units_per_box_status as "real" | "estimated" | null) ?? undefined,
         multiples: Number(row.multiples ?? 0),

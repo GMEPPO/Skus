@@ -213,7 +213,7 @@ export async function findWordReferenceConflict(
 }
 
 export function formatSharedReferenceWarningMessage(sharedCount: number): string {
-  return `${sharedCount} PALABRAS TIENEN ESA MISMA REFERENCIA`;
+  return `${sharedCount} PALAVRAS PARTILHAM ESTA MESMA REFERÊNCIA`;
 }
 
 export function formatWordReferenceConflictMessage(conflict: WordReferenceConflict): string {

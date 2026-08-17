@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Dashboard</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Painel</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-400">
           Vista geral da biblioteca global de seis niveis e dos SKUs gerados.
         </p>

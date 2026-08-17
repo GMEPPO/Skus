@@ -37,7 +37,7 @@ describe("word reference validation", () => {
   });
 
   it("formata aviso de referencia partilhada", () => {
-    expect(formatSharedReferenceWarningMessage(3)).toBe("3 PALABRAS TIENEN ESA MISMA REFERENCIA");
+    expect(formatSharedReferenceWarningMessage(3)).toBe("3 PALAVRAS PARTILHAM ESTA MESMA REFERÊNCIA");
   });
 
   it("avisa designacoes acima de 60 caracteres", () => {

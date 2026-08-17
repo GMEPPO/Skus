@@ -70,7 +70,7 @@ export function WordHistoryModal({ refreshToken }: { refreshToken: number }) {
     <>
       <Button type="button" variant="outline" className="h-9 gap-2 px-3" onClick={() => setOpen(true)}>
         <BookText className="h-4 w-4" />
-        Historico palavras ({wordsTotal ?? "…"})
+        Histórico palavras ({wordsTotal ?? "…"})
       </Button>
 
       {open ? (
@@ -92,7 +92,7 @@ export function WordHistoryModal({ refreshToken }: { refreshToken: number }) {
             <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-5 py-4">
               <div>
                 <h2 id="word-history-title" className="text-lg font-semibold text-slate-50">
-                  Historico de palavras criadas
+                  Histórico de palavras criadas
                 </h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Palavras da biblioteca global ordenadas pela data de criacao mais recente.

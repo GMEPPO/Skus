@@ -6,7 +6,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Skus Administrator",
+  title: "Administrador de SKUs",
   description: "Administração de utilizadores, vocabulário, famílias e geração de códigos SKU.",
 };
 
