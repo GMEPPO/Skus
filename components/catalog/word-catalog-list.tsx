@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Search } from "lucide-react";
 import { WordCombinationWarningsPanel } from "@/components/catalog/word-combination-warnings-panel";
 import { Badge } from "@/components/ui/badge";
