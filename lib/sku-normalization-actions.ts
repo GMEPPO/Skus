@@ -18,6 +18,12 @@ const NORMALIZATION_RPC_ERRORS: Record<string, string> = {
   renew_failed: "Nao foi possivel renovar o bloqueio.",
   release_failed: "Nao foi possivel libertar o bloqueio.",
   missing_legacy_code: "Registo sem codigo legacy valido.",
+  word_not_in_level:
+    "Uma palavra selecionada nao pertence ao nivel correto (catalogo desatualizado). Recarrega a pagina ou usa Limpar tudo.",
+  word_inactive: "Uma palavra selecionada esta inactiva.",
+  level_required: "Falta preencher um nivel obrigatorio.",
+  invalid_reference_code: "Codigo de referencia invalido numa palavra selecionada.",
+  normalization_category_mismatch: "A categoria da normalizacao nao coincide com a seleccionada.",
 };
 
 function mapRpcError(error: { message?: string } | null): { code: string; message: string } {
@@ -38,7 +44,7 @@ async function getAuthenticatedClient() {
     return {
       ok: false as const,
       code: "flag_off",
-      message: "Normalização V2 desativada (funcionalidade desligada).",
+      message: "Normalizacao V2 desativada (feature flag OFF).",
     };
   }
 
@@ -88,7 +94,7 @@ export async function claimNormalizationForGeneratorAction(
     return {
       ok: false,
       code: "flag_off",
-      message: "Normalização V2 desativada (funcionalidade desligada).",
+      message: "Normalizacao V2 desativada (feature flag OFF).",
     };
   }
 

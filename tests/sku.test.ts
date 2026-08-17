@@ -117,7 +117,7 @@ describe("sku builder", () => {
     ).toBe("ALG-SOL-SAB-020-CXA-000");
   });
 
-  it("keeps hidden technical format out of generated designations", () => {
+  it("includes format level words in generated designations", () => {
     expect(
       buildDesignationByLocale(
         sabsolCatalog,
@@ -130,7 +130,35 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Sabonete 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA Solido Sabonete 20g Caixa Cartao");
+  });
+
+  it("always includes format level words even when includeInDesignation is false", () => {
+    const catalogWithHiddenFormat: GeneratorCatalog = {
+      ...sabsolCatalog,
+      levels: sabsolCatalog.levels.map((level) =>
+        level.id === "format"
+          ? {
+              ...level,
+              options: level.options.map((option) => ({ ...option, includeInDesignation: false })),
+            }
+          : level,
+      ),
+    };
+
+    expect(
+      buildDesignationByLocale(
+        catalogWithHiddenFormat,
+        {
+          brand: "alg",
+          format: "sol",
+          product: "sab",
+          size: "020",
+          packaging: "cxa",
+        },
+        "pt",
+      ),
+    ).toBe("ALG OCEAN SPA Solido Sabonete 20g Caixa Cartao");
   });
 
   it("filters words by label, code and localized designation", () => {
@@ -166,7 +194,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Sabonete 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA Solido Sabonete 20g Caixa Cartao");
   });
 
   it("ignores empty reference 000 in designations", () => {
@@ -206,7 +234,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("Sabonete 20g Caixa Cartao");
+    ).toBe("Solido Sabonete 20g Caixa Cartao");
   });
 
   it("builds example pattern with wildcards for unselected levels", () => {

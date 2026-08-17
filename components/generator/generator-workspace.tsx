@@ -203,6 +203,7 @@ export function GeneratorWorkspace({
               }
               onClearNormalization={() => void handleClearNormalization()}
               onNormalizationComplete={handleNormalizationComplete}
+              normalizationSidebarOpen={sidebarOpen}
             />
           </CardContent>
         </Card>

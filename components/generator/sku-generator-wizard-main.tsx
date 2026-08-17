@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ChevronDown, ChevronRight, ImagePlus, Plus, Search, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ImagePlus, Plus, RotateCcw, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -93,6 +93,19 @@ function buildSecureSelectionsPayload(catalog: GeneratorCatalog, selections: Sel
   return payload;
 }
 
+function validateSecureSelections(catalog: GeneratorCatalog, selections: Selections): string | null {
+  for (const level of catalog.levels) {
+    const selectedId = selections[level.id];
+    if (!selectedId || isEmptySelection(selectedId)) continue;
+
+    const option = level.options.find((item) => item.id === selectedId);
+    if (!option) {
+      return `Selecao invalida em "${level.label}". Recarrega a pagina ou usa Limpar tudo.`;
+    }
+  }
+  return null;
+}
+
 export function SkuGeneratorWizardMain({
   catalog,
   secureGenerationV2Enabled = false,
@@ -105,6 +118,7 @@ export function SkuGeneratorWizardMain({
   normalizationTarget = null,
   onClearNormalization,
   onNormalizationComplete,
+  normalizationSidebarOpen = false,
 }: {
   catalog: GeneratorCatalog;
   /** When true, calls generate_sku_secure (requires categoryId + level selections). Default OFF. */
@@ -123,6 +137,8 @@ export function SkuGeneratorWizardMain({
   } | null;
   onClearNormalization?: () => void;
   onNormalizationComplete?: () => void;
+  /** When true, offsets the normalization dock to sit beside the pending sidebar. */
+  normalizationSidebarOpen?: boolean;
 }) {
   const [selections, setSelections] = useState<Selections>({});
   const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
@@ -586,6 +602,12 @@ export function SkuGeneratorWizardMain({
       return;
     }
 
+    const selectionError = validateSecureSelections(catalog, selections);
+    if (selectionError) {
+      setSubmitError(selectionError);
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
     const formData = new FormData(event.currentTarget);
@@ -773,6 +795,45 @@ export function SkuGeneratorWizardMain({
     }
   }
 
+  const hasWizardDraft =
+    selectedCount > 0 ||
+    logisticsRequired ||
+    hasAnyMeasurements ||
+    Boolean(productImagePreviewUrl) ||
+    Object.values(searchByLevel).some(Boolean);
+
+  function resetWizardForNewSku() {
+    if (isNormalizationMode) return;
+
+    setSelections({});
+    setSelectionOrder([]);
+    setSearchByLevel({});
+    setUnitsPerBox("");
+    setMultiples("");
+    setWeight("");
+    setUnitsPerBoxStatus("estimated");
+    setMultiplesStatus("estimated");
+    setWeightStatus("estimated");
+    setLogisticsRequired(false);
+    setSubmitError(null);
+    setCodeExamples([]);
+    setProductImagePreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setProductImageName("");
+    setExpandedLevelIds(firstLevelId ? new Set([firstLevelId]) : new Set());
+
+    const form = document.getElementById("sku-generator-form");
+    const imageInput = form?.querySelector<HTMLInputElement>('input[name="productImage"]') ?? null;
+    clearProductImage(imageInput);
+
+    const nextRequestId = crypto.randomUUID();
+    requestBoundPayloadKeyRef.current = null;
+    secureRequestIdRef.current = nextRequestId;
+    setSecureRequestId(nextRequestId);
+  }
+
   function renderSkuReferenceSummary() {
     return (
       <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
@@ -810,6 +871,39 @@ export function SkuGeneratorWizardMain({
           <p className="text-[11px] text-slate-500">
             Pre-visualizacao local. O codigo final vem da resposta do servidor.
           </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderNormalizationDock() {
+    if (!isNormalizationMode || !normalizationTarget) return null;
+
+    return (
+      <div className="rounded-2xl border border-amber-500/40 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
+        <p className="text-xs uppercase tracking-[0.2em] text-amber-300">A normalizar</p>
+        <p className="mt-2 break-all font-mono text-lg font-semibold text-slate-50">
+          {normalizationTarget.legacyCode ?? "—"}
+        </p>
+        <p className="mt-2 text-sm leading-snug text-slate-300">
+          {normalizationTarget.legacyDesignation ??
+            normalizationTarget.sourceDesignationPt ??
+            "Sem designacao legacy"}
+        </p>
+        {!normalizationV2Enabled ? (
+          <p className="mt-3 text-xs text-amber-200">
+            Ativa `NEXT_PUBLIC_SKUS_NORMALIZATION_V2=true` para concluir este registo.
+          </p>
+        ) : null}
+        {onClearNormalization ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4 h-9 w-full px-3 text-sm"
+            onClick={onClearNormalization}
+          >
+            Cancelar normalizacao
+          </Button>
         ) : null}
       </div>
     );
@@ -894,32 +988,6 @@ export function SkuGeneratorWizardMain({
   return (
     <>
     <div className="space-y-6">
-      {isNormalizationMode && normalizationTarget ? (
-        <Card className="space-y-3 border-amber-500/30 bg-amber-500/5 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300">A normalizar</p>
-              <p className="mt-1 font-mono text-lg text-slate-50">{normalizationTarget.legacyCode ?? "—"}</p>
-              <p className="mt-1 text-sm text-slate-300">
-                {normalizationTarget.legacyDesignation ??
-                  normalizationTarget.sourceDesignationPt ??
-                  "Sem designacao legacy"}
-              </p>
-            </div>
-            {onClearNormalization ? (
-              <Button type="button" variant="outline" className="h-9 px-3" onClick={onClearNormalization}>
-                Cancelar normalizacao
-              </Button>
-            ) : null}
-          </div>
-          {!normalizationV2Enabled ? (
-            <p className="text-sm text-amber-200">
-              Ativa `NEXT_PUBLIC_SKUS_NORMALIZATION_V2=true` para concluir este registo.
-            </p>
-          ) : null}
-        </Card>
-      ) : null}
-
       <form id="sku-generator-form" onSubmit={handleSubmit} className="space-y-6">
         {usesSecurePayload ? (
           <>
@@ -938,6 +1006,21 @@ export function SkuGeneratorWizardMain({
         )}
 
         <div onMouseEnter={hideFloatingSummaryImmediately}>
+        {!isNormalizationMode ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 gap-2 px-3 text-sm"
+              disabled={!hasWizardDraft || isSubmitting}
+              onClick={resetWizardForNewSku}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Limpar tudo
+            </Button>
+          </div>
+        ) : null}
+
         <label className="flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
           <input
             type="checkbox"
@@ -1218,6 +1301,18 @@ export function SkuGeneratorWizardMain({
         </div>
       ) : null}
     </div>
+
+    {isNormalizationMode && normalizationTarget ? (
+      <div
+        className={`fixed bottom-4 z-50 w-[min(18rem,calc(100vw-2rem))] max-h-[calc(100vh-6rem)] overflow-y-auto ${
+          normalizationSidebarOpen ? "left-4 lg:left-[calc(18rem+1rem)] xl:left-[calc(20rem+1rem)]" : "left-4"
+        }`}
+        aria-live="polite"
+        aria-label="Referencia em normalizacao"
+      >
+        {renderNormalizationDock()}
+      </div>
+    ) : null}
 
     <WordCreateModal
       open={Boolean(wordCreateLevel)}

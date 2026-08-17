@@ -80,6 +80,16 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   sku_reference_duplicate:
     "Esta referencia SKU ja existe no historico de codigos novos ou normalizados. Escolhe outra combinacao.",
   sku_generation_invariant_violation: "Invariante de geracao violada.",
+  word_not_in_level:
+    "Uma palavra selecionada nao pertence ao nivel correto (catalogo desatualizado). Recarrega a pagina ou usa Limpar tudo.",
+  word_inactive: "Uma palavra selecionada esta inactiva.",
+  word_not_found: "Uma palavra selecionada ja nao existe. Recarrega a pagina ou limpa a selecao.",
+  level_required: "Falta preencher um nivel obrigatorio.",
+  level_disabled: "Selecionaste um nivel desactivado.",
+  invalid_reference_code: "Codigo de referencia invalido numa palavra selecionada.",
+  lock_expired: "O bloqueio de normalizacao expirou. Volta a seleccionar a referencia.",
+  locked_by_other_user: "Esta referencia esta bloqueada por outro utilizador.",
+  normalization_category_mismatch: "A categoria da normalizacao nao coincide com a seleccionada.",
 };
 
 function mapRpcError(error: { message?: string; code?: string } | null): { code: string; message: string } {
@@ -101,7 +111,7 @@ export async function generateSkuSecureAction(formData: FormData): Promise<Gener
     return {
       ok: false,
       code: "flag_off",
-      message: "Geração segura V2 desativada (funcionalidade desligada).",
+      message: "Geracao segura V2 desativada (feature flag OFF).",
     };
   }
 
@@ -220,7 +230,7 @@ export async function completeSkuNormalizationSecureAction(
     return {
       ok: false,
       code: "flag_off",
-      message: "Normalização segura V2 desativada (funcionalidade desligada).",
+      message: "Normalizacao segura V2 desativada (feature flag OFF).",
     };
   }
 

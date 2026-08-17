@@ -21,12 +21,14 @@ export function isEmptyReferenceWord(word?: Pick<GeneratorWord, "referenceCode" 
     .toLowerCase() === "vazio";
 }
 
+const DESIGNATION_ALWAYS_FIELD_TYPES = new Set(["product", "format"]);
+
 function shouldIncludeWordInDesignation(
   level: Pick<GeneratorLevel, "fieldType">,
   option: GeneratorWord,
 ): boolean {
   if (isEmptyReferenceWord(option)) return false;
-  if (level.fieldType === "product") return true;
+  if (DESIGNATION_ALWAYS_FIELD_TYPES.has(level.fieldType)) return true;
   return option.includeInDesignation;
 }
 
