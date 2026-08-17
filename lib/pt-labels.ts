@@ -1,4 +1,4 @@
-export function familyStatusLabel(status: "draft" | "active" | "archived"): string {
+export function familyStatusLabel(status: string): string {
   switch (status) {
     case "draft":
       return "Rascunho";

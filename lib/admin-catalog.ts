@@ -38,7 +38,7 @@ export interface FamilyBuilderDetail {
   name: string;
   slug: string;
   description: string;
-  status: string;
+  status: "draft" | "active" | "archived";
   draftTreeVersionId: string | null;
   publishedTreeVersionId: string | null;
   levels: Array<{
