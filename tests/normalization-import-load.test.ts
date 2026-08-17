@@ -42,25 +42,22 @@ describe("normalization import load", () => {
     );
   });
 
-  it("partitionImportRowsForLoad permite duplicados pendentes e avisa OK2 duplicados", () => {
+  it("partitionImportRowsForLoad carrega todas as linhas pendentes validas", () => {
     const rows = [
       baseRow("LEG-A"),
       baseRow(null, { sourceRowNumber: 3, normalizationStatus: "cancelled", importIssue: "MISSING_LEGACY_CODE" }),
       baseRow("LEG-B", {
         sourceRowNumber: 4,
-        normalizationStatus: "completed",
         sourceNewCode: "NEW-001",
         sourceStatus: "OK2",
       }),
       baseRow("LEG-C", {
         sourceRowNumber: 5,
-        normalizationStatus: "completed",
         sourceNewCode: "NEW-001",
         sourceStatus: "OK2",
       }),
       baseRow("LEG-D", {
         sourceRowNumber: 6,
-        normalizationStatus: "completed",
         sourceNewCode: "TAKEN-001",
         sourceStatus: "OK2",
       }),
@@ -72,24 +69,10 @@ describe("normalization import load", () => {
       new Set(["TAKEN001"]),
     );
 
-    expect(rowsToLoad.map((row) => row.sourceRowNumber)).toEqual([2, 4, 7]);
+    expect(rowsToLoad.map((row) => row.sourceRowNumber)).toEqual([2, 4, 5, 6, 7]);
     expect(skippedRows).toEqual([
       { sourceRowNumber: 3, legacyCode: null, reason: "Falta referencia antiga" },
-      { sourceRowNumber: 6, legacyCode: "LEG-D", reason: "Referencia OK2 ja existe no historico de normalizados" },
     ]);
-    expect(ok2DuplicateReviewRows).toEqual([
-      {
-        sourceRowNumber: 4,
-        legacyCode: "LEG-B",
-        sourceNewCode: "NEW-001",
-        reason: "Referencia nova OK2 duplicada no Excel - rever manualmente antes de usar",
-      },
-      {
-        sourceRowNumber: 5,
-        legacyCode: "LEG-C",
-        sourceNewCode: "NEW-001",
-        reason: "Referencia nova OK2 duplicada no Excel - rever manualmente antes de usar",
-      },
-    ]);
+    expect(ok2DuplicateReviewRows).toEqual([]);
   });
 });

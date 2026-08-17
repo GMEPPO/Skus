@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import {
   clearPendingImportQueue,
-  completeImportedOk2RowsForBatch,
   insertNormalizationRowsResilient,
   partitionImportRowsForLoad,
   releaseBatchFileSha256,
@@ -17,7 +16,6 @@ import {
   sha256Buffer,
   summarizeImportRows,
 } from "@/lib/normalization-import-parser";
-import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import { runNormalizationImportMaintenance } from "@/lib/normalization-data";
 import { findTakenSkuReferences } from "@/lib/sku-reference-uniqueness-data";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
@@ -44,17 +42,11 @@ function isAllowedExcelName(fileName: string) {
   return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
-function isImportedOk2Row(row: ReturnType<typeof parseNormalizationWorkbook>["rows"][number]) {
-  return row.normalizationStatus === "completed" && isOk2SourceStatus(row.sourceStatus);
-}
-
 function buildInsertRow(
   batchId: string,
   row: ReturnType<typeof parseNormalizationWorkbook>["rows"][number],
   categoryId: string | null,
 ) {
-  const storeOk2AsPending = isImportedOk2Row(row);
-
   return {
     import_batch_id: batchId,
     source_row_number: row.sourceRowNumber,
@@ -66,25 +58,19 @@ function buildInsertRow(
     source_designation_en: row.sourceDesignationEn,
     source_status: row.sourceStatus,
     source_observations: row.sourceObservations,
-    normalization_status: storeOk2AsPending ? "pending" : row.normalizationStatus,
+    normalization_status: row.normalizationStatus,
     import_issue: row.importIssue,
     category_id: categoryId,
-    final_new_code: !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceNewCode : null,
-    final_designation_pt:
-      !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceDesignationPt : null,
-    final_designation_es:
-      !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceDesignationEs : null,
-    final_designation_en:
-      !storeOk2AsPending && row.normalizationStatus === "completed" ? row.sourceDesignationEn : null,
-    completed_at:
-      !storeOk2AsPending && row.normalizationStatus === "completed" ? new Date().toISOString() : null,
+    final_new_code: null,
+    final_designation_pt: null,
+    final_designation_es: null,
+    final_designation_en: null,
+    completed_at: null,
   };
 }
 
-function collectCompletedReferenceCodes(rows: ReturnType<typeof parseNormalizationWorkbook>["rows"]) {
-  return rows
-    .map((row) => (row.normalizationStatus === "completed" ? row.sourceNewCode : null))
-    .filter((code): code is string => Boolean(code));
+function collectCompletedReferenceCodes(_rows: ReturnType<typeof parseNormalizationWorkbook>["rows"]) {
+  return [] as string[];
 }
 
 function buildSuccessMessage(
@@ -96,9 +82,9 @@ function buildSuccessMessage(
 ) {
   const skippedSuffix = skippedRows.length > 0 ? `, ${skippedRows.length} nao carregada(s)` : "";
   const reviewSuffix =
-    ok2DuplicateReviewRows.length > 0 ? `, ${ok2DuplicateReviewRows.length} OK2 duplicado(s) para rever` : "";
+    ok2DuplicateReviewRows.length > 0 ? `, ${ok2DuplicateReviewRows.length} referencia(s) duplicada(s) no Excel` : "";
   const replaceSuffix = replacedPrevious ? " A lista anterior foi substituida." : " A lista anterior foi mantida.";
-  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes, ${summary.completedRows} OK2)${skippedSuffix}${reviewSuffix}.${replaceSuffix}`;
+  return `Import concluido: ${loadedRows} linha(s) carregada(s) (${summary.pendingRows} pendentes)${skippedSuffix}${reviewSuffix}.${replaceSuffix}`;
 }
 
 export async function importNormalizationBatchAction(formData: FormData): Promise<ImportNormalizationBatchResult> {
@@ -226,7 +212,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
   const insertAttempts = rowsToLoad.map((row) => ({
     sourceRowNumber: row.sourceRowNumber,
     legacyCode: row.legacyCode,
-    isOk2: isOk2SourceStatus(row.sourceStatus),
+    isOk2: false,
     payload: buildInsertRow(batch.id, row, categoryId),
   }));
 
@@ -247,14 +233,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     };
   }
 
-  let ok2CompleteSkippedRows: SkippedImportRow[] = [];
-  try {
-    ok2CompleteSkippedRows = await completeImportedOk2RowsForBatch(supabase, batch.id);
-  } catch {
-    ok2CompleteSkippedRows = [];
-  }
-
-  const allSkippedRows = [...preSkippedRows, ...insertSkippedRows, ...ok2CompleteSkippedRows];
+  const allSkippedRows = [...preSkippedRows, ...insertSkippedRows];
 
   if (insertedCount === 0) {
     await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
@@ -280,14 +259,9 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
         !insertSkippedRows.some(
           (skipped) =>
             skipped.sourceRowNumber === row.sourceRowNumber && skipped.legacyCode === row.legacyCode,
-        ) &&
-        !ok2CompleteSkippedRows.some(
-          (skipped) =>
-            skipped.sourceRowNumber === row.sourceRowNumber && skipped.legacyCode === row.legacyCode,
         ),
     ),
   );
-  loadedSummary.pendingRows += ok2CompleteSkippedRows.length;
 
   await supabase
     .from("skus_normalization_import_batches")

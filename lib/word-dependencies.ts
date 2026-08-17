@@ -68,7 +68,11 @@ export function isWordVisibleByDependencies(
   return matches.length > 0;
 }
 
-function packagingHierarchyOneSelected(catalog: GeneratorCatalog, selections: Record<string, string>) {
+function isHierarchyTwoWord(word: Pick<GeneratorWord, "selectionHierarchy">) {
+  return Number(word.selectionHierarchy) === 2;
+}
+
+function packagingHierarchyTwoSelected(catalog: GeneratorCatalog, selections: Record<string, string>) {
   const packagingLevel = catalog.levels.find((level) => level.fieldType === "packaging");
   if (!packagingLevel) return false;
 
@@ -76,7 +80,7 @@ function packagingHierarchyOneSelected(catalog: GeneratorCatalog, selections: Re
   if (!selectedId || isEmptySelection(selectedId)) return false;
 
   const selected = packagingLevel.options.find((option) => option.id === selectedId);
-  return Boolean(selected && selected.selectionHierarchy === 1);
+  return Boolean(selected && isHierarchyTwoWord(selected));
 }
 
 export function isWordVisibleInGenerator(
@@ -89,16 +93,8 @@ export function isWordVisibleInGenerator(
     return false;
   }
 
-  if (level.fieldType === "packaging" && word.selectionHierarchy === 2) {
-    return false;
-  }
-
-  if (level.fieldType === "extra" && word.selectionHierarchy === 2) {
-    return !packagingHierarchyOneSelected(catalog, selections);
-  }
-
-  if (level.fieldType === "packaging" && word.selectionHierarchy === 1) {
-    return true;
+  if (level.fieldType === "extra" && isHierarchyTwoWord(word)) {
+    return !packagingHierarchyTwoSelected(catalog, selections);
   }
 
   return true;

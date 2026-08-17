@@ -6,6 +6,7 @@ import {
   getFieldTypeOptions,
   getWordsCatalog,
 } from "@/lib/admin-catalog";
+import { buildWordCombinationWarningSummaries } from "@/lib/word-combination-analysis-data";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -23,6 +24,10 @@ export default async function CatalogWordsManagePage({
     getWordsCatalog(),
     getFieldTypeOptions(),
   ]);
+
+  const warningSummaries = await buildWordCombinationWarningSummaries(words);
+  const combinationWarnings = Object.fromEntries(warningSummaries);
+  const wordsWithWarnings = warningSummaries.size;
 
   return (
     <div className="space-y-6">
@@ -48,10 +53,18 @@ export default async function CatalogWordsManagePage({
           <CardTitle>Catalogo atual</CardTitle>
           <CardDescription>
             Lista agrupada por nivel, com busca por palavra, codigo e designacoes.
+            {wordsWithWarnings > 0
+              ? ` ${wordsWithWarnings} palavra(s) com combinacoes que podem exceder os limites PHC.`
+              : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WordCatalogList words={words} fieldTypes={fieldTypes} deleteAction={deleteWordAction} />
+          <WordCatalogList
+            words={words}
+            fieldTypes={fieldTypes}
+            deleteAction={deleteWordAction}
+            combinationWarnings={combinationWarnings}
+          />
         </CardContent>
       </Card>
     </div>

@@ -1,7 +1,6 @@
 "use server";
 
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
-import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import {
   buildIlikePattern,
   NORMALIZATION_HISTORY_PAGE_SIZE,
@@ -99,38 +98,6 @@ function pickSourceDesignation(row: NormalizationFieldRow): string | null {
   return row.source_designation_pt ?? row.source_designation_es ?? row.source_designation_en ?? null;
 }
 
-async function reconcileImportedOk2Rows(supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>) {
-  const { data: pendingOk2, error } = await supabase
-    .from("skus_code_normalizations")
-    .select(
-      "id, source_new_code, source_designation_pt, source_designation_es, source_designation_en, final_new_code, final_designation_pt, final_designation_es, final_designation_en",
-    )
-    .eq("normalization_status", "pending")
-    .ilike("source_status", "ok2");
-
-  if (error) throw new Error(error.message);
-
-  const completedAt = new Date().toISOString();
-  for (const row of (pendingOk2 ?? []) as NormalizationFieldRow[]) {
-    const sourceDesignation = pickSourceDesignation(row);
-    const { error: updateError } = await supabase
-      .from("skus_code_normalizations")
-      .update({
-        normalization_status: "completed",
-        completed_at: completedAt,
-        final_new_code: row.final_new_code ?? row.source_new_code,
-        final_designation_pt: row.final_designation_pt ?? row.source_designation_pt ?? sourceDesignation,
-        final_designation_es: row.final_designation_es ?? row.source_designation_es,
-        final_designation_en: row.final_designation_en ?? row.source_designation_en,
-      })
-      .eq("id", row.id);
-
-    if (updateError) {
-      console.warn("[reconcileImportedOk2Rows] failed to complete OK2 row", row.id, updateError.message);
-    }
-  }
-}
-
 async function backfillCompletedNormalizationFields(
   supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
 ) {
@@ -191,12 +158,7 @@ const PENDING_QUEUE_SELECT = `
 export async function runNormalizationImportMaintenance() {
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) return;
-  await reconcileImportedOk2Rows(supabase);
   await backfillCompletedNormalizationFields(supabase);
-}
-
-function applyPendingOk2Exclusion<T extends { not: (column: string, operator: string, value: string) => T }>(query: T) {
-  return query.not("source_status", "ilike", "OK2");
 }
 
 function applyPendingReferenceFilter<T extends { or: (filters: string) => T }>(query: T, referenceFilter?: string) {
@@ -274,7 +236,6 @@ export async function countPendingNormalizationQueue(input?: {
     .select("id", { count: "exact", head: true })
     .eq("normalization_status", "pending");
 
-  query = applyPendingOk2Exclusion(query);
   query = applyPendingReferenceFilter(query, input?.referenceFilter);
   query = applyPendingDesignationFilter(query, input?.designationFilter);
 
@@ -305,16 +266,13 @@ export async function searchPendingNormalizationQueue(input: {
     .eq("normalization_status", "pending")
     .order("created_at", { ascending: true });
 
-  query = applyPendingOk2Exclusion(query);
   query = applyPendingReferenceFilter(query, input.referenceFilter);
   query = applyPendingDesignationFilter(query, input.designationFilter);
 
   const { data, error, count } = await query.range(from, to);
   if (error) throw new Error(error.message);
 
-  const items = ((data ?? []) as Record<string, unknown>[])
-    .filter((row) => !isOk2SourceStatus(row.source_status ? String(row.source_status) : null))
-    .map(mapQueueItem);
+  const items = ((data ?? []) as Record<string, unknown>[]).map(mapQueueItem);
 
   return toPaginatedResult(items, count ?? 0, page, pageSize);
 }
@@ -425,6 +383,35 @@ export async function searchCompletedNormalizationHistory(input: {
   if (error) throw new Error(error.message);
 
   return toPaginatedResult(((data ?? []) as Record<string, unknown>[]).map(mapHistoryItem), count ?? 0, page, pageSize);
+}
+
+const NORMALIZATION_HISTORY_EXPORT_PAGE_SIZE = 500;
+const NORMALIZATION_HISTORY_EXPORT_MAX_ROWS = 20_000;
+
+export async function fetchAllCompletedNormalizationHistory(input?: {
+  legacyCodeFilter?: string;
+  legacyDesignationFilter?: string;
+  newCodeFilter?: string;
+  newDesignationFilter?: string;
+  categoryFilter?: string;
+}): Promise<NormalizationHistoryItem[]> {
+  const items: NormalizationHistoryItem[] = [];
+  let page = 1;
+
+  while (items.length < NORMALIZATION_HISTORY_EXPORT_MAX_ROWS) {
+    const result = await searchCompletedNormalizationHistory({
+      ...input,
+      page,
+      pageSize: NORMALIZATION_HISTORY_EXPORT_PAGE_SIZE,
+    });
+
+    items.push(...result.items);
+
+    if (result.items.length === 0 || page >= result.totalPages) break;
+    page += 1;
+  }
+
+  return items.slice(0, NORMALIZATION_HISTORY_EXPORT_MAX_ROWS);
 }
 
 /** @deprecated Prefer searchPendingNormalizationQueue for UI pagination. */

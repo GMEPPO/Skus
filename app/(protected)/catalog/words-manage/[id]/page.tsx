@@ -9,6 +9,7 @@ import {
   getWordsCatalog,
   updateWordAction,
 } from "@/lib/admin-catalog";
+import { getGeneratorCatalogForCategoryLevel } from "@/lib/word-combination-analysis-data";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -35,6 +36,9 @@ export default async function EditWordPage({
   }
 
   const parentLevels = await getParentLevelsForWordEdit(word.categoryLevelId);
+  const generatorCatalog = word.categoryLevelId
+    ? await getGeneratorCatalogForCategoryLevel(word.categoryLevelId)
+    : null;
   const showHierarchyField =
     word.fieldTypeLabel.toLowerCase().includes("embal") || word.fieldTypeLabel.toLowerCase().includes("extra");
 
@@ -74,6 +78,8 @@ export default async function EditWordPage({
             categoryLevelId={word.categoryLevelId ?? undefined}
             parentLevels={parentLevels}
             showHierarchyField={showHierarchyField}
+            generatorCatalog={generatorCatalog ?? undefined}
+            analysisLevelId={word.categoryLevelId ?? undefined}
             initialValues={{
               wordId: word.id,
               label: word.label,

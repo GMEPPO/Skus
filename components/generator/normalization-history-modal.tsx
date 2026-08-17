@@ -1,17 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { History, X } from "lucide-react";
+import { Download, History, X } from "lucide-react";
 import { NormalizationPaginationControls } from "@/components/generator/normalization-pagination-controls";
 import { useDebouncedValue } from "@/components/generator/use-debounced-value";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { downloadNormalizationHistoryExcel } from "@/lib/normalization-history-export";
 import { isOk2SourceStatus } from "@/lib/normalization-source-status";
 import {
   countCompletedNormalizationAction,
+  exportCompletedNormalizationHistoryAction,
   searchCompletedNormalizationHistoryAction,
 } from "@/lib/normalization-query-actions";
-import type { NormalizationHistoryItem } from "@/lib/types";
 
 function formatCompletedAt(value: string | null) {
   if (!value) return "—";
@@ -36,6 +37,8 @@ export function NormalizationHistoryModal({ refreshToken }: { refreshToken: numb
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [completedTotal, setCompletedTotal] = useState<number | null>(null);
 
   const [legacyCodeFilter, setLegacyCodeFilter] = useState("");
@@ -107,6 +110,33 @@ export function NormalizationHistoryModal({ refreshToken }: { refreshToken: numb
 
   function closeModal() {
     setOpen(false);
+    setExportError(null);
+  }
+
+  async function handleExportExcel() {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const rows = await exportCompletedNormalizationHistoryAction({
+        legacyCodeFilter: debouncedLegacyCodeFilter,
+        legacyDesignationFilter: debouncedLegacyDesignationFilter,
+        newCodeFilter: debouncedNewCodeFilter,
+        newDesignationFilter: debouncedNewDesignationFilter,
+        categoryFilter: debouncedCategoryFilter,
+      });
+
+      if (rows.length === 0) {
+        setExportError("Nao ha registos para exportar com estes filtros.");
+        return;
+      }
+
+      const suffix = hasFilters ? "-filtrado" : "";
+      downloadNormalizationHistoryExcel(rows, `historico-normalizados${suffix}.xlsx`);
+    } catch {
+      setExportError("Nao foi possivel exportar o historico.");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   const hasFilters = Boolean(
@@ -153,11 +183,27 @@ export function NormalizationHistoryModal({ refreshToken }: { refreshToken: numb
                   {hasFilters ? `${total} resultado(s) no universo total` : `${total} registo(s)`}
                 </p>
               </div>
-              <Button type="button" variant="outline" className="h-9 w-9 shrink-0 p-0" onClick={closeModal}>
-                <X className="h-4 w-4" />
-                <span className="sr-only">Fechar</span>
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 gap-2 px-3"
+                  disabled={isExporting || (completedTotal !== null && completedTotal === 0 && !hasFilters)}
+                  onClick={() => void handleExportExcel()}
+                >
+                  <Download className="h-4 w-4" />
+                  {isExporting ? "A exportar..." : "Exportar Excel"}
+                </Button>
+                <Button type="button" variant="outline" className="h-9 w-9 shrink-0 p-0" onClick={closeModal}>
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Fechar</span>
+                </Button>
+              </div>
             </div>
+
+            {exportError ? (
+              <p className="border-b border-slate-800 px-5 py-2 text-sm text-amber-200">{exportError}</p>
+            ) : null}
 
             <div className="min-h-0 flex-1 overflow-auto p-4">
               {isLoading && items.length === 0 ? (
@@ -166,8 +212,7 @@ export function NormalizationHistoryModal({ refreshToken }: { refreshToken: numb
                 </p>
               ) : total === 0 && !hasFilters ? (
                 <p className="rounded-xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">
-                  Ainda nao existem produtos normalizados. Conclui registos no gerador ou importa um Excel com linhas
-                  OK2.
+                  Ainda nao existem produtos normalizados. Conclui registos no gerador a partir da fila pendente.
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-800">

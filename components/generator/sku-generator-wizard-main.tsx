@@ -146,6 +146,10 @@ export function SkuGeneratorWizardMain({
     return Boolean(selectedId) && !isEmptySelection(selectedId);
   }).length;
   const selectedCount = Object.keys(selections).filter((key) => selections[key]).length;
+  const activeLevelIndex = useMemo(() => {
+    const index = catalog.levels.findIndex((level) => !selections[level.id]);
+    return index === -1 ? catalog.levels.length : index;
+  }, [catalog.levels, selections]);
   const designation = buildDesignation(catalog, selections);
   const designationPt = buildDesignationByLocale(catalog, selections, "pt");
   const designationEs = buildDesignationByLocale(catalog, selections, "es");
@@ -521,9 +525,11 @@ export function SkuGeneratorWizardMain({
 
         <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="space-y-4">
-            {catalog.levels.map((level) => {
+            {catalog.levels.map((level, levelIndex) => {
               const selectedId = selections[level.id];
-              const selectedWord = getSelectedWord(level, selectedId);
+              const isActive = levelIndex === activeLevelIndex;
+              const isLocked = levelIndex > activeLevelIndex;
+              const isCompleted = levelIndex < activeLevelIndex;
               const emptyOptionSelected = isLevelSelectionEmpty(level, selectedId);
               const allOptions = sortGeneratorWords(getAvailableOptions(catalog, level.id, selections));
               const hasEmptyReferenceWord = allOptions.some((option) => option.referenceCode === "000");
@@ -534,7 +540,11 @@ export function SkuGeneratorWizardMain({
               return (
                 <div
                   key={level.id}
-                  className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 shadow-lg shadow-black/10"
+                  className={[
+                    "rounded-2xl border bg-slate-900/60 p-4 shadow-lg shadow-black/10 transition",
+                    isActive ? "border-amber-500/40 ring-1 ring-amber-500/20" : "border-slate-700",
+                    isLocked ? "opacity-70" : "",
+                  ].join(" ")}
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -542,17 +552,19 @@ export function SkuGeneratorWizardMain({
                       <h3 className="text-lg font-semibold text-slate-50">{level.label}</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      {selectedId ? (
+                      {isCompleted ? (
                         <Badge variant="success">
                           <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
                           preenchido
                         </Badge>
-                      ) : isRequiredLevel(level) ? (
+                      ) : isActive ? (
                         <Badge>ativo</Badge>
+                      ) : isRequiredLevel(level) ? (
+                        <Badge variant="outline">bloqueado</Badge>
                       ) : (
                         <Badge variant="outline">opcional</Badge>
                       )}
-                      {fieldTypes.length > 0 ? (
+                      {isActive && fieldTypes.length > 0 ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -567,81 +579,89 @@ export function SkuGeneratorWizardMain({
                     </div>
                   </div>
 
-                  {selectedId ? (
-                    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-2">
+                  {isCompleted && selectedId ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-2">
                       <Sparkles className="h-4 w-4 text-amber-300" />
                       <span className="text-sm text-slate-100">{getSelectionDisplayLabel(level, selectedId)}</span>
                       <span className="rounded-md bg-slate-950 px-2 py-1 text-xs text-slate-400">
                         {getSelectionDisplayCode(level, selectedId)}
                       </span>
                       <Button type="button" variant="outline" onClick={() => clearSelection(level)}>
-                        Limpar
+                        Alterar
                       </Button>
                     </div>
                   ) : null}
 
-                  <label className="mb-3 flex h-11 items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus-within:ring-2 focus-within:ring-amber-400">
-                    <Search className="h-4 w-4 text-slate-500" />
-                    <input
-                      value={query}
-                      onChange={(event) =>
-                        setSearchByLevel((current) => ({
-                          ...current,
-                          [level.id]: event.target.value,
-                        }))
-                      }
-                      placeholder={`Pesquisar por palavra, código ou designação em ${level.label}`}
-                      className="h-full flex-1 bg-transparent outline-none placeholder:text-slate-600"
-                    />
-                  </label>
+                  {isLocked ? (
+                    <p className="text-sm text-slate-500">Seleciona o nivel anterior para continuar.</p>
+                  ) : null}
 
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {options.map((option) => {
-                      const isSelected = selectedId === option.id;
-                      const isEmptyOption = isEmptyReferenceWord(option);
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => handleSelection(level, option)}
-                          className={[
-                            "rounded-xl border px-4 py-3 text-left transition",
-                            isSelected
-                              ? "border-amber-400 bg-amber-400/10"
-                              : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-slate-100">{isEmptyOption ? "Vazio" : option.label}</p>
-                              <p className="mt-1 text-xs text-slate-500">{option.referenceCode}</p>
+                  {isActive ? (
+                    <>
+                      <label className="mb-3 flex h-11 items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus-within:ring-2 focus-within:ring-amber-400">
+                        <Search className="h-4 w-4 text-slate-500" />
+                        <input
+                          value={query}
+                          onChange={(event) =>
+                            setSearchByLevel((current) => ({
+                              ...current,
+                              [level.id]: event.target.value,
+                            }))
+                          }
+                          placeholder={`Pesquisar por palavra, código ou designação em ${level.label}`}
+                          className="h-full flex-1 bg-transparent outline-none placeholder:text-slate-600"
+                        />
+                      </label>
+
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {options.map((option) => {
+                          const isSelected = selectedId === option.id;
+                          const isEmptyOption = isEmptyReferenceWord(option);
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => handleSelection(level, option)}
+                              className={[
+                                "rounded-xl border px-4 py-3 text-left transition",
+                                isSelected
+                                  ? "border-amber-400 bg-amber-400/10"
+                                  : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
+                              ].join(" ")}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-medium text-slate-100">{isEmptyOption ? "Vazio" : option.label}</p>
+                                  <p className="mt-1 text-xs text-slate-500">{option.referenceCode}</p>
+                                </div>
+                                {isSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {showLegacyEmptyOption ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSelection(level, null)}
+                            className={[
+                              "rounded-xl border px-4 py-3 text-left transition",
+                              emptyOptionSelected
+                                ? "border-amber-400 bg-amber-400/10"
+                                : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium text-slate-100">Vazio</p>
+                                <p className="mt-1 text-xs text-slate-500">000</p>
+                              </div>
+                              {emptyOptionSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
                             </div>
-                            {isSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {showLegacyEmptyOption ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSelection(level, null)}
-                        className={[
-                          "rounded-xl border px-4 py-3 text-left transition",
-                          emptyOptionSelected
-                            ? "border-amber-400 bg-amber-400/10"
-                            : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-slate-100">Vazio</p>
-                            <p className="mt-1 text-xs text-slate-500">000</p>
-                          </div>
-                          {emptyOptionSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
-                        </div>
-                      </button>
-                    ) : null}
-                  </div>
+                          </button>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               );
             })}

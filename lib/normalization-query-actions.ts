@@ -1,8 +1,10 @@
 "use server";
 
+import { requireRole } from "@/lib/auth";
 import {
   countCompletedNormalizationHistory,
   countPendingNormalizationQueue,
+  fetchAllCompletedNormalizationHistory,
   searchCompletedNormalizationHistory,
   searchPendingNormalizationQueue,
 } from "@/lib/normalization-data";
@@ -43,4 +45,15 @@ export async function countCompletedNormalizationAction(input?: {
   categoryFilter?: string;
 }): Promise<number> {
   return countCompletedNormalizationHistory(input);
+}
+
+export async function exportCompletedNormalizationHistoryAction(input?: {
+  legacyCodeFilter?: string;
+  legacyDesignationFilter?: string;
+  newCodeFilter?: string;
+  newDesignationFilter?: string;
+  categoryFilter?: string;
+}): Promise<NormalizationHistoryItem[]> {
+  await requireRole("editor");
+  return fetchAllCompletedNormalizationHistory(input);
 }

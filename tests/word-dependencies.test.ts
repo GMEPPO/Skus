@@ -89,6 +89,17 @@ const catalog: GeneratorCatalog = {
           parentMatchMode: "any",
           selectionHierarchy: 1,
         },
+        {
+          id: "alg-pack",
+          label: "ALGODAO",
+          referenceCode: "ALG",
+          designation: "ALGODAO",
+          designationPt: "ALGODAO",
+          designationEs: "ALGODON",
+          designationEn: "COTTON",
+          includeInDesignation: true,
+          selectionHierarchy: 2,
+        },
       ],
     },
     {
@@ -130,13 +141,24 @@ describe("word dependencies", () => {
     expect(visibleWithRecarga.some((word) => word.id === "alu")).toBe(true);
   });
 
-  it("shows hierarchy-2 extra words when no hierarchy-1 packaging is selected", () => {
+  it("shows hierarchy-2 words at packaging", () => {
+    const visible = getVisibleOptionsForLevel(catalog, "packaging", { product: "sab" });
+    expect(visible.some((word) => word.id === "alg-pack")).toBe(true);
+  });
+
+  it("shows hierarchy-2 extra words when no hierarchy-2 packaging is selected", () => {
     const visible = getVisibleOptionsForLevel(catalog, "extra", { product: "sab" });
     expect(visible.some((word) => word.id === "alg")).toBe(true);
 
-    const hidden = getVisibleOptionsForLevel(catalog, "extra", {
+    const stillVisibleWithHierarchyOne = getVisibleOptionsForLevel(catalog, "extra", {
       product: "sab",
       packaging: "caixa",
+    });
+    expect(stillVisibleWithHierarchyOne.some((word) => word.id === "alg")).toBe(true);
+
+    const hidden = getVisibleOptionsForLevel(catalog, "extra", {
+      product: "sab",
+      packaging: "alg-pack",
     });
     expect(hidden.some((word) => word.id === "alg")).toBe(false);
   });

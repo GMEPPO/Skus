@@ -59,7 +59,7 @@ describe("normalization import parser", () => {
     expect(parsed.rows[0].sourceDesignationPt).toBe("ACHB LAVANDA Sabonete 20g ALLEGRO");
     expect(parsed.rows[0].sourceDesignationEs).toBe("ACHB Lavanda Jabon 20g ALLEGRO");
     expect(parsed.rows[0].sourceDesignationEn).toBe("ACHB Lavender Soap 20g ALLEGRO");
-    expect(parsed.rows[0].normalizationStatus).toBe("completed");
+    expect(parsed.rows[0].normalizationStatus).toBe("pending");
   });
 
   it("mapeia Designacao_nova para designacao PT de destino", () => {
@@ -75,10 +75,10 @@ describe("normalization import parser", () => {
 
     const parsed = parseNormalizationWorkbook(buffer);
     expect(parsed.rows[0].sourceDesignationPt).toBe("Produto novo PT");
-    expect(parsed.rows[0].normalizationStatus).toBe("completed");
+    expect(parsed.rows[0].normalizationStatus).toBe("pending");
   });
 
-  it("marca completed quando Status e OK2", () => {
+  it("mantem pending quando Status e OK2", () => {
     const buffer = buildWorkbookBuffer([
       {
         Referencia_antiga: "LEG-OK2",
@@ -89,7 +89,7 @@ describe("normalization import parser", () => {
     ]);
 
     const parsed = parseNormalizationWorkbook(buffer);
-    expect(parsed.rows[0].normalizationStatus).toBe("completed");
+    expect(parsed.rows[0].normalizationStatus).toBe("pending");
     expect(parsed.rows[0].sourceStatus).toBe("OK2");
   });
 

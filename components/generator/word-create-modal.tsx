@@ -109,6 +109,8 @@ export function WordCreateModal({
             }}
             parentLevels={parentLevels}
             showHierarchyField={showHierarchyField}
+            generatorCatalog={catalog}
+            analysisLevelId={level.id}
           />
         </div>
       </div>

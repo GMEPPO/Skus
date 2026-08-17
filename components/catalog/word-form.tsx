@@ -5,15 +5,22 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { WordDependencyFields, type WordDependencyRuleRow } from "@/components/catalog/word-dependency-fields";
+import { WordCombinationWarningsPanel } from "@/components/catalog/word-combination-warnings-panel";
 import { checkWordReferenceCodeAction } from "@/lib/word-validation-actions";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
 import type { ParentLevelOption } from "@/lib/word-dependency-actions";
 import { MAX_DESIGNATION_LENGTH } from "@/lib/sku";
 import {
+  analyzeWordCombinationLimits,
+  DRAFT_WORD_ID,
+  injectWordIntoCatalog,
+} from "@/lib/word-combination-limits";
+import {
   collectDesignationLengthWarnings,
   formatDesignationLengthWarning,
 } from "@/lib/word-reference-validation";
 import type { ParentMatchMode } from "@/lib/word-dependencies";
+import type { GeneratorCatalog } from "@/lib/types";
 
 type WordFormInitialValues = {
   wordId?: string;
@@ -84,6 +91,8 @@ export function WordForm({
   parentLevels = [],
   showHierarchyField = false,
   variant = "page",
+  generatorCatalog,
+  analysisLevelId,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   clientAction?: (formData: FormData) => Promise<WordFormClientResult>;
@@ -99,6 +108,8 @@ export function WordForm({
   parentLevels?: ParentLevelOption[];
   showHierarchyField?: boolean;
   variant?: "page" | "modal";
+  generatorCatalog?: GeneratorCatalog;
+  analysisLevelId?: string;
 }) {
   const [label, setLabel] = useState(initialValues.label);
   const [referenceCode, setReferenceCode] = useState(initialValues.referenceCode);
@@ -106,6 +117,7 @@ export function WordForm({
   const [designationPt, setDesignationPt] = useState(initialValues.designationPt);
   const [designationEs, setDesignationEs] = useState(initialValues.designationEs);
   const [designationEn, setDesignationEn] = useState(initialValues.designationEn);
+  const [includeInDesignation, setIncludeInDesignation] = useState(initialValues.includeInDesignation);
   const [referenceMessage, setReferenceMessage] = useState<string | null>(null);
   const [referenceAvailable, setReferenceAvailable] = useState<boolean | null>(null);
   const [referenceWarning, setReferenceWarning] = useState(false);
@@ -131,6 +143,53 @@ export function WordForm({
     [designationEn, designationEs, designationPt, label],
   );
 
+  const resolvedAnalysisLevelId = analysisLevelId ?? categoryLevelId ?? null;
+
+  const parentWordIdsForAnalysis = useMemo(
+    () =>
+      visibilityMode === "conditional"
+        ? dependencyRules.map((rule) => rule.parentWordId).filter(Boolean)
+        : [],
+    [dependencyRules, visibilityMode],
+  );
+
+  const combinationAnalysis = useMemo(() => {
+    if (!generatorCatalog || !resolvedAnalysisLevelId) return null;
+
+    const normalizedReference = referenceCode.trim().toUpperCase();
+    if (!normalizedReference || normalizedReference === "000") return null;
+    if (!designationPt.trim() || !designationEs.trim() || !designationEn.trim()) return null;
+
+    const wordId = initialValues.wordId ?? DRAFT_WORD_ID;
+    const catalogWithWord = injectWordIntoCatalog(generatorCatalog, resolvedAnalysisLevelId, {
+      id: wordId,
+      label: label.trim() || "Nova palavra",
+      referenceCode: normalizedReference,
+      designationPt: designationPt.trim(),
+      designationEs: designationEs.trim(),
+      designationEn: designationEn.trim(),
+      includeInDesignation,
+      parentWordIds: parentWordIdsForAnalysis,
+      parentMatchMode,
+      selectionHierarchy,
+    });
+
+    return analyzeWordCombinationLimits(catalogWithWord, resolvedAnalysisLevelId, wordId);
+  }, [
+    designationEn,
+    designationEs,
+    designationPt,
+    generatorCatalog,
+    includeInDesignation,
+    initialValues.wordId,
+    label,
+    parentMatchMode,
+    parentWordIdsForAnalysis,
+    referenceCode,
+    resolvedAnalysisLevelId,
+    selectionHierarchy,
+  ]);
+
   const selectedFieldType = useMemo(
     () => fieldTypes.find((fieldType) => fieldType.id === fieldTypeId) ?? null,
     [fieldTypeId, fieldTypes],
@@ -143,6 +202,7 @@ export function WordForm({
     setDesignationPt(initialValues.designationPt);
     setDesignationEs(initialValues.designationEs);
     setDesignationEn(initialValues.designationEn);
+    setIncludeInDesignation(initialValues.includeInDesignation);
     setVisibilityMode(
       initialValues.visibilityMode ?? (initialValues.parentWordIds?.length ? "conditional" : "always"),
     );
@@ -337,7 +397,7 @@ export function WordForm({
         <div
           className={`rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 ${isModal ? "" : "md:col-span-2 xl:col-span-3"}`}
         >
-          <p className="text-sm font-medium text-amber-200">Avisos de designacao</p>
+          <p className="text-sm font-medium text-amber-200">Avisos de designacao (palavra isolada)</p>
           <ul className="mt-2 space-y-1 text-xs text-amber-100/90">
             {designationWarnings.map((warning) => (
               <li key={`${warning.locale}-${warning.label}`}>{formatDesignationLengthWarning(warning)}</li>
@@ -345,6 +405,12 @@ export function WordForm({
           </ul>
         </div>
       ) : null}
+
+      <WordCombinationWarningsPanel
+        compact={isModal}
+        analysis={combinationAnalysis}
+        title="Combinacoes SKU que excedem limites com esta palavra"
+      />
 
       {parentLevels.length > 0 ? (
         <WordDependencyFields
@@ -368,7 +434,8 @@ export function WordForm({
         <input
           type="checkbox"
           name="includeInDesignation"
-          defaultChecked={initialValues.includeInDesignation}
+          checked={includeInDesignation}
+          onChange={(event) => setIncludeInDesignation(event.target.checked)}
           className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-amber-400 focus:ring-amber-400"
         />
         <div>
