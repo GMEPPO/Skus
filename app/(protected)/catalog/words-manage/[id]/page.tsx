@@ -5,6 +5,7 @@ import { WordForm } from "@/components/catalog/word-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getFieldTypeOptions,
+  getParentLevelsForWordEdit,
   getWordsCatalog,
   updateWordAction,
 } from "@/lib/admin-catalog";
@@ -33,6 +34,10 @@ export default async function EditWordPage({
     notFound();
   }
 
+  const parentLevels = await getParentLevelsForWordEdit(word.categoryLevelId);
+  const showHierarchyField =
+    word.fieldTypeLabel.toLowerCase().includes("embal") || word.fieldTypeLabel.toLowerCase().includes("extra");
+
   return (
     <div className="space-y-6">
       <div>
@@ -45,7 +50,7 @@ export default async function EditWordPage({
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Editar palavra</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Atualiza o nivel, referencia e designacoes usadas pelo gerador global.
+          Atualiza o nivel, referencia, designacoes e dependencias usadas pelo gerador.
         </p>
       </div>
 
@@ -66,6 +71,9 @@ export default async function EditWordPage({
             submitLabel="Guardar alteracoes"
             cancelHref="/catalog/words-manage"
             fieldTypes={fieldTypes}
+            categoryLevelId={word.categoryLevelId ?? undefined}
+            parentLevels={parentLevels}
+            showHierarchyField={showHierarchyField}
             initialValues={{
               wordId: word.id,
               label: word.label,
@@ -75,6 +83,10 @@ export default async function EditWordPage({
               designationEs: word.designationEs,
               designationEn: word.designationEn,
               includeInDesignation: word.includeInDesignation,
+              visibilityMode: word.parentWordIds.length > 0 ? "conditional" : "always",
+              parentWordIds: word.parentWordIds,
+              parentMatchMode: word.parentMatchMode,
+              selectionHierarchy: word.selectionHierarchy,
             }}
           />
         </CardContent>

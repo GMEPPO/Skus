@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { WordDependencyFields, type WordDependencyRuleRow } from "@/components/catalog/word-dependency-fields";
 import { checkWordReferenceCodeAction } from "@/lib/word-validation-actions";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
+import type { ParentLevelOption } from "@/lib/word-dependency-actions";
 import { MAX_DESIGNATION_LENGTH } from "@/lib/sku";
 import {
   collectDesignationLengthWarnings,
   formatDesignationLengthWarning,
 } from "@/lib/word-reference-validation";
+import type { ParentMatchMode } from "@/lib/word-dependencies";
 
 type WordFormInitialValues = {
   wordId?: string;
@@ -21,6 +24,10 @@ type WordFormInitialValues = {
   designationEs: string;
   designationEn: string;
   includeInDesignation: boolean;
+  visibilityMode?: "always" | "conditional";
+  parentWordIds?: string[];
+  parentMatchMode?: ParentMatchMode;
+  selectionHierarchy?: number | null;
 };
 
 type WordFormClientResult = { ok: true; wordId: string } | { ok: false; message: string };
@@ -74,6 +81,8 @@ export function WordForm({
   categoryLevelId,
   lockFieldType = false,
   lockedFieldTypeLabel,
+  parentLevels = [],
+  showHierarchyField = false,
   variant = "page",
 }: {
   action?: (formData: FormData) => void | Promise<void>;
@@ -87,6 +96,8 @@ export function WordForm({
   categoryLevelId?: string;
   lockFieldType?: boolean;
   lockedFieldTypeLabel?: string;
+  parentLevels?: ParentLevelOption[];
+  showHierarchyField?: boolean;
   variant?: "page" | "modal";
 }) {
   const [label, setLabel] = useState(initialValues.label);
@@ -97,9 +108,16 @@ export function WordForm({
   const [designationEn, setDesignationEn] = useState(initialValues.designationEn);
   const [referenceMessage, setReferenceMessage] = useState<string | null>(null);
   const [referenceAvailable, setReferenceAvailable] = useState<boolean | null>(null);
+  const [referenceWarning, setReferenceWarning] = useState(false);
   const [checkingReference, setCheckingReference] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [visibilityMode, setVisibilityMode] = useState<"always" | "conditional">(
+    initialValues.visibilityMode ?? (initialValues.parentWordIds?.length ? "conditional" : "always"),
+  );
+  const [parentMatchMode, setParentMatchMode] = useState<ParentMatchMode>(initialValues.parentMatchMode ?? "any");
+  const [selectionHierarchy, setSelectionHierarchy] = useState<number | null>(initialValues.selectionHierarchy ?? null);
+  const [dependencyRules, setDependencyRules] = useState<WordDependencyRuleRow[]>([]);
 
   const isModal = variant === "modal";
   const gridClassName = isModal ? "grid gap-3" : "grid gap-4 md:grid-cols-2 xl:grid-cols-3";
@@ -117,7 +135,6 @@ export function WordForm({
     () => fieldTypes.find((fieldType) => fieldType.id === fieldTypeId) ?? null,
     [fieldTypeId, fieldTypes],
   );
-  const isSizeFieldType = selectedFieldType?.code === "size";
 
   useEffect(() => {
     setLabel(initialValues.label);
@@ -126,8 +143,32 @@ export function WordForm({
     setDesignationPt(initialValues.designationPt);
     setDesignationEs(initialValues.designationEs);
     setDesignationEn(initialValues.designationEn);
+    setVisibilityMode(
+      initialValues.visibilityMode ?? (initialValues.parentWordIds?.length ? "conditional" : "always"),
+    );
+    setParentMatchMode(initialValues.parentMatchMode ?? "any");
+    setSelectionHierarchy(initialValues.selectionHierarchy ?? null);
     setSubmitError(null);
   }, [initialValues]);
+
+  useEffect(() => {
+    const parentWordIds = initialValues.parentWordIds ?? [];
+    if (parentWordIds.length === 0 || parentLevels.length === 0) {
+      setDependencyRules([]);
+      return;
+    }
+
+    const nextRules: WordDependencyRuleRow[] = [];
+    for (const parentWordId of parentWordIds) {
+      for (const level of parentLevels) {
+        if (level.words.some((word) => word.id === parentWordId)) {
+          nextRules.push({ levelId: level.levelId, parentWordId });
+          break;
+        }
+      }
+    }
+    setDependencyRules(nextRules);
+  }, [initialValues.parentWordIds, parentLevels]);
 
   useEffect(() => {
     const normalized = referenceCode.trim().toUpperCase();
@@ -140,12 +181,7 @@ export function WordForm({
     if (normalized === "000") {
       setReferenceMessage("000 e reservado para Vazio e pode repetir-se em cada nivel.");
       setReferenceAvailable(true);
-      return;
-    }
-
-    if (isSizeFieldType) {
-      setReferenceMessage("Tamanhos (gr/ml/kg/l) podem partilhar a mesma referencia (ex.: 30gr e 30ml).");
-      setReferenceAvailable(true);
+      setReferenceWarning(false);
       return;
     }
 
@@ -162,13 +198,16 @@ export function WordForm({
 
       if (!result.ok) {
         setReferenceAvailable(null);
+        setReferenceWarning(false);
         setReferenceMessage(result.message);
-      } else if (result.available) {
+      } else if (result.sharedReferenceCount && result.sharedReferenceCount > 0) {
         setReferenceAvailable(true);
-        setReferenceMessage("Referencia disponivel neste nivel (pode repetir-se noutros niveis).");
+        setReferenceWarning(true);
+        setReferenceMessage(result.message ?? null);
       } else {
-        setReferenceAvailable(false);
-        setReferenceMessage(result.message);
+        setReferenceAvailable(true);
+        setReferenceWarning(false);
+        setReferenceMessage(result.message ?? "Referencia valida neste nivel.");
       }
       setCheckingReference(false);
     }, 350);
@@ -177,7 +216,7 @@ export function WordForm({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [fieldTypeId, initialValues.wordId, isSizeFieldType, label, referenceCode]);
+  }, [fieldTypeId, initialValues.wordId, label, referenceCode]);
 
   const canSubmit = referenceAvailable !== false && !isSubmitting;
 
@@ -231,12 +270,12 @@ export function WordForm({
           onChange={(event) => setReferenceCode(event.target.value.toUpperCase())}
           className={[
             `flex w-full rounded-lg border bg-slate-950 px-3 uppercase text-slate-100 ${isModal ? "h-9 text-xs" : "h-11 text-sm"}`,
-            referenceAvailable === false ? "border-red-400" : referenceAvailable ? "border-emerald-500/60" : "border-slate-700",
+            referenceAvailable === false ? "border-red-400" : referenceWarning ? "border-amber-400/80" : referenceAvailable ? "border-emerald-500/60" : "border-slate-700",
           ].join(" ")}
         />
         {checkingReference ? <p className="text-xs text-slate-500">A verificar referencia...</p> : null}
         {referenceMessage ? (
-          <p className={`text-xs ${referenceAvailable === false ? "text-red-300" : "text-slate-400"}`}>{referenceMessage}</p>
+          <p className={`text-xs ${referenceAvailable === false ? "text-red-300" : referenceWarning ? "text-amber-300" : "text-slate-400"}`}>{referenceMessage}</p>
         ) : null}
       </label>
 
@@ -305,6 +344,22 @@ export function WordForm({
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {parentLevels.length > 0 ? (
+        <WordDependencyFields
+          compact={isModal}
+          parentLevels={parentLevels}
+          visibilityMode={visibilityMode}
+          onVisibilityModeChange={setVisibilityMode}
+          rules={dependencyRules}
+          onRulesChange={setDependencyRules}
+          parentMatchMode={parentMatchMode}
+          onParentMatchModeChange={setParentMatchMode}
+          selectionHierarchy={selectionHierarchy}
+          onSelectionHierarchyChange={setSelectionHierarchy}
+          showHierarchyField={showHierarchyField}
+        />
       ) : null}
 
       <label

@@ -5,17 +5,39 @@ import { WordForm } from "@/components/catalog/word-form";
 import { Button } from "@/components/ui/button";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
 import { createWordFromGeneratorAction } from "@/lib/word-catalog-actions";
-import type { GeneratorLevel } from "@/lib/types";
+import type { GeneratorCatalog, GeneratorLevel } from "@/lib/types";
+import type { ParentLevelOption } from "@/lib/word-dependency-actions";
+
+function buildParentLevelsFromCatalog(catalog: GeneratorCatalog, levelId: string): ParentLevelOption[] {
+  const currentIndex = catalog.levels.findIndex((level) => level.id === levelId);
+  if (currentIndex <= 0) return [];
+
+  return catalog.levels.slice(0, currentIndex).map((level) => ({
+    levelId: level.id,
+    levelKey: level.fieldType,
+    levelLabel: level.label,
+    sortOrder: level.order,
+    words: level.options
+      .filter((option) => option.referenceCode !== "000")
+      .map((option) => ({
+        id: option.id,
+        label: option.label,
+        referenceCode: option.referenceCode,
+      })),
+  }));
+}
 
 export function WordCreateModal({
   open,
   level,
+  catalog,
   fieldTypes,
   onClose,
   onCreated,
 }: {
   open: boolean;
   level: GeneratorLevel | null;
+  catalog: GeneratorCatalog;
   fieldTypes: FieldTypeOption[];
   onClose: () => void;
   onCreated: (wordId: string, levelId: string) => void;
@@ -23,6 +45,8 @@ export function WordCreateModal({
   if (!open || !level) return null;
 
   const fieldTypeId = level.fieldTypeId ?? fieldTypes.find((fieldType) => fieldType.code === level.fieldType)?.id ?? "";
+  const parentLevels = buildParentLevelsFromCatalog(catalog, level.id);
+  const showHierarchyField = level.fieldType === "packaging" || level.fieldType === "extra";
 
   return (
     <div
@@ -78,7 +102,13 @@ export function WordCreateModal({
               designationEs: "",
               designationEn: "",
               includeInDesignation: true,
+              visibilityMode: "always",
+              parentWordIds: [],
+              parentMatchMode: "any",
+              selectionHierarchy: null,
             }}
+            parentLevels={parentLevels}
+            showHierarchyField={showHierarchyField}
           />
         </div>
       </div>

@@ -26,6 +26,7 @@ import {
   MAX_DESIGNATION_LENGTH,
   sortGeneratorWords,
 } from "@/lib/sku";
+import { pruneInvalidDownstreamSelections } from "@/lib/word-dependencies";
 
 type Selections = Record<string, string>;
 type SearchByLevel = Record<string, string>;
@@ -274,10 +275,10 @@ export function SkuGeneratorWizardMain({
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
     const nextValue = word === null ? buildEmptySelectionId(level.id) : word?.id ?? "";
-    const nextSelections = {
+    const nextSelections = pruneInvalidDownstreamSelections(catalog, {
       ...selections,
       [level.id]: nextValue,
-    };
+    }, level.id);
     const nextSelectionOrder = [...selectionOrder.filter((id) => id !== level.id), level.id];
     bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
     setSelectionOrder(nextSelectionOrder);
@@ -524,7 +525,7 @@ export function SkuGeneratorWizardMain({
               const selectedId = selections[level.id];
               const selectedWord = getSelectedWord(level, selectedId);
               const emptyOptionSelected = isLevelSelectionEmpty(level, selectedId);
-              const allOptions = sortGeneratorWords(getAvailableOptions(catalog, level.id));
+              const allOptions = sortGeneratorWords(getAvailableOptions(catalog, level.id, selections));
               const hasEmptyReferenceWord = allOptions.some((option) => option.referenceCode === "000");
               const query = searchByLevel[level.id] ?? "";
               const options = filterGeneratorWords(allOptions, query).slice(0, 36);
@@ -1032,6 +1033,7 @@ export function SkuGeneratorWizardMain({
     <WordCreateModal
       open={Boolean(wordCreateLevel)}
       level={wordCreateLevel}
+      catalog={catalog}
       fieldTypes={fieldTypes}
       onClose={() => setWordCreateLevel(null)}
       onCreated={(wordId, levelId) => {

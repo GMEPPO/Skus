@@ -30,6 +30,11 @@ export type WordReferenceConflict = {
   levelLabel: string;
 };
 
+export type SharedWordReferenceMatch = {
+  wordId: string;
+  label: string;
+};
+
 export type WordReferenceScope = {
   fieldTypeId?: string | null;
   categoryLevelId?: string | null;
@@ -143,35 +148,24 @@ export async function resolveCategoryLevelId(
   return null;
 }
 
-export async function findWordReferenceConflict(
+export async function findWordsSharingReference(
   supabase: ServiceSupabase,
   referenceCode: string,
-  options?: WordReferenceScope & { excludeWordId?: string; wordLabel?: string; normalizedLabel?: string },
-): Promise<WordReferenceConflict | null> {
+  options?: WordReferenceScope & { excludeWordId?: string },
+): Promise<SharedWordReferenceMatch[]> {
   const normalized = normalizeWordReferenceCode(referenceCode);
   if (!normalized || isEmptyWordReferenceCode(normalized)) {
-    return null;
-  }
-
-  const candidateFieldTypeCode = await resolveFieldTypeCode(supabase, options ?? {});
-  if (isSizeReferenceScope(candidateFieldTypeCode)) {
-    return null;
+    return [];
   }
 
   const categoryLevelId = await resolveCategoryLevelId(supabase, options ?? {});
   if (!categoryLevelId) {
-    return null;
+    return [];
   }
-
-  const candidateLabel =
-    options?.normalizedLabel ??
-    (options?.wordLabel ? normalizeWordLabel(options.wordLabel) : null);
 
   let query = supabase
     .from("skus_words")
-    .select(
-      "id, label, normalized_label, reference_code, category_level_id, skus_category_levels(label)",
-    )
+    .select("id, label")
     .eq("is_active", true)
     .eq("reference_code", normalized)
     .eq("category_level_id", categoryLevelId);
@@ -182,32 +176,48 @@ export async function findWordReferenceConflict(
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  if (!data?.length) return null;
 
-  for (const row of data) {
-    const rowLabel = String(row.normalized_label ?? normalizeWordLabel(row.label ?? ""));
-    if (candidateLabel && rowLabel === candidateLabel) {
-      continue;
-    }
+  return (data ?? []).map((row) => ({
+    wordId: String(row.id),
+    label: String(row.label ?? ""),
+  }));
+}
 
-    const levelRelation = row.skus_category_levels as { label?: string } | { label?: string }[] | null;
-    const levelLabel = Array.isArray(levelRelation)
-      ? String(levelRelation[0]?.label ?? "Sem nivel")
-      : String(levelRelation?.label ?? "Sem nivel");
+/** @deprecated Usar findWordsSharingReference + formatSharedReferenceWarningMessage */
+export async function findWordReferenceConflict(
+  supabase: ServiceSupabase,
+  referenceCode: string,
+  options?: WordReferenceScope & { excludeWordId?: string; wordLabel?: string; normalizedLabel?: string },
+): Promise<WordReferenceConflict | null> {
+  const matches = await findWordsSharingReference(supabase, referenceCode, options);
+  if (matches.length === 0) return null;
 
-    return {
-      wordId: String(row.id),
-      label: String(row.label ?? ""),
-      referenceCode: String(row.reference_code ?? normalized),
-      levelLabel,
-    };
+  const categoryLevelId = await resolveCategoryLevelId(supabase, options ?? {});
+  let levelLabel = "Sem nivel";
+  if (categoryLevelId) {
+    const { data } = await supabase
+      .from("skus_category_levels")
+      .select("label")
+      .eq("id", categoryLevelId)
+      .maybeSingle();
+    levelLabel = String(data?.label ?? levelLabel);
   }
 
-  return null;
+  const first = matches[0];
+  return {
+    wordId: first.wordId,
+    label: first.label,
+    referenceCode: normalizeWordReferenceCode(referenceCode),
+    levelLabel,
+  };
+}
+
+export function formatSharedReferenceWarningMessage(sharedCount: number): string {
+  return `${sharedCount} PALABRAS TIENEN ESA MISMA REFERENCIA`;
 }
 
 export function formatWordReferenceConflictMessage(conflict: WordReferenceConflict): string {
-  return `A referencia ${conflict.referenceCode} ja esta usada por "${conflict.label}" no mesmo nivel (${conflict.levelLabel}). No mesmo nivel cada palavra deve ter referencia unica (excepto 000 e tamanhos gr/ml/kg/l).`;
+  return formatSharedReferenceWarningMessage(1);
 }
 
 export type DesignationLengthWarning = {

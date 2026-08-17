@@ -61,6 +61,9 @@ const legacyWordRelations = {
   familyLabels: [],
   parentWordIds: [],
   parentWordLabels: [],
+  parentMatchMode: "any" as const,
+  selectionHierarchy: null,
+  categoryLevelId: null,
 };
 
 const words: WordListItem[] = [

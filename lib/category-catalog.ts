@@ -37,10 +37,14 @@ export interface CatalogWordRow {
   designationEn: string;
   includeInDesignation: boolean;
   isActive: boolean;
+  selectionHierarchy: number | null;
+  parentMatchMode: "any" | "all";
+  parentWordIds: string[];
 }
 
 export interface GeneratorCatalogForCategory {
   category: SkuCategoryRow;
+  parentEdges: Array<{ childWordId: string; parentWordId: string }>;
   levels: Array<
     CategoryLevelRow & {
       options: CatalogWordRow[];
@@ -110,9 +114,10 @@ function mapLevel(row: Record<string, unknown>): CategoryLevelRow {
   };
 }
 
-function mapWord(row: Record<string, unknown>): CatalogWordRow {
+function mapWord(row: Record<string, unknown>, parentWordIds: string[] = []): CatalogWordRow {
   const referenceCode = String(row.reference_code ?? "");
   const isEmptyReference = referenceCode === "000";
+  const parentMatchModeRaw = String(row.parent_match_mode ?? "any");
 
   return {
     id: String(row.id),
@@ -125,7 +130,40 @@ function mapWord(row: Record<string, unknown>): CatalogWordRow {
     designationEn: isEmptyReference ? "" : String(row.designation_en ?? row.designation ?? row.label ?? ""),
     includeInDesignation: isEmptyReference ? false : Boolean(row.include_in_designation ?? true),
     isActive: Boolean(row.is_active ?? true),
+    selectionHierarchy:
+      row.selection_hierarchy === null || row.selection_hierarchy === undefined
+        ? null
+        : Number(row.selection_hierarchy),
+    parentMatchMode: parentMatchModeRaw === "all" ? "all" : "any",
+    parentWordIds,
   };
+}
+
+function indexParentEdges(edges: Array<{ childWordId: string; parentWordId: string }>) {
+  const byChild = new Map<string, string[]>();
+  for (const edge of edges) {
+    const bucket = byChild.get(edge.childWordId) ?? [];
+    bucket.push(edge.parentWordId);
+    byChild.set(edge.childWordId, bucket);
+  }
+  return byChild;
+}
+
+async function loadCategoryParentEdges(
+  supabase: NonNullable<ReturnType<typeof createSupabaseServiceServerClient>>,
+  categoryId: string,
+) {
+  const { data, error } = await supabase
+    .from("skus_word_parent_edges")
+    .select("child_word_id, parent_word_id")
+    .eq("category_id", categoryId);
+
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    childWordId: String(row.child_word_id),
+    parentWordId: String(row.parent_word_id),
+  }));
 }
 
 function sortCatalogWords(words: CatalogWordRow[]) {
@@ -180,23 +218,28 @@ export async function getGeneratorCatalogForCategory(categoryId: string): Promis
 
   const levelRows = ((levels ?? []) as Record<string, unknown>[]).map(mapLevel);
   const levelIds = levelRows.map((l) => l.id);
+  const parentEdges = await loadCategoryParentEdges(supabase, categoryId);
+  const parentIdsByChild = indexParentEdges(parentEdges);
 
   let words: CatalogWordRow[] = [];
   if (levelIds.length > 0) {
     const { data: wordRows, error: wordErr } = await supabase
       .from("skus_words")
       .select(
-        "id, category_level_id, default_field_type_id, label, reference_code, designation, designation_pt, designation_es, designation_en, include_in_designation, is_active",
+        "id, category_level_id, default_field_type_id, label, reference_code, designation, designation_pt, designation_es, designation_en, include_in_designation, is_active, selection_hierarchy, parent_match_mode",
       )
       .in("category_level_id", levelIds)
       .eq("is_active", true)
       .order("label", { ascending: true });
     if (wordErr) throw new Error(wordErr.message);
-    words = ((wordRows ?? []) as Record<string, unknown>[]).map(mapWord);
+    words = ((wordRows ?? []) as Record<string, unknown>[]).map((row) =>
+      mapWord(row, parentIdsByChild.get(String(row.id)) ?? []),
+    );
   }
 
   return {
     category: mapCategory(category as Record<string, unknown>),
+    parentEdges,
     levels: levelRows.map((level) => ({
       ...level,
       options: sortCatalogWords(words.filter((w) => w.categoryLevelId === level.id)),
@@ -237,12 +280,12 @@ export async function getCategoryConfigurationForAdmin(
     const { data: wordRows, error: wordErr } = await supabase
       .from("skus_words")
       .select(
-        "id, category_level_id, default_field_type_id, label, reference_code, designation, designation_pt, designation_es, designation_en, include_in_designation, is_active",
+        "id, category_level_id, default_field_type_id, label, reference_code, designation, designation_pt, designation_es, designation_en, include_in_designation, is_active, selection_hierarchy, parent_match_mode",
       )
       .in("category_level_id", levelIds)
       .order("label", { ascending: true });
     if (wordErr) throw new Error(wordErr.message);
-    words = ((wordRows ?? []) as Record<string, unknown>[]).map(mapWord);
+    words = ((wordRows ?? []) as Record<string, unknown>[]).map((row) => mapWord(row, []));
   }
 
   return {

@@ -4,11 +4,9 @@ import { requireRole } from "@/lib/auth";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import {
   collectDesignationLengthWarnings,
-  findWordReferenceConflict,
-  formatWordReferenceConflictMessage,
-  isSizeReferenceScope,
+  findWordsSharingReference,
+  formatSharedReferenceWarningMessage,
   normalizeWordReferenceCode,
-  resolveFieldTypeCode,
 } from "@/lib/word-reference-validation";
 
 export async function checkWordReferenceCodeAction(
@@ -17,8 +15,7 @@ export async function checkWordReferenceCodeAction(
   fieldTypeId?: string,
   wordLabel?: string,
 ): Promise<
-  | { ok: true; available: true }
-  | { ok: true; available: false; message: string; conflictLabel: string; conflictLevel: string }
+  | { ok: true; available: true; sharedReferenceCount?: number; message?: string }
   | { ok: false; message: string }
 > {
   await requireRole("editor");
@@ -29,7 +26,7 @@ export async function checkWordReferenceCodeAction(
   }
 
   if (normalized === "000") {
-    return { ok: true, available: true };
+    return { ok: true, available: true, message: "000 e reservado para Vazio e pode repetir-se em cada nivel." };
   }
 
   const supabase = createSupabaseServiceServerClient();
@@ -38,26 +35,20 @@ export async function checkWordReferenceCodeAction(
   }
 
   try {
-    const fieldTypeCode = await resolveFieldTypeCode(supabase, { fieldTypeId });
-    if (isSizeReferenceScope(fieldTypeCode)) {
-      return { ok: true, available: true };
-    }
-
-    const conflict = await findWordReferenceConflict(supabase, normalized, {
+    const sharedMatches = await findWordsSharingReference(supabase, normalized, {
       excludeWordId,
       fieldTypeId,
-      wordLabel,
     });
-    if (!conflict) {
-      return { ok: true, available: true };
+
+    if (sharedMatches.length === 0) {
+      return { ok: true, available: true, message: "Referencia valida neste nivel." };
     }
 
     return {
       ok: true,
-      available: false,
-      message: formatWordReferenceConflictMessage(conflict),
-      conflictLabel: conflict.label,
-      conflictLevel: conflict.levelLabel,
+      available: true,
+      sharedReferenceCount: sharedMatches.length,
+      message: formatSharedReferenceWarningMessage(sharedMatches.length),
     };
   } catch {
     return { ok: false, message: "Nao foi possivel validar a referencia." };

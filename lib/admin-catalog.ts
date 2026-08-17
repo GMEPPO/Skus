@@ -6,12 +6,10 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import type { WordListItem } from "@/lib/types";
-import {
-  findWordReferenceConflict,
-  formatWordReferenceConflictMessage,
-  isEmptyWordReferenceCode,
-  normalizeWordReferenceCode,
-} from "@/lib/word-reference-validation";
+import { normalizeWordReferenceCode } from "@/lib/word-reference-validation";
+import { parseWordDependencyFormData } from "@/lib/word-dependencies";
+import { resolveCategoryIdForLevel, syncWordParentEdges } from "@/lib/word-dependency-persistence";
+import type { ParentLevelOption } from "@/lib/word-dependency-actions";
 
 const GLOBAL_LEVEL_CODES = ["brand", "format", "product", "size", "packaging", "extra"] as const;
 
@@ -92,12 +90,10 @@ type WordRow = {
   designation_en: string | null;
   include_in_designation: boolean | null;
   is_active?: boolean | null;
+  selection_hierarchy?: number | null;
+  parent_match_mode?: string | null;
   skus_field_types?: FieldTypeRelation;
 };
-
-const deleteWordSchema = z.object({
-  wordId: z.string().uuid(),
-});
 
 const createWordSchema = z.object({
   label: z.string().trim().min(1),
@@ -110,6 +106,10 @@ const createWordSchema = z.object({
   designationEs: z.string().trim().min(1),
   designationEn: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
+  selectionHierarchy: z.number().int().min(1).max(2).nullable().optional(),
+  visibilityMode: z.enum(["always", "conditional"]).optional(),
+  parentWordIds: z.array(z.string().uuid()).optional(),
+  parentMatchMode: z.enum(["any", "all"]).optional(),
 });
 
 const updateWordSchema = createWordSchema.extend({
@@ -142,9 +142,14 @@ function sortFieldTypes(rows: FieldTypeRow[]) {
     .sort((left, right) => GLOBAL_LEVEL_CODES.indexOf(left.code as (typeof GLOBAL_LEVEL_CODES)[number]) - GLOBAL_LEVEL_CODES.indexOf(right.code as (typeof GLOBAL_LEVEL_CODES)[number]));
 }
 
-function mapWord(row: WordRow): WordListItem {
+const deleteWordSchema = z.object({
+  wordId: z.string().uuid(),
+});
+
+function mapWord(row: WordRow, parentWordIds: string[] = [], parentLabels: string[] = []): WordListItem {
   const relation = getFieldTypeRelation(row.skus_field_types);
   const designationPt = String(row.designation_pt ?? row.designation ?? row.label ?? "");
+  const parentMatchModeRaw = String(row.parent_match_mode ?? "any");
 
   return {
     id: String(row.id),
@@ -159,8 +164,14 @@ function mapWord(row: WordRow): WordListItem {
     includeInDesignation: Boolean(row.include_in_designation ?? true),
     familyIds: [],
     familyLabels: [],
-    parentWordIds: [],
-    parentWordLabels: [],
+    parentWordIds,
+    parentWordLabels: parentLabels,
+    parentMatchMode: parentMatchModeRaw === "all" ? "all" : "any",
+    selectionHierarchy:
+      row.selection_hierarchy === null || row.selection_hierarchy === undefined
+        ? null
+        : Number(row.selection_hierarchy),
+    categoryLevelId: row.category_level_id ? String(row.category_level_id) : null,
   };
 }
 
@@ -187,10 +198,33 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
 
   const wordsResult = await supabase
     .from("skus_words")
-    .select("id, label, reference_code, default_field_type_id, designation, designation_pt, designation_es, designation_en, include_in_designation, skus_field_types(id, code, name)")
+    .select(
+      "id, label, reference_code, default_field_type_id, category_level_id, designation, designation_pt, designation_es, designation_en, include_in_designation, selection_hierarchy, parent_match_mode, skus_field_types(id, code, name)",
+    )
     .order("label", { ascending: true });
 
-  const words = ((wordsResult.data ?? []) as WordRow[]).map(mapWord);
+  const edgesResult = await supabase.from("skus_word_parent_edges").select("child_word_id, parent_word_id");
+
+  const parentIdsByChild = new Map<string, string[]>();
+  for (const edge of edgesResult.data ?? []) {
+    const childId = String(edge.child_word_id);
+    const bucket = parentIdsByChild.get(childId) ?? [];
+    bucket.push(String(edge.parent_word_id));
+    parentIdsByChild.set(childId, bucket);
+  }
+
+  const words = ((wordsResult.data ?? []) as WordRow[]).map((row) => {
+    const parentWordIds = parentIdsByChild.get(String(row.id)) ?? [];
+    return mapWord(row, parentWordIds);
+  });
+
+  const labelById = new Map(words.map((word) => [word.id, `${word.label} (${word.referenceCode})`]));
+  for (const word of words) {
+    word.parentWordLabels = word.parentWordIds
+      .map((parentId) => labelById.get(parentId))
+      .filter((label): label is string => Boolean(label));
+  }
+
   const fieldTypes = await getFieldTypeOptions();
   const levelOrder = new Map(fieldTypes.map((fieldType, index) => [fieldType.id, index]));
 
@@ -199,6 +233,13 @@ export async function getWordsCatalog(): Promise<WordListItem[]> {
     if (levelDiff !== 0) return levelDiff;
     return left.label.localeCompare(right.label);
   });
+}
+
+export async function getParentLevelsForWordEdit(categoryLevelId: string | null): Promise<ParentLevelOption[]> {
+  if (!categoryLevelId) return [];
+  const { getParentWordOptionsForLevel } = await import("@/lib/word-dependency-actions");
+  const result = await getParentWordOptionsForLevel(categoryLevelId);
+  return result?.levels ?? [];
 }
 
 function revalidateCatalog() {
@@ -232,6 +273,15 @@ export async function updateWordAction(formData: FormData) {
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
+    ...(() => {
+      const dependency = parseWordDependencyFormData(formData);
+      return {
+        selectionHierarchy: dependency.selectionHierarchy,
+        visibilityMode: dependency.visibilityMode,
+        parentWordIds: dependency.parentWordIds,
+        parentMatchMode: dependency.parentMatchMode,
+      };
+    })(),
   });
 
   if (!parsed.success) {
@@ -243,8 +293,19 @@ export async function updateWordAction(formData: FormData) {
     redirect(`/catalog/words-manage/${parsed.data.wordId}?status=error&message=Supabase+service+role+nao+configurada`);
   }
 
-  const { wordId, label, referenceCode, designationPt, designationEs, designationEn, includeInDesignation } =
-    parsed.data;
+  const {
+    wordId,
+    label,
+    referenceCode,
+    designationPt,
+    designationEs,
+    designationEn,
+    includeInDesignation,
+    selectionHierarchy = null,
+    parentWordIds = [],
+    parentMatchMode = "any",
+    visibilityMode = "always",
+  } = parsed.data;
 
   let categoryLevelId = parsed.data.categoryLevelId ?? null;
   let defaultFieldTypeId = parsed.data.fieldTypeId ?? null;
@@ -264,23 +325,6 @@ export async function updateWordAction(formData: FormData) {
   }
 
   const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
-  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
-    try {
-      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
-        excludeWordId: wordId,
-        fieldTypeId: defaultFieldTypeId,
-        categoryLevelId,
-        wordLabel: label,
-      });
-      if (conflict) {
-        redirect(
-          `/catalog/words-manage/${wordId}?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
-        );
-      }
-    } catch {
-      redirect(`/catalog/words-manage/${wordId}?status=error&message=Nao+foi+possivel+validar+a+referencia`);
-    }
-  }
 
   const updateResult = await supabase
     .from("skus_words")
@@ -295,16 +339,27 @@ export async function updateWordAction(formData: FormData) {
       designation_es: designationEs,
       designation_en: designationEn,
       include_in_designation: includeInDesignation,
+      selection_hierarchy: selectionHierarchy,
+      parent_match_mode: parentMatchMode,
       updated_at: new Date().toISOString(),
     })
     .eq("id", wordId);
 
   if (updateResult.error) {
-    const message =
-      updateResult.error.code === "23505"
-        ? encodeURIComponent("Referencia ja existente noutra palavra do mesmo nivel.")
-        : "Nao+foi+possivel+editar+a+palavra";
-    redirect(`/catalog/words-manage/${wordId}?status=error&message=${message}`);
+    redirect(`/catalog/words-manage/${wordId}?status=error&message=Nao+foi+possivel+editar+a+palavra`);
+  }
+
+  const categoryId = await resolveCategoryIdForLevel(supabase, categoryLevelId);
+  if (categoryId) {
+    const edgeResult = await syncWordParentEdges(supabase, {
+      categoryId,
+      childWordId: wordId,
+      parentWordIds: visibilityMode === "conditional" ? parentWordIds : [],
+      parentMatchMode,
+    });
+    if (!edgeResult.ok) {
+      redirect(`/catalog/words-manage/${wordId}?status=error&message=${encodeURIComponent(edgeResult.message)}`);
+    }
   }
 
   revalidateCatalog();
@@ -370,23 +425,6 @@ export async function reactivateWordAction(formData: FormData) {
   }
 
   const normalizedReferenceCode = normalizeWordReferenceCode(String(word.reference_code ?? ""));
-  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
-    try {
-      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
-        excludeWordId: parsed.data.wordId,
-        fieldTypeId: word.default_field_type_id ? String(word.default_field_type_id) : null,
-        categoryLevelId: word.category_level_id ? String(word.category_level_id) : null,
-        wordLabel: String(word.label ?? ""),
-      });
-      if (conflict) {
-        redirect(
-          `/catalog/words-manage?status=error&message=${encodeURIComponent(formatWordReferenceConflictMessage(conflict))}`,
-        );
-      }
-    } catch {
-      redirect("/catalog/words-manage?status=error&message=Nao+foi+possivel+validar+a+referencia");
-    }
-  }
 
   const { error } = await supabase
     .from("skus_words")

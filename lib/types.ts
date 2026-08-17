@@ -34,6 +34,9 @@ export interface WordListItem {
   familyLabels: string[];
   parentWordIds: string[];
   parentWordLabels: string[];
+  parentMatchMode: "any" | "all";
+  selectionHierarchy: number | null;
+  categoryLevelId: string | null;
 }
 
 export interface GeneratorWord {
@@ -45,6 +48,9 @@ export interface GeneratorWord {
   designationEs: string;
   designationEn: string;
   includeInDesignation: boolean;
+  parentWordIds?: string[];
+  parentMatchMode?: "any" | "all";
+  selectionHierarchy?: number | null;
 }
 
 export interface GeneratorLevel {
@@ -67,6 +73,8 @@ export interface WordHistoryItem {
 
 export interface GeneratorCatalog {
   levels: GeneratorLevel[];
+  parentEdges?: Array<{ childWordId: string; parentWordId: string }>;
+  categoryId?: string;
 }
 
 export interface RecentSkuGeneration {

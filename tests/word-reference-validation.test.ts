@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectDesignationLengthWarnings,
-  formatWordReferenceConflictMessage,
+  formatSharedReferenceWarningMessage,
   isEmptyWordReferenceCode,
   isSizeReferenceScope,
   normalizeWordLabel,
@@ -36,15 +36,8 @@ describe("word reference validation", () => {
     ).toBe("size");
   });
 
-  it("formata mensagem de conflito global", () => {
-    expect(
-      formatWordReferenceConflictMessage({
-        wordId: "1",
-        label: "Frasco",
-        referenceCode: "FRA",
-        levelLabel: "Formato",
-      }),
-    ).toContain("Frasco");
+  it("formata aviso de referencia partilhada", () => {
+    expect(formatSharedReferenceWarningMessage(3)).toBe("3 PALABRAS TIENEN ESA MISMA REFERENCIA");
   });
 
   it("avisa designacoes acima de 60 caracteres", () => {

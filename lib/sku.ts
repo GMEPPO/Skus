@@ -1,4 +1,5 @@
 import type { GeneratorCatalog, GeneratorWord } from "@/lib/types";
+import { getVisibleOptionsForLevel } from "@/lib/word-dependencies";
 
 export const MAX_DESIGNATION_LENGTH = 60;
 export const EMPTY_SELECTION_PREFIX = "__empty__:";
@@ -27,8 +28,9 @@ export function sortGeneratorWords(options: GeneratorWord[]): GeneratorWord[] {
 export function getAvailableOptions(
   catalog: GeneratorCatalog,
   levelId: string,
+  selections: Record<string, string> = {},
 ): GeneratorWord[] {
-  return catalog.levels.find((item) => item.id === levelId)?.options ?? [];
+  return getVisibleOptionsForLevel(catalog, levelId, selections);
 }
 
 export function filterGeneratorWords(options: GeneratorWord[], query: string) {

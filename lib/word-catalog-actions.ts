@@ -6,12 +6,9 @@ import { requireRole } from "@/lib/auth";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import type { WordHistoryItem } from "@/lib/types";
 import { buildIlikePattern } from "@/lib/normalization-search-utils";
-import {
-  findWordReferenceConflict,
-  formatWordReferenceConflictMessage,
-  isEmptyWordReferenceCode,
-  normalizeWordReferenceCode,
-} from "@/lib/word-reference-validation";
+import { normalizeWordReferenceCode } from "@/lib/word-reference-validation";
+import { parseWordDependencyFormData } from "@/lib/word-dependencies";
+import { resolveCategoryIdForLevel, syncWordParentEdges } from "@/lib/word-dependency-persistence";
 
 const WORD_HISTORY_PAGE_SIZE = 50;
 
@@ -24,6 +21,10 @@ const createWordInputSchema = z.object({
   designationEs: z.string().trim().min(1),
   designationEn: z.string().trim().min(1),
   includeInDesignation: z.boolean(),
+  selectionHierarchy: z.number().int().min(1).max(2).nullable().optional(),
+  visibilityMode: z.enum(["always", "conditional"]).optional(),
+  parentWordIds: z.array(z.string().uuid()).optional(),
+  parentMatchMode: z.enum(["any", "all"]).optional(),
 });
 
 function normalizeLabel(value: string) {
@@ -38,6 +39,8 @@ function revalidateWordCatalog() {
 }
 
 function parseCreateWordFormData(formData: FormData) {
+  const dependency = parseWordDependencyFormData(formData);
+
   return createWordInputSchema.safeParse({
     label: formData.get("label"),
     referenceCode: formData.get("referenceCode"),
@@ -47,6 +50,10 @@ function parseCreateWordFormData(formData: FormData) {
     designationEs: formData.get("designationEs"),
     designationEn: formData.get("designationEn"),
     includeInDesignation: formData.get("includeInDesignation") === "on",
+    selectionHierarchy: dependency.selectionHierarchy,
+    visibilityMode: dependency.visibilityMode,
+    parentWordIds: dependency.parentWordIds,
+    parentMatchMode: dependency.parentMatchMode,
   });
 }
 
@@ -58,7 +65,18 @@ async function persistNewWord(
     return { ok: false, message: "Supabase service role nao configurada." };
   }
 
-  const { label, referenceCode, designationPt, designationEs, designationEn, includeInDesignation } = parsed;
+  const {
+    label,
+    referenceCode,
+    designationPt,
+    designationEs,
+    designationEn,
+    includeInDesignation,
+    selectionHierarchy = null,
+    parentWordIds = [],
+    parentMatchMode = "any",
+    visibilityMode = "always",
+  } = parsed;
 
   let categoryLevelId = parsed.categoryLevelId ?? null;
   let defaultFieldTypeId = parsed.fieldTypeId ?? null;
@@ -90,20 +108,6 @@ async function persistNewWord(
   }
 
   const normalizedReferenceCode = normalizeWordReferenceCode(referenceCode);
-  if (!isEmptyWordReferenceCode(normalizedReferenceCode)) {
-    try {
-      const conflict = await findWordReferenceConflict(supabase, normalizedReferenceCode, {
-        fieldTypeId: defaultFieldTypeId,
-        categoryLevelId,
-        wordLabel: label,
-      });
-      if (conflict) {
-        return { ok: false, message: formatWordReferenceConflictMessage(conflict) };
-      }
-    } catch {
-      return { ok: false, message: "Nao foi possivel validar a referencia." };
-    }
-  }
 
   const insertResult = await supabase
     .from("skus_words")
@@ -118,6 +122,8 @@ async function persistNewWord(
       designation_es: designationEs,
       designation_en: designationEn,
       include_in_designation: includeInDesignation,
+      selection_hierarchy: selectionHierarchy,
+      parent_match_mode: parentMatchMode,
       is_active: true,
     })
     .select("id")
@@ -130,8 +136,23 @@ async function persistNewWord(
     return { ok: false, message: "Nao foi possivel criar a palavra." };
   }
 
+  const wordId = String(insertResult.data.id);
+  const categoryId = await resolveCategoryIdForLevel(supabase, categoryLevelId);
+
+  if (categoryId && visibilityMode === "conditional" && parentWordIds.length > 0) {
+    const edgeResult = await syncWordParentEdges(supabase, {
+      categoryId,
+      childWordId: wordId,
+      parentWordIds,
+      parentMatchMode,
+    });
+    if (!edgeResult.ok) {
+      return edgeResult;
+    }
+  }
+
   revalidateWordCatalog();
-  return { ok: true, wordId: String(insertResult.data.id) };
+  return { ok: true, wordId };
 }
 
 export async function createWordFromGeneratorAction(
