@@ -1,4 +1,4 @@
-import type { GeneratorCatalog, GeneratorWord } from "@/lib/types";
+import type { GeneratorCatalog, GeneratorLevel, GeneratorWord } from "@/lib/types";
 import { getVisibleOptionsForLevel } from "@/lib/word-dependencies";
 
 export const MAX_DESIGNATION_LENGTH = 60;
@@ -13,8 +13,33 @@ export function isEmptySelection(value?: string) {
   return Boolean(value && value.startsWith(EMPTY_SELECTION_PREFIX));
 }
 
-export function isEmptyReferenceWord(word?: Pick<GeneratorWord, "referenceCode"> | null) {
-  return word?.referenceCode === "000";
+export function isEmptyReferenceWord(word?: Pick<GeneratorWord, "referenceCode" | "label"> | null) {
+  if (!word) return false;
+  if (word.referenceCode === "000") return true;
+  return String(word.label ?? "")
+    .trim()
+    .toLowerCase() === "vazio";
+}
+
+function shouldIncludeWordInDesignation(
+  level: Pick<GeneratorLevel, "fieldType">,
+  option: GeneratorWord,
+): boolean {
+  if (isEmptyReferenceWord(option)) return false;
+  if (level.fieldType === "product") return true;
+  return option.includeInDesignation;
+}
+
+function pickDesignationText(option: GeneratorWord, locale: DesignationLocale): string | null {
+  const value =
+    locale === "en"
+      ? option.designationEn || option.designation || option.label
+      : locale === "es"
+        ? option.designationEs || option.designation || option.label
+        : option.designationPt || option.designation || option.label;
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "vazio") return null;
+  return trimmed;
 }
 
 export function sortGeneratorWords(options: GeneratorWord[]): GeneratorWord[] {
@@ -71,10 +96,8 @@ export function buildDesignationByLocale(
       const selectedValue = selections[level.id];
       if (isEmptySelection(selectedValue)) return null;
       const option = level.options.find((item) => item.id === selectedValue);
-      if (!option || !option.includeInDesignation || isEmptyReferenceWord(option)) return null;
-      if (locale === "en") return option.designationEn || option.designation || option.label;
-      if (locale === "es") return option.designationEs || option.designation || option.label;
-      return option.designationPt || option.designation || option.label;
+      if (!option || !shouldIncludeWordInDesignation(level, option)) return null;
+      return pickDesignationText(option, locale);
     })
     .filter((value): value is string => Boolean(value));
 

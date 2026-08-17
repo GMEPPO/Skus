@@ -141,6 +141,34 @@ describe("sku builder", () => {
     expect(filterGeneratorWords(options, "missing")).toHaveLength(0);
   });
 
+  it("always includes product level words in designations when not 000", () => {
+    const catalogWithHiddenProduct: GeneratorCatalog = {
+      ...sabsolCatalog,
+      levels: sabsolCatalog.levels.map((level) =>
+        level.id === "product"
+          ? {
+              ...level,
+              options: level.options.map((option) => ({ ...option, includeInDesignation: false })),
+            }
+          : level,
+      ),
+    };
+
+    expect(
+      buildDesignationByLocale(
+        catalogWithHiddenProduct,
+        {
+          brand: "alg",
+          format: "sol",
+          product: "sab",
+          size: "020",
+          packaging: "cxa",
+        },
+        "pt",
+      ),
+    ).toBe("ALG OCEAN SPA Sabonete 20g Caixa Cartao");
+  });
+
   it("ignores empty reference 000 in designations", () => {
     const catalogWithEmpty: GeneratorCatalog = {
       ...sabsolCatalog,

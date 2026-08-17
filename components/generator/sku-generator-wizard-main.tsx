@@ -79,7 +79,16 @@ function buildSecureSelectionsPayload(catalog: GeneratorCatalog, selections: Sel
   for (const level of catalog.levels) {
     const selectedId = selections[level.id];
     if (!selectedId) continue;
-    payload[level.id] = isEmptySelection(selectedId) ? { kind: "empty" } : { kind: "word", wordId: selectedId };
+    if (isEmptySelection(selectedId)) {
+      payload[level.id] = { kind: "empty" };
+      continue;
+    }
+    const option = level.options.find((item) => item.id === selectedId);
+    if (!option || isEmptyReferenceWord(option)) {
+      payload[level.id] = { kind: "empty" };
+      continue;
+    }
+    payload[level.id] = { kind: "word", wordId: selectedId };
   }
   return payload;
 }
@@ -335,7 +344,10 @@ export function SkuGeneratorWizardMain({
     if (!level || !word) return;
 
     setSelections((current) => {
-      const nextSelections = { ...current, [level.id]: word.id };
+      const nextSelections = {
+        ...current,
+        [level.id]: isEmptyReferenceWord(word) ? buildEmptySelectionId(level.id) : word.id,
+      };
       bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
       return nextSelections;
     });
@@ -353,7 +365,8 @@ export function SkuGeneratorWizardMain({
   }
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
-    const nextValue = word === null ? buildEmptySelectionId(level.id) : word?.id ?? "";
+    const nextValue =
+      !word || isEmptyReferenceWord(word) ? buildEmptySelectionId(level.id) : word.id;
     const nextSelections = pruneInvalidDownstreamSelections(catalog, {
       ...selections,
       [level.id]: nextValue,
