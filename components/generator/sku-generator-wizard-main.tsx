@@ -726,26 +726,28 @@ export function SkuGeneratorWizardMain({
 
   function renderSkuReferenceSummary() {
     return (
-      <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Referencia</p>
-          <p className="text-xs text-slate-500">
-            Progresso {selectedCount}/{catalog.levels.length}
+      <div className="mt-2 space-y-1 border-t border-slate-800/80 pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Referencia</p>
+          <p className="text-[10px] text-slate-500">
+            {selectedCount}/{catalog.levels.length} niveis
           </p>
         </div>
-        <p className="break-all font-mono text-lg font-semibold text-amber-300">{skuPreview || "—"}</p>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <p className="break-all font-mono text-sm font-semibold leading-tight text-amber-300">
+          {skuPreview || "—"}
+        </p>
+        <div className="flex flex-wrap items-center gap-1">
           {catalog.levels.map((level, index) => {
             const selectedId = selections[level.id];
             const isSelected = Boolean(selectedId);
             const segmentCode = isSelected ? getSelectionDisplayCode(level, selectedId) : "---";
             return (
               <React.Fragment key={level.id}>
-                {index > 0 ? <span className="font-mono text-slate-600">-</span> : null}
+                {index > 0 ? <span className="font-mono text-[10px] text-slate-600">-</span> : null}
                 <span
                   title={`${level.label}${isSelected ? `: ${getSelectionDisplayLabel(level, selectedId)}` : " (por escolher)"}`}
                   className={[
-                    "rounded-md px-1.5 py-0.5 font-mono text-sm",
+                    "rounded px-1 py-px font-mono text-[11px] leading-4",
                     isSelected
                       ? "bg-amber-400/15 font-semibold text-amber-300"
                       : "bg-slate-900 text-slate-500",
@@ -758,8 +760,8 @@ export function SkuGeneratorWizardMain({
           })}
         </div>
         {secureGenerationV2Enabled ? (
-          <p className="text-[11px] text-slate-500">
-            Pre-visualizacao local. O codigo final vem da resposta do servidor.
+          <p className="text-[10px] leading-tight text-slate-600">
+            Pre-visualizacao local; codigo final vem do servidor.
           </p>
         ) : null}
       </div>
@@ -1001,23 +1003,31 @@ export function SkuGeneratorWizardMain({
           ) : null}
         </div>
 
-        <div className="sticky bottom-4 z-20 space-y-2">
-          <div className="rounded-2xl border border-amber-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="sticky bottom-2 z-20 space-y-1.5">
+          <div className="rounded-xl border border-amber-500/30 bg-slate-950/95 p-3 shadow-xl shadow-black/25 backdrop-blur">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-xs uppercase tracking-[0.24em] text-amber-300">Designacao</p>
-                <p className={`mt-2 text-base ${isDesignationTooLong ? "text-red-300" : "text-slate-100"}`}>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-amber-300">Designacao</p>
+                  {designation ? (
+                    <p className={`text-[10px] ${isDesignationTooLong ? "text-red-300" : "text-slate-500"}`}>
+                      {designationLength}/{MAX_DESIGNATION_LENGTH}
+                      {isDesignationTooLong ? " · limite excedido" : ""}
+                    </p>
+                  ) : null}
+                </div>
+                <p
+                  className={`mt-0.5 line-clamp-2 text-sm leading-snug ${isDesignationTooLong ? "text-red-300" : "text-slate-100"}`}
+                >
                   {designation || "Seleciona os campos para construir a designacao final."}
                 </p>
-                {designation ? (
-                  <p className={`mt-2 text-xs ${isDesignationTooLong ? "text-red-300" : "text-slate-400"}`}>
-                    {designationLength}/{MAX_DESIGNATION_LENGTH} caracteres
-                    {isDesignationTooLong ? " - limite excedido" : ""}
-                  </p>
-                ) : null}
                 {renderSkuReferenceSummary()}
               </div>
-              <Button type="submit" disabled={!canSubmit || isSubmitting} className="shrink-0">
+              <Button
+                type="submit"
+                disabled={!canSubmit || isSubmitting}
+                className="h-9 shrink-0 px-4 text-sm sm:self-end"
+              >
                 {isSubmitting
                   ? "A guardar..."
                   : isNormalizationMode
@@ -1028,30 +1038,32 @@ export function SkuGeneratorWizardMain({
           </div>
 
           {selectionOrder.length > 0 ? (
-            <div className="rounded-2xl border border-slate-700/80 bg-slate-950/95 p-4 shadow-xl shadow-black/20 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Codigos semelhantes</p>
-              <p className="mt-1 text-xs text-slate-600">Histórico de códigos novos e normalizados</p>
+            <div className="rounded-xl border border-slate-700/80 bg-slate-950/95 p-3 shadow-lg shadow-black/15 backdrop-blur">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Codigos semelhantes</p>
+                <p className="text-[10px] text-slate-600">Novos e normalizados</p>
+              </div>
               {codeExamplesLoading ? (
-                <p className="mt-3 text-sm text-slate-500">A procurar codigos semelhantes...</p>
+                <p className="mt-1.5 text-xs text-slate-500">A procurar...</p>
               ) : codeExamples.length > 0 ? (
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
                   {codeExamples.map((example) => (
                     <li
                       key={`${example.source}-${example.code}`}
-                      className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2.5"
+                      className="rounded-lg border border-slate-800 bg-slate-900/70 px-2.5 py-1.5"
                     >
-                      <p className="break-all text-sm font-semibold text-amber-200">{example.code}</p>
+                      <p className="break-all text-xs font-semibold text-amber-200">{example.code}</p>
                       {example.designationPt ? (
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-400">{example.designationPt}</p>
+                        <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">{example.designationPt}</p>
                       ) : null}
-                      <p className="mt-1.5 text-[10px] uppercase tracking-[0.16em] text-slate-600">
+                      <p className="mt-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-600">
                         {example.source === "normalization" ? "Normalização" : "Histórico"}
                       </p>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-sm text-slate-500">
+                <p className="mt-1.5 text-xs text-slate-500">
                   Ainda nao existem codigos criados com esta combinacao de palavras.
                 </p>
               )}
@@ -1059,9 +1071,9 @@ export function SkuGeneratorWizardMain({
           ) : null}
 
           {wordDesignationWarnings.length > 0 ? (
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 shadow-xl shadow-black/20 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Avisos de designacao</p>
-              <ul className="mt-3 space-y-2 text-xs text-amber-100/90">
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 shadow-lg shadow-black/15 backdrop-blur">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-amber-200">Avisos de designacao</p>
+              <ul className="mt-1.5 space-y-1 text-[11px] text-amber-100/90">
                 {wordDesignationWarnings.map((warning) => (
                   <li key={`${warning.levelLabel}-${warning.wordLabel}-${warning.locale}`}>
                     {warning.wordLabel} ({warning.levelLabel}) — {warning.locale.toUpperCase()}: {warning.length}/
