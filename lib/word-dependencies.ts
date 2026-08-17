@@ -86,22 +86,12 @@ function getSelectedPackagingWord(catalog: GeneratorCatalog, selections: Record<
   return packagingLevel.options.find((option) => option.id === selectedId) ?? null;
 }
 
-function isSameHierarchyTwoWord(
-  word: Pick<GeneratorWord, "id" | "referenceCode" | "selectionHierarchy">,
-  selected: Pick<GeneratorWord, "id" | "referenceCode" | "selectionHierarchy">,
-) {
-  if (!isHierarchyTwoWord(word) || !isHierarchyTwoWord(selected)) return false;
-  return word.id === selected.id || word.referenceCode === selected.referenceCode;
-}
-
-function isHierarchyTwoWordAlreadySelectedInPackaging(
-  word: GeneratorWord,
+function isHierarchyTwoSelectedInPackaging(
   catalog: GeneratorCatalog,
   selections: Record<string, string>,
 ) {
   const selected = getSelectedPackagingWord(catalog, selections);
-  if (!selected || !isHierarchyTwoWord(selected)) return false;
-  return isSameHierarchyTwoWord(word, selected);
+  return Boolean(selected && isHierarchyTwoWord(selected));
 }
 
 export function isWordVisibleInGenerator(
@@ -115,7 +105,7 @@ export function isWordVisibleInGenerator(
   }
 
   if (level.fieldType === "extra" && isHierarchyTwoWord(word)) {
-    return !isHierarchyTwoWordAlreadySelectedInPackaging(word, catalog, selections);
+    return !isHierarchyTwoSelectedInPackaging(catalog, selections);
   }
 
   return true;

@@ -170,13 +170,13 @@ describe("word dependencies", () => {
     expect(withHierarchyOnePackaging.some((word) => word.id === "lim")).toBe(true);
   });
 
-  it("hides only the hierarchy-2 word already selected at packaging in extra", () => {
+  it("hides all hierarchy-2 extra words when hierarchy-2 packaging is selected", () => {
     const withAlgAtPackaging = getVisibleOptionsForLevel(catalog, "extra", {
       product: "sab",
       packaging: "alg-pack",
     });
     expect(withAlgAtPackaging.some((word) => word.id === "alg")).toBe(false);
-    expect(withAlgAtPackaging.some((word) => word.id === "lim")).toBe(true);
+    expect(withAlgAtPackaging.some((word) => word.id === "lim")).toBe(false);
   });
 
   it("clears invalid downstream selections when upstream changes", () => {
