@@ -72,15 +72,36 @@ function isHierarchyTwoWord(word: Pick<GeneratorWord, "selectionHierarchy">) {
   return Number(word.selectionHierarchy) === 2;
 }
 
-function packagingHierarchyTwoSelected(catalog: GeneratorCatalog, selections: Record<string, string>) {
-  const packagingLevel = catalog.levels.find((level) => level.fieldType === "packaging");
-  if (!packagingLevel) return false;
+function getPackagingLevel(catalog: GeneratorCatalog) {
+  return catalog.levels.find((level) => level.fieldType === "packaging");
+}
+
+function getSelectedPackagingWord(catalog: GeneratorCatalog, selections: Record<string, string>) {
+  const packagingLevel = getPackagingLevel(catalog);
+  if (!packagingLevel) return null;
 
   const selectedId = selections[packagingLevel.id];
-  if (!selectedId || isEmptySelection(selectedId)) return false;
+  if (!selectedId || isEmptySelection(selectedId)) return null;
 
-  const selected = packagingLevel.options.find((option) => option.id === selectedId);
-  return Boolean(selected && isHierarchyTwoWord(selected));
+  return packagingLevel.options.find((option) => option.id === selectedId) ?? null;
+}
+
+function isSameHierarchyTwoWord(
+  word: Pick<GeneratorWord, "id" | "referenceCode" | "selectionHierarchy">,
+  selected: Pick<GeneratorWord, "id" | "referenceCode" | "selectionHierarchy">,
+) {
+  if (!isHierarchyTwoWord(word) || !isHierarchyTwoWord(selected)) return false;
+  return word.id === selected.id || word.referenceCode === selected.referenceCode;
+}
+
+function isHierarchyTwoWordAlreadySelectedInPackaging(
+  word: GeneratorWord,
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+) {
+  const selected = getSelectedPackagingWord(catalog, selections);
+  if (!selected || !isHierarchyTwoWord(selected)) return false;
+  return isSameHierarchyTwoWord(word, selected);
 }
 
 export function isWordVisibleInGenerator(
@@ -94,7 +115,7 @@ export function isWordVisibleInGenerator(
   }
 
   if (level.fieldType === "extra" && isHierarchyTwoWord(word)) {
-    return !packagingHierarchyTwoSelected(catalog, selections);
+    return !isHierarchyTwoWordAlreadySelectedInPackaging(word, catalog, selections);
   }
 
   return true;

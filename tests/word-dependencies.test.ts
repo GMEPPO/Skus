@@ -120,6 +120,17 @@ const catalog: GeneratorCatalog = {
           includeInDesignation: true,
           selectionHierarchy: 2,
         },
+        {
+          id: "lim",
+          label: "LIMAO",
+          referenceCode: "LIM",
+          designation: "LIMAO",
+          designationPt: "LIMAO",
+          designationEs: "LIMON",
+          designationEn: "LEMON",
+          includeInDesignation: true,
+          selectionHierarchy: 2,
+        },
       ],
     },
   ],
@@ -146,21 +157,26 @@ describe("word dependencies", () => {
     expect(visible.some((word) => word.id === "alg-pack")).toBe(true);
   });
 
-  it("shows hierarchy-2 extra words when no hierarchy-2 packaging is selected", () => {
+  it("shows all hierarchy-2 extra words when hierarchy-1 packaging is selected", () => {
     const visible = getVisibleOptionsForLevel(catalog, "extra", { product: "sab" });
     expect(visible.some((word) => word.id === "alg")).toBe(true);
+    expect(visible.some((word) => word.id === "lim")).toBe(true);
 
-    const stillVisibleWithHierarchyOne = getVisibleOptionsForLevel(catalog, "extra", {
+    const withHierarchyOnePackaging = getVisibleOptionsForLevel(catalog, "extra", {
       product: "sab",
       packaging: "caixa",
     });
-    expect(stillVisibleWithHierarchyOne.some((word) => word.id === "alg")).toBe(true);
+    expect(withHierarchyOnePackaging.some((word) => word.id === "alg")).toBe(true);
+    expect(withHierarchyOnePackaging.some((word) => word.id === "lim")).toBe(true);
+  });
 
-    const hidden = getVisibleOptionsForLevel(catalog, "extra", {
+  it("hides only the hierarchy-2 word already selected at packaging in extra", () => {
+    const withAlgAtPackaging = getVisibleOptionsForLevel(catalog, "extra", {
       product: "sab",
       packaging: "alg-pack",
     });
-    expect(hidden.some((word) => word.id === "alg")).toBe(false);
+    expect(withAlgAtPackaging.some((word) => word.id === "alg")).toBe(false);
+    expect(withAlgAtPackaging.some((word) => word.id === "lim")).toBe(true);
   });
 
   it("clears invalid downstream selections when upstream changes", () => {

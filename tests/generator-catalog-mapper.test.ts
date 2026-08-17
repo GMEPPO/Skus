@@ -116,8 +116,7 @@ describe("generator catalog mapper hierarchy mirroring", () => {
     expect(
       getVisibleOptionsForLevel(catalog, "extra", { packaging: "caixa" }).some((word) => word.id === "alg"),
     ).toBe(true);
-    expect(
-      getVisibleOptionsForLevel(catalog, "extra", { packaging: "alg" }).some((word) => word.id === "alg"),
-    ).toBe(false);
+    const withAlgAtPackaging = getVisibleOptionsForLevel(catalog, "extra", { packaging: "alg" });
+    expect(withAlgAtPackaging.some((word) => word.id === "alg")).toBe(false);
   });
 });

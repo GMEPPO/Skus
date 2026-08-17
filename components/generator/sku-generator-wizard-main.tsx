@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ArrowRight, CheckCircle2, ImagePlus, Plus, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, ImagePlus, Plus, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -137,6 +137,7 @@ export function SkuGeneratorWizardMain({
   const [codeExamples, setCodeExamples] = useState<SkuCodeExample[]>([]);
   const [codeExamplesLoading, setCodeExamplesLoading] = useState(false);
   const [wordCreateLevel, setWordCreateLevel] = useState<GeneratorLevel | null>(null);
+  const activeLevelRef = useRef<HTMLDivElement>(null);
 
   const isNormalizationMode = Boolean(normalizationTarget);
   const usesSecurePayload = secureGenerationV2Enabled || isNormalizationMode;
@@ -150,6 +151,11 @@ export function SkuGeneratorWizardMain({
     const index = catalog.levels.findIndex((level) => !selections[level.id]);
     return index === -1 ? catalog.levels.length : index;
   }, [catalog.levels, selections]);
+
+  useEffect(() => {
+    activeLevelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [activeLevelIndex]);
+
   const designation = buildDesignation(catalog, selections);
   const designationPt = buildDesignationByLocale(catalog, selections, "pt");
   const designationEs = buildDesignationByLocale(catalog, selections, "es");
@@ -290,12 +296,26 @@ export function SkuGeneratorWizardMain({
   }
 
   function clearSelection(level: GeneratorLevel) {
+    const changedIndex = catalog.levels.findIndex((entry) => entry.id === level.id);
     const nextSelections = { ...selections };
-    delete nextSelections[level.id];
+    for (const downstream of catalog.levels.slice(changedIndex)) {
+      delete nextSelections[downstream.id];
+    }
     bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
-    setSelectionOrder(selectionOrder.filter((id) => id !== level.id));
+    setSelectionOrder(selectionOrder.filter((id) => catalog.levels.findIndex((entry) => entry.id === id) < changedIndex));
+    setSearchByLevel((current) => {
+      const next = { ...current };
+      for (const downstream of catalog.levels.slice(changedIndex)) {
+        delete next[downstream.id];
+      }
+      return next;
+    });
     setSelections(nextSelections);
   }
+
+  const completedLevels = catalog.levels.slice(0, activeLevelIndex);
+  const activeLevel = activeLevelIndex < catalog.levels.length ? catalog.levels[activeLevelIndex] : null;
+  const allLevelsCompleted = activeLevelIndex >= catalog.levels.length;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -525,146 +545,149 @@ export function SkuGeneratorWizardMain({
 
         <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="space-y-4">
-            {catalog.levels.map((level, levelIndex) => {
-              const selectedId = selections[level.id];
-              const isActive = levelIndex === activeLevelIndex;
-              const isLocked = levelIndex > activeLevelIndex;
-              const isCompleted = levelIndex < activeLevelIndex;
-              const emptyOptionSelected = isLevelSelectionEmpty(level, selectedId);
-              const allOptions = sortGeneratorWords(getAvailableOptions(catalog, level.id, selections));
-              const hasEmptyReferenceWord = allOptions.some((option) => option.referenceCode === "000");
-              const query = searchByLevel[level.id] ?? "";
-              const options = filterGeneratorWords(allOptions, query).slice(0, 36);
-              const showLegacyEmptyOption = !hasEmptyReferenceWord && level.fieldType === "extra";
-
-              return (
-                <div
-                  key={level.id}
-                  className={[
-                    "rounded-2xl border bg-slate-900/60 p-4 shadow-lg shadow-black/10 transition",
-                    isActive ? "border-amber-500/40 ring-1 ring-amber-500/20" : "border-slate-700",
-                    isLocked ? "opacity-70" : "",
-                  ].join(" ")}
-                >
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Nivel {level.order}</p>
-                      <h3 className="text-lg font-semibold text-slate-50">{level.label}</h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isCompleted ? (
-                        <Badge variant="success">
-                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                          preenchido
-                        </Badge>
-                      ) : isActive ? (
-                        <Badge>ativo</Badge>
-                      ) : isRequiredLevel(level) ? (
-                        <Badge variant="outline">bloqueado</Badge>
-                      ) : (
-                        <Badge variant="outline">opcional</Badge>
-                      )}
-                      {isActive && fieldTypes.length > 0 ? (
+            {completedLevels.length > 0 ? (
+              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-slate-500">Niveis concluidos</p>
+                <div className="space-y-2">
+                  {completedLevels.map((level) => {
+                    const selectedId = selections[level.id];
+                    if (!selectedId) return null;
+                    return (
+                      <div
+                        key={level.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">
+                            Nivel {level.order} · {level.label}
+                          </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                            <span className="truncate text-sm text-slate-100">
+                              {getSelectionDisplayLabel(level, selectedId)}
+                            </span>
+                            <span className="rounded-md bg-slate-950 px-1.5 py-0.5 font-mono text-xs text-slate-400">
+                              {getSelectionDisplayCode(level, selectedId)}
+                            </span>
+                          </div>
+                        </div>
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-8 w-8 p-0"
-                          title={`Criar palavra em ${level.label}`}
-                          aria-label={`Criar palavra em ${level.label}`}
-                          onClick={() => setWordCreateLevel(level)}
+                          className="h-8 shrink-0 px-2.5 text-xs"
+                          onClick={() => clearSelection(level)}
                         >
-                          <Plus className="h-4 w-4" />
+                          Alterar
                         </Button>
-                      ) : null}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
-                  {isCompleted && selectedId ? (
-                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-2">
-                      <Sparkles className="h-4 w-4 text-amber-300" />
-                      <span className="text-sm text-slate-100">{getSelectionDisplayLabel(level, selectedId)}</span>
-                      <span className="rounded-md bg-slate-950 px-2 py-1 text-xs text-slate-400">
-                        {getSelectionDisplayCode(level, selectedId)}
-                      </span>
-                      <Button type="button" variant="outline" onClick={() => clearSelection(level)}>
-                        Alterar
-                      </Button>
-                    </div>
-                  ) : null}
+            {activeLevel ? (
+              (() => {
+                const level = activeLevel;
+                const selectedId = selections[level.id];
+                const emptyOptionSelected = isLevelSelectionEmpty(level, selectedId);
+                const allOptions = sortGeneratorWords(getAvailableOptions(catalog, level.id, selections));
+                const hasEmptyReferenceWord = allOptions.some((option) => option.referenceCode === "000");
+                const query = searchByLevel[level.id] ?? "";
+                const options = filterGeneratorWords(allOptions, query).slice(0, 36);
+                const showLegacyEmptyOption = !hasEmptyReferenceWord && level.fieldType === "extra";
 
-                  {isLocked ? (
-                    <p className="text-sm text-slate-500">Seleciona o nivel anterior para continuar.</p>
-                  ) : null}
-
-                  {isActive ? (
-                    <>
-                      <label className="mb-3 flex h-11 items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus-within:ring-2 focus-within:ring-amber-400">
-                        <Search className="h-4 w-4 text-slate-500" />
-                        <input
-                          value={query}
-                          onChange={(event) =>
-                            setSearchByLevel((current) => ({
-                              ...current,
-                              [level.id]: event.target.value,
-                            }))
-                          }
-                          placeholder={`Pesquisar por palavra, código ou designação em ${level.label}`}
-                          className="h-full flex-1 bg-transparent outline-none placeholder:text-slate-600"
-                        />
-                      </label>
-
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {options.map((option) => {
-                          const isSelected = selectedId === option.id;
-                          const isEmptyOption = isEmptyReferenceWord(option);
-                          return (
-                            <button
-                              key={option.id}
-                              type="button"
-                              onClick={() => handleSelection(level, option)}
-                              className={[
-                                "rounded-xl border px-4 py-3 text-left transition",
-                                isSelected
-                                  ? "border-amber-400 bg-amber-400/10"
-                                  : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
-                              ].join(" ")}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="font-medium text-slate-100">{isEmptyOption ? "Vazio" : option.label}</p>
-                                  <p className="mt-1 text-xs text-slate-500">{option.referenceCode}</p>
-                                </div>
-                                {isSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
-                              </div>
-                            </button>
-                          );
-                        })}
-                        {showLegacyEmptyOption ? (
-                          <button
+                return (
+                  <div
+                    ref={activeLevelRef}
+                    className="rounded-2xl border border-amber-500/40 bg-slate-900/60 p-4 shadow-lg shadow-black/10 ring-1 ring-amber-500/20"
+                  >
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-amber-300/90">
+                          Nivel {level.order} · activo
+                        </p>
+                        <h3 className="text-lg font-semibold text-slate-50">{level.label}</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge>{isRequiredLevel(level) ? "obrigatorio" : "opcional"}</Badge>
+                        {fieldTypes.length > 0 ? (
+                          <Button
                             type="button"
-                            onClick={() => handleSelection(level, null)}
-                            className={[
-                              "rounded-xl border px-4 py-3 text-left transition",
-                              emptyOptionSelected
-                                ? "border-amber-400 bg-amber-400/10"
-                                : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
-                            ].join(" ")}
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            title={`Criar palavra em ${level.label}`}
+                            aria-label={`Criar palavra em ${level.label}`}
+                            onClick={() => setWordCreateLevel(level)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <label className="mb-3 flex h-11 items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus-within:ring-2 focus-within:ring-amber-400">
+                      <Search className="h-4 w-4 text-slate-500" />
+                      <input
+                        value={query}
+                        onChange={(event) =>
+                          setSearchByLevel((current) => ({
+                            ...current,
+                            [level.id]: event.target.value,
+                          }))
+                        }
+                        placeholder={`Pesquisar por palavra, código ou designação em ${level.label}`}
+                        className="h-full flex-1 bg-transparent outline-none placeholder:text-slate-600"
+                      />
+                    </label>
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {options.map((option) => {
+                        const isEmptyOption = isEmptyReferenceWord(option);
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => handleSelection(level, option)}
+                            className="rounded-xl border border-slate-700 bg-slate-950/40 px-4 py-3 text-left transition hover:border-slate-500 hover:bg-slate-800/80"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="font-medium text-slate-100">Vazio</p>
-                                <p className="mt-1 text-xs text-slate-500">000</p>
+                                <p className="font-medium text-slate-100">{isEmptyOption ? "Vazio" : option.label}</p>
+                                <p className="mt-1 text-xs text-slate-500">{option.referenceCode}</p>
                               </div>
-                              {emptyOptionSelected ? <Sparkles className="h-4 w-4 text-amber-300" /> : null}
                             </div>
                           </button>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              );
-            })}
+                        );
+                      })}
+                      {showLegacyEmptyOption ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSelection(level, null)}
+                          className={[
+                            "rounded-xl border px-4 py-3 text-left transition",
+                            emptyOptionSelected
+                              ? "border-amber-400 bg-amber-400/10"
+                              : "border-slate-700 bg-slate-950/40 hover:border-slate-500 hover:bg-slate-800/80",
+                          ].join(" ")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-slate-100">Vazio</p>
+                              <p className="mt-1 text-xs text-slate-500">000</p>
+                            </div>
+                          </div>
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : allLevelsCompleted ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-100">
+                Todos os niveis foram preenchidos. Revê o resumo e conclui a geracao.
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-4">
