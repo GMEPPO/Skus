@@ -5,6 +5,36 @@
 
 begin;
 
+delete from public.skus_word_parent_edges e
+using public.skus_words w,
+      public.skus_category_levels cl,
+      public.skus_categories c
+where e.child_word_id = w.id
+  and c.id = cl.category_id
+  and c.slug = 'cosmetica'
+  and cl.key = 'brand'
+  and (
+    w.category_level_id = cl.id
+    or (
+      cl.legacy_field_type_id is not null
+      and w.default_field_type_id = cl.legacy_field_type_id
+    )
+  );
+
+delete from public.skus_words w
+using public.skus_category_levels cl,
+      public.skus_categories c
+where c.id = cl.category_id
+  and c.slug = 'cosmetica'
+  and cl.key = 'brand'
+  and (
+    w.category_level_id = cl.id
+    or (
+      cl.legacy_field_type_id is not null
+      and w.default_field_type_id = cl.legacy_field_type_id
+    )
+  );
+
 with cosmetica as (
   select id from public.skus_categories where slug = 'cosmetica' limit 1
 ),
@@ -14,32 +44,6 @@ brand_level as (
   join cosmetica c on c.id = cl.category_id
   where cl.key = 'brand'
   limit 1
-),
-removed_edges as (
-  delete from public.skus_word_parent_edges e
-  using public.skus_words w, brand_level bl
-  where e.child_word_id = w.id
-    and (
-      w.category_level_id = bl.id
-      or (
-        bl.legacy_field_type_id is not null
-        and w.default_field_type_id = bl.legacy_field_type_id
-      )
-    )
-  returning e.id
-),
-removed_words as (
-  delete from public.skus_words w
-  using brand_level bl
-  where (
-      w.category_level_id = bl.id
-      or (
-        bl.legacy_field_type_id is not null
-        and w.default_field_type_id = bl.legacy_field_type_id
-      )
-    )
-    and coalesce((select 0 from removed_edges limit 1), 0) = 0
-  returning w.id
 ),
 dictionary(label, normalized_label, reference_code, designation_pt, designation_es, designation_en, include_in_designation) as (
   values
@@ -132,7 +136,6 @@ select
   true
 from dictionary d
 cross join brand_level bl
-where coalesce((select 0 from removed_words limit 1), 0) = 0
 returning label, reference_code;
 
 -- Verificacao rapida pos-carga (executar manualmente se quiser):
