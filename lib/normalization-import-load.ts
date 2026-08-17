@@ -272,60 +272,49 @@ export async function insertNormalizationRowsResilient(
   return { insertedCount, skippedRows };
 }
 
-type PendingOk2Row = {
-  id: string;
-  source_row_number: number;
-  legacy_code: string | null;
-  source_new_code: string | null;
-  source_designation_pt: string | null;
-  source_designation_es: string | null;
-  source_designation_en: string | null;
-};
-
-export async function completeImportedOk2RowsForBatch(
+/** Cancel completed import-only rows so re-imported legacy codes re-enter the pending queue. */
+export async function cancelCompletedImportOnlyForLegacyCodes(
   supabase: ServiceSupabase,
-  batchId: string,
-): Promise<SkippedImportRow[]> {
-  const { data, error } = await supabase
-    .from("skus_code_normalizations")
-    .select(
-      "id, source_row_number, legacy_code, source_new_code, source_designation_pt, source_designation_es, source_designation_en",
-    )
-    .eq("import_batch_id", batchId)
-    .eq("normalization_status", "pending")
-    .ilike("source_status", "ok2");
+  legacyCodes: string[],
+): Promise<void> {
+  const codes = [...new Set(legacyCodes.map((code) => code.trim()).filter(Boolean))];
+  if (codes.length === 0) return;
 
-  if (error) throw new Error(error.message);
-
-  const skippedRows: SkippedImportRow[] = [];
-  const completedAt = new Date().toISOString();
-
-  for (const row of (data ?? []) as PendingOk2Row[]) {
-    const sourceDesignation =
-      row.source_designation_pt ?? row.source_designation_es ?? row.source_designation_en ?? null;
-
-    const { error: updateError } = await supabase
+  const chunkSize = 100;
+  for (let offset = 0; offset < codes.length; offset += chunkSize) {
+    const chunk = codes.slice(offset, offset + chunkSize);
+    const { error } = await supabase
       .from("skus_code_normalizations")
       .update({
-        normalization_status: "completed",
-        completed_at: completedAt,
-        final_new_code: row.source_new_code,
-        final_designation_pt: row.source_designation_pt ?? sourceDesignation,
-        final_designation_es: row.source_designation_es,
-        final_designation_en: row.source_designation_en,
+        normalization_status: "cancelled",
+        completed_at: null,
+        final_new_code: null,
+        final_designation_pt: null,
+        final_designation_es: null,
+        final_designation_en: null,
       })
-      .eq("id", row.id);
+      .eq("normalization_status", "completed")
+      .is("generation_id", null)
+      .in("legacy_code", chunk);
 
-    if (updateError) {
-      skippedRows.push({
-        sourceRowNumber: Number(row.source_row_number),
-        legacyCode: row.legacy_code,
-        reason: mapNormalizationInsertError(updateError.message, updateError.details, updateError.code, {
-          isOk2: true,
-        }),
-      });
-    }
+    if (error) throw new Error(error.message);
   }
+}
 
-  return skippedRows;
+/** Safety net: never leave freshly imported rows marked completed (legacy OK2 auto-complete). */
+export async function ensureImportBatchRowsStayPending(supabase: ServiceSupabase, batchId: string): Promise<void> {
+  const { error } = await supabase
+    .from("skus_code_normalizations")
+    .update({
+      normalization_status: "pending",
+      completed_at: null,
+      final_new_code: null,
+      final_designation_pt: null,
+      final_designation_es: null,
+      final_designation_en: null,
+    })
+    .eq("import_batch_id", batchId)
+    .eq("normalization_status", "completed");
+
+  if (error) throw new Error(error.message);
 }

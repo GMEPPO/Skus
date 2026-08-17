@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import {
+  cancelCompletedImportOnlyForLegacyCodes,
   clearPendingImportQueue,
+  ensureImportBatchRowsStayPending,
   insertNormalizationRowsResilient,
   partitionImportRowsForLoad,
   releaseBatchFileSha256,
@@ -58,7 +60,7 @@ function buildInsertRow(
     source_designation_en: row.sourceDesignationEn,
     source_status: row.sourceStatus,
     source_observations: row.sourceObservations,
-    normalization_status: row.normalizationStatus,
+    normalization_status: row.normalizationStatus === "cancelled" ? "cancelled" : "pending",
     import_issue: row.importIssue,
     category_id: categoryId,
     final_new_code: null,
@@ -183,6 +185,19 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
 
   const summary = summarizeImportRows(rowsToLoad);
 
+  try {
+    await cancelCompletedImportOnlyForLegacyCodes(
+      supabase,
+      rowsToLoad.map((row) => row.legacyCode).filter((code): code is string => Boolean(code)),
+    );
+  } catch {
+    return {
+      ok: false,
+      code: "cancel_previous_failed",
+      message: "Nao foi possivel preparar o historico anterior para reimportacao.",
+    };
+  }
+
   const { data: batch, error: batchError } = await supabase
     .from("skus_normalization_import_batches")
     .insert({
@@ -191,7 +206,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
       status: "completed",
       total_rows: summary.totalRows,
       pending_rows: summary.pendingRows,
-      completed_rows: summary.completedRows,
+      completed_rows: 0,
       invalid_rows: summary.invalidRows,
       imported_by: user.id,
       completed_at: new Date().toISOString(),
@@ -233,6 +248,18 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     };
   }
 
+  try {
+    await ensureImportBatchRowsStayPending(supabase, batch.id);
+  } catch {
+    await supabase.from("skus_code_normalizations").delete().eq("import_batch_id", batch.id);
+    await supabase.from("skus_normalization_import_batches").delete().eq("id", batch.id);
+    return {
+      ok: false,
+      code: "pending_enforce_failed",
+      message: "Import gravado com estado invalido. Tenta novamente apos o deploy mais recente.",
+    };
+  }
+
   const allSkippedRows = [...preSkippedRows, ...insertSkippedRows];
 
   if (insertedCount === 0) {
@@ -268,7 +295,7 @@ export async function importNormalizationBatchAction(formData: FormData): Promis
     .update({
       total_rows: loadedSummary.totalRows,
       pending_rows: loadedSummary.pendingRows,
-      completed_rows: loadedSummary.completedRows,
+      completed_rows: 0,
       invalid_rows: loadedSummary.invalidRows,
     })
     .eq("id", batch.id);
