@@ -18,45 +18,28 @@ product_level as (
 ),
 removed_edges as (
   delete from public.skus_word_parent_edges e
-  using public.skus_words w, product_level ll, cosmetica c
+  using public.skus_words w, product_level ll
   where e.child_word_id = w.id
     and (
       w.category_level_id = ll.id
       or (
         ll.legacy_field_type_id is not null
         and w.default_field_type_id = ll.legacy_field_type_id
-        and (
-          w.category_level_id is null
-          or exists (
-            select 1
-            from public.skus_category_levels cl
-            where cl.category_id = c.id
-              and cl.key = 'product'
-              and cl.id = w.category_level_id
-          )
-        )
       )
     )
   returning e.id
 ),
 removed_words as (
   delete from public.skus_words w
-  using product_level ll, cosmetica c
-  where w.category_level_id = ll.id
-     or (
-       ll.legacy_field_type_id is not null
-       and w.default_field_type_id = ll.legacy_field_type_id
-       and (
-         w.category_level_id is null
-         or exists (
-           select 1
-           from public.skus_category_levels cl
-           where cl.category_id = c.id
-             and cl.key = 'product'
-             and cl.id = w.category_level_id
-         )
-       )
-     )
+  using product_level ll
+  where (
+      w.category_level_id = ll.id
+      or (
+        ll.legacy_field_type_id is not null
+        and w.default_field_type_id = ll.legacy_field_type_id
+      )
+    )
+    and coalesce((select 0 from removed_edges limit 1), 0) = 0
   returning w.id
 ),
 dictionary(label, normalized_label, reference_code, designation_pt, designation_es, designation_en, empty_designation, include_in_designation) as (
@@ -123,6 +106,7 @@ select
   true
 from dictionary d
 cross join product_level ll
+where coalesce((select 0 from removed_words limit 1), 0) = 0
 returning label, reference_code, designation_pt, designation_es, designation_en;
 
 commit;
