@@ -18,15 +18,45 @@ format_level as (
 ),
 removed_edges as (
   delete from public.skus_word_parent_edges e
-  using public.skus_words w, format_level ll
+  using public.skus_words w, format_level ll, cosmetica c
   where e.child_word_id = w.id
-    and w.category_level_id = ll.id
+    and (
+      w.category_level_id = ll.id
+      or (
+        ll.legacy_field_type_id is not null
+        and w.default_field_type_id = ll.legacy_field_type_id
+        and (
+          w.category_level_id is null
+          or exists (
+            select 1
+            from public.skus_category_levels cl
+            where cl.category_id = c.id
+              and cl.key = 'format'
+              and cl.id = w.category_level_id
+          )
+        )
+      )
+    )
   returning e.id
 ),
 removed_words as (
   delete from public.skus_words w
-  using format_level ll
+  using format_level ll, cosmetica c
   where w.category_level_id = ll.id
+     or (
+       ll.legacy_field_type_id is not null
+       and w.default_field_type_id = ll.legacy_field_type_id
+       and (
+         w.category_level_id is null
+         or exists (
+           select 1
+           from public.skus_category_levels cl
+           where cl.category_id = c.id
+             and cl.key = 'format'
+             and cl.id = w.category_level_id
+         )
+       )
+     )
   returning w.id
 ),
 dictionary(label, normalized_label, reference_code, designation_pt, designation_es, designation_en, include_in_designation) as (
