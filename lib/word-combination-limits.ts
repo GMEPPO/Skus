@@ -171,6 +171,8 @@ export function analyzeWordCombinationLimits(
     return { violations: [], pathsExplored: 0, truncated: false };
   }
 
+  const resolvedTargetWord: GeneratorWord = targetWord;
+
   const levelIds = catalog.levels.map((level) => level.id);
   const violations: CombinationLimitViolation[] = [];
   const seenViolations = new Set<string>();
@@ -204,7 +206,7 @@ export function analyzeWordCombinationLimits(
     const level = catalog.levels[levelIndex];
 
     if (level.id === targetLevelId) {
-      if (!isWordVisibleInGenerator(targetWord, level, catalog, selections)) {
+      if (!isWordVisibleInGenerator(resolvedTargetWord, level, catalog, selections)) {
         return;
       }
 

@@ -13,6 +13,7 @@ import {
   exportCompletedNormalizationHistoryAction,
   searchCompletedNormalizationHistoryAction,
 } from "@/lib/normalization-query-actions";
+import type { NormalizationHistoryItem } from "@/lib/types";
 
 function formatCompletedAt(value: string | null) {
   if (!value) return "—";
