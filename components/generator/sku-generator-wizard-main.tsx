@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ArrowRight, ChevronDown, ChevronRight, ImagePlus, Plus, Search, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ImagePlus, Plus, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -124,7 +124,7 @@ export function SkuGeneratorWizardMain({
   const [multiplesStatus, setMultiplesStatus] = useState<"real" | "estimated">("estimated");
   const [weight, setWeight] = useState("");
   const [weightStatus, setWeightStatus] = useState<"real" | "estimated">("estimated");
-  const [logisticsRequired, setLogisticsRequired] = useState(true);
+  const [logisticsRequired, setLogisticsRequired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [modalData, setModalData] = useState<GeneratedSkuModalData | null>(null);
@@ -550,6 +550,7 @@ export function SkuGeneratorWizardMain({
       formData.delete("weight");
       formData.delete("weightStatus");
       formData.delete("requestId");
+      formData.delete("productImage");
     }
 
     if (isNormalizationMode && normalizationTarget) {
@@ -709,6 +710,62 @@ export function SkuGeneratorWizardMain({
     setModalData(null);
   }
 
+  function handleExtendedDataToggle(enabled: boolean) {
+    setLogisticsRequired(enabled);
+    if (!enabled) {
+      setUnitsPerBox("");
+      setMultiples("");
+      setWeight("");
+      setProductImagePreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      setProductImageName("");
+    }
+  }
+
+  function renderSkuReferenceSummary() {
+    return (
+      <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Referencia</p>
+          <p className="text-xs text-slate-500">
+            Progresso {selectedCount}/{catalog.levels.length}
+          </p>
+        </div>
+        <p className="break-all font-mono text-lg font-semibold text-amber-300">{skuPreview || "—"}</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {catalog.levels.map((level, index) => {
+            const selectedId = selections[level.id];
+            const isSelected = Boolean(selectedId);
+            const segmentCode = isSelected ? getSelectionDisplayCode(level, selectedId) : "---";
+            return (
+              <React.Fragment key={level.id}>
+                {index > 0 ? <span className="font-mono text-slate-600">-</span> : null}
+                <span
+                  title={`${level.label}${isSelected ? `: ${getSelectionDisplayLabel(level, selectedId)}` : " (por escolher)"}`}
+                  className={[
+                    "rounded-md px-1.5 py-0.5 font-mono text-sm",
+                    isSelected
+                      ? "bg-amber-400/15 font-semibold text-amber-300"
+                      : "bg-slate-900 text-slate-500",
+                  ].join(" ")}
+                >
+                  {segmentCode}
+                </span>
+              </React.Fragment>
+            );
+          })}
+        </div>
+        {secureGenerationV2Enabled ? (
+          <p className="text-[11px] text-slate-500">
+            Pre-visualizacao local. O codigo final vem da resposta do servidor.
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <>
     <div className="space-y-6">
@@ -755,214 +812,144 @@ export function SkuGeneratorWizardMain({
           </>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
-          <div className="space-y-3">
-            {catalog.levels.map((level, levelIndex) => renderLevelPanel(level, levelIndex))}
-            {allLevelsCompleted ? (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-100">
-                Todos os niveis foram preenchidos. Revê o resumo e conclui a geracao.
-              </div>
-            ) : null}
+        <label className="flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
+          <input
+            type="checkbox"
+            checked={logisticsRequired}
+            onChange={(event) => handleExtendedDataToggle(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-amber-400 focus:ring-amber-400"
+          />
+          <div>
+            <p className="text-sm font-medium text-slate-100">
+              Incluir dados logisticos e imagem do produto
+            </p>
+            <p className="text-xs text-slate-400">
+              Desactivado: gera o codigo apenas com os niveis e a designacao, sem pedir quantidades nem foto.
+            </p>
           </div>
+        </label>
 
-          <div className="space-y-4">
-            <Card className="space-y-4 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Resumo</p>
-                <h3 className="mt-1 text-xl font-semibold text-slate-50">SKU global</h3>
-                <p className="mt-2 text-sm text-slate-400">
-                  {secureGenerationV2Enabled
-                    ? "Fluxo V2 seguro: o servidor e a fonte autoritativa para codigo e designacoes."
-                    : "Biblioteca livre por nivel."}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Progressao</p>
-                <p className="mt-2 text-3xl font-semibold text-slate-50">
-                  {selectedCount}/{catalog.levels.length}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Pré-visualização SKU</p>
-                <p className="mt-2 break-all text-lg font-semibold text-amber-300">{skuPreview}</p>
-                {secureGenerationV2Enabled ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Pré-visualização local apenas para orientação. O resultado final vem exclusivamente da resposta do
-                    RPC.
-                  </p>
-                ) : null}
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-500">Fluxo ativo</p>
-              <p className="mb-3 text-sm text-slate-400">
-                {secureGenerationV2Enabled ? "Geração segura (V2)" : "Geração legada"}
+        {logisticsRequired ? (
+          <Card className="space-y-4 p-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Dados logisticos</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Obrigatorios para gerar: quantidade por caixa, multiplos e peso (real ou estimado).
               </p>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                {catalog.levels.map((level, index) => (
-                  <div
-                    key={level.id}
-                    className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-3 py-1"
-                  >
-                    <span>{level.label}</span>
-                    {index < catalog.levels.length - 1 ? <ArrowRight className="h-3.5 w-3.5" /> : null}
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            <Card className="space-y-4 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Dados logisticos</p>
-                <label className="mt-3 flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
+              {measurementError ? <p className="mt-2 text-sm text-amber-300">{measurementError}</p> : null}
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-3 md:col-span-1 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Quantidade por caixa</span>
                   <input
-                    type="checkbox"
-                    checked={logisticsRequired}
-                    onChange={(event) => {
-                      const next = event.target.checked;
-                      setLogisticsRequired(next);
-                      if (!next) {
-                        setUnitsPerBox("");
-                        setMultiples("");
-                        setWeight("");
-                      }
-                    }}
-                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-amber-400 focus:ring-amber-400"
+                    name="unitsPerBox"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required={logisticsRequired && !isNormalizationMode}
+                    value={unitsPerBox}
+                    onChange={(event) => setUnitsPerBox(event.target.value)}
+                    onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
                   />
-                  <div>
-                    <p className="text-sm font-medium text-slate-100">Incluir dados logisticos neste codigo</p>
-                    <p className="text-xs text-slate-400">
-                      Desmarca para gerar o SKU sem quantidade por caixa, multiplos ou peso.
-                    </p>
-                  </div>
                 </label>
-                {logisticsRequired ? (
-                  <p className="mt-2 text-sm text-slate-400">
-                    Estes campos sao obrigatorios e cada um pode ser marcado como real ou estimado.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-sm text-slate-500">Dados logisticos opcionais para este codigo.</p>
-                )}
-                {measurementError ? <p className="mt-2 text-sm text-amber-300">{measurementError}</p> : null}
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Estado</span>
+                  <select
+                    name="unitsPerBoxStatus"
+                    value={unitsPerBoxStatus}
+                    onChange={(event) => {
+                      const next = event.target.value as "real" | "estimated";
+                      bindOrRenewRequestIdForPayload(
+                        buildSecurePayloadKey(selections, unitsPerBox, next, multiples, multiplesStatus, weight, weightStatus),
+                      );
+                      setUnitsPerBoxStatus(next);
+                    }}
+                    className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="estimated">Estimado</option>
+                    <option value="real">Confirmado</option>
+                  </select>
+                </label>
               </div>
-              <div className={`grid gap-4 ${logisticsRequired ? "" : "pointer-events-none opacity-50"}`}>
-                <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                  <label className="space-y-2">
-                    <span className="text-sm text-slate-300">Quantidade por caixa</span>
-                    <input
-                      name="unitsPerBox"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      required={logisticsRequired && !isNormalizationMode}
-                      value={unitsPerBox}
-                      onChange={(event) => setUnitsPerBox(event.target.value)}
-                      onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
-                      className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm text-slate-300">Estado</span>
-                    <select
-                      name="unitsPerBoxStatus"
-                      value={unitsPerBoxStatus}
-                      onChange={(event) => {
-                        const next = event.target.value as "real" | "estimated";
-                        bindOrRenewRequestIdForPayload(
-                          buildSecurePayloadKey(selections, unitsPerBox, next, multiples, multiplesStatus, weight, weightStatus),
-                        );
-                        setUnitsPerBoxStatus(next);
-                      }}
-                      className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    >
-                      <option value="estimated">Estimado</option>
-                      <option value="real">Confirmado</option>
-                    </select>
-                  </label>
-                </div>
 
-                <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                  <label className="space-y-2">
-                    <span className="text-sm text-slate-300">Multiplos</span>
-                    <input
-                      name="multiples"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      required={logisticsRequired && !isNormalizationMode}
-                      value={multiples}
-                      onChange={(event) => setMultiples(event.target.value)}
-                      onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
-                      className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm text-slate-300">Estado</span>
-                    <select
-                      name="multiplesStatus"
-                      value={multiplesStatus}
-                      onChange={(event) => {
-                        const next = event.target.value as "real" | "estimated";
-                        bindOrRenewRequestIdForPayload(
-                          buildSecurePayloadKey(selections, unitsPerBox, unitsPerBoxStatus, multiples, next, weight, weightStatus),
-                        );
-                        setMultiplesStatus(next);
-                      }}
-                      className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    >
-                      <option value="estimated">Estimado</option>
-                      <option value="real">Confirmado</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                  <label className="space-y-2">
-                    <span className="text-sm text-slate-300">Peso</span>
-                    <input
-                      name="weight"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      required={logisticsRequired && !isNormalizationMode}
-                      value={weight}
-                      onChange={(event) => setWeight(event.target.value)}
-                      onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
-                      className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm text-slate-300">Estado</span>
-                    <select
-                      name="weightStatus"
-                      value={weightStatus}
-                      onChange={(event) => {
-                        const next = event.target.value as "real" | "estimated";
-                        bindOrRenewRequestIdForPayload(
-                          buildSecurePayloadKey(selections, unitsPerBox, unitsPerBoxStatus, multiples, multiplesStatus, weight, next),
-                        );
-                        setWeightStatus(next);
-                      }}
-                      className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
-                    >
-                      <option value="estimated">Estimado</option>
-                      <option value="real">Confirmado</option>
-                    </select>
-                  </label>
-                </div>
+              <div className="grid gap-3 md:col-span-1 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Multiplos</span>
+                  <input
+                    name="multiples"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required={logisticsRequired && !isNormalizationMode}
+                    value={multiples}
+                    onChange={(event) => setMultiples(event.target.value)}
+                    onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Estado</span>
+                  <select
+                    name="multiplesStatus"
+                    value={multiplesStatus}
+                    onChange={(event) => {
+                      const next = event.target.value as "real" | "estimated";
+                      bindOrRenewRequestIdForPayload(
+                        buildSecurePayloadKey(selections, unitsPerBox, unitsPerBoxStatus, multiples, next, weight, weightStatus),
+                      );
+                      setMultiplesStatus(next);
+                    }}
+                    className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="estimated">Estimado</option>
+                    <option value="real">Confirmado</option>
+                  </select>
+                </label>
               </div>
-            </Card>
 
-            <Card className="space-y-4 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Imagem do produto</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  Podes anexar uma imagem JPG, PNG ou WEBP ate 5 MB. Este campo e opcional.
-                </p>
+              <div className="grid gap-3 md:col-span-1 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Peso</span>
+                  <input
+                    name="weight"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required={logisticsRequired && !isNormalizationMode}
+                    value={weight}
+                    onChange={(event) => setWeight(event.target.value)}
+                    onBlur={() => bindOrRenewRequestIdForPayload(buildSecurePayloadKey())}
+                    className="flex h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm text-slate-300">Estado</span>
+                  <select
+                    name="weightStatus"
+                    value={weightStatus}
+                    onChange={(event) => {
+                      const next = event.target.value as "real" | "estimated";
+                      bindOrRenewRequestIdForPayload(
+                        buildSecurePayloadKey(selections, unitsPerBox, unitsPerBoxStatus, multiples, multiplesStatus, weight, next),
+                      );
+                      setWeightStatus(next);
+                    }}
+                    className="flex h-11 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100"
+                  >
+                    <option value="estimated">Estimado</option>
+                    <option value="real">Confirmado</option>
+                  </select>
+                </label>
               </div>
-              <div className="grid gap-4">
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-600 bg-slate-950/50 px-4 py-8 text-center transition hover:border-amber-400/70 hover:bg-slate-900/70">
+            </div>
+
+            <div className="border-t border-slate-800 pt-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Imagem do produto</p>
+              <p className="mt-1 text-sm text-slate-400">Opcional. JPG, PNG ou WEBP ate 5 MB.</p>
+              <div className="mt-3 grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-950/50 px-4 py-6 text-center transition hover:border-amber-400/70 hover:bg-slate-900/70">
                   <input
                     name="productImage"
                     type="file"
@@ -970,46 +957,54 @@ export function SkuGeneratorWizardMain({
                     className="hidden"
                     onChange={handleProductImageChange}
                   />
-                  <ImagePlus className="h-8 w-8 text-amber-300" />
-                  <p className="mt-3 text-sm font-medium text-slate-100">
-                    {productImageName || "Selecionar imagem do produto"}
+                  <ImagePlus className="h-7 w-7 text-amber-300" />
+                  <p className="mt-2 text-sm font-medium text-slate-100">
+                    {productImageName || "Selecionar imagem"}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">Formato recomendado: imagem quadrada ou retrato curto.</p>
                 </label>
-
                 {productImagePreviewUrl ? (
-                  <div className="rounded-2xl border border-slate-700 bg-slate-950/50 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-sm text-slate-300">Pré-visualização da imagem</p>
+                  <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="text-sm text-slate-300">Pre-visualizacao</p>
                       <Button
                         type="button"
                         variant="outline"
+                        className="h-8 px-2 text-xs"
                         onClick={(event) => {
                           const form = event.currentTarget.closest("form");
                           const input = form?.querySelector<HTMLInputElement>('input[name="productImage"]') ?? null;
                           clearProductImage(input);
                         }}
                       >
-                        <X className="mr-2 h-4 w-4" />
+                        <X className="mr-1 h-3.5 w-3.5" />
                         Remover
                       </Button>
                     </div>
                     <img
                       src={productImagePreviewUrl}
-                      alt="Pré-visualização da imagem do produto"
-                      className="h-56 w-full rounded-xl object-cover"
+                      alt="Pre-visualizacao da imagem do produto"
+                      className="h-32 w-full rounded-lg object-cover md:w-48"
                     />
                   </div>
                 ) : null}
               </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
+        ) : null}
+
+        <div className="space-y-3">
+          {catalog.levels.map((level, levelIndex) => renderLevelPanel(level, levelIndex))}
+          {allLevelsCompleted ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-100">
+              Todos os niveis foram preenchidos. Revê o resumo e conclui a geracao.
+            </div>
+          ) : null}
         </div>
 
         <div className="sticky bottom-4 z-20 space-y-2">
           <div className="rounded-2xl border border-amber-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs uppercase tracking-[0.24em] text-amber-300">Designacao</p>
                 <p className={`mt-2 text-base ${isDesignationTooLong ? "text-red-300" : "text-slate-100"}`}>
                   {designation || "Seleciona os campos para construir a designacao final."}
@@ -1020,8 +1015,9 @@ export function SkuGeneratorWizardMain({
                     {isDesignationTooLong ? " - limite excedido" : ""}
                   </p>
                 ) : null}
+                {renderSkuReferenceSummary()}
               </div>
-              <Button type="submit" disabled={!canSubmit || isSubmitting}>
+              <Button type="submit" disabled={!canSubmit || isSubmitting} className="shrink-0">
                 {isSubmitting
                   ? "A guardar..."
                   : isNormalizationMode
