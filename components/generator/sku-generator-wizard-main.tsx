@@ -158,11 +158,9 @@ export function SkuGeneratorWizardMain({
   const [secureRequestId, setSecureRequestId] = useState(() => crypto.randomUUID());
   const secureRequestIdRef = useRef(secureRequestId);
   const requestBoundPayloadKeyRef = useRef<string | null>(null);
-  const hideSummaryTimerRef = useRef<number | null>(null);
   const [normalizationCompleted, setNormalizationCompleted] = useState(false);
   const [codeExamples, setCodeExamples] = useState<SkuCodeExample[]>([]);
   const [codeExamplesLoading, setCodeExamplesLoading] = useState(false);
-  const [floatingSummaryVisible, setFloatingSummaryVisible] = useState(false);
   const [wordCreateLevel, setWordCreateLevel] = useState<GeneratorLevel | null>(null);
   const [expandedLevelIds, setExpandedLevelIds] = useState<Set<string>>(() => {
     const firstLevelId = catalog.levels[0]?.id;
@@ -194,40 +192,6 @@ export function SkuGeneratorWizardMain({
     if (!targetLevel || !expandedLevelIds.has(targetLevel.id)) return;
     levelRefs.current[targetLevel.id]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [activeLevelIndex, catalog.levels, expandedLevelIds]);
-
-  function showFloatingSummary() {
-    if (hideSummaryTimerRef.current) {
-      window.clearTimeout(hideSummaryTimerRef.current);
-      hideSummaryTimerRef.current = null;
-    }
-    setFloatingSummaryVisible(true);
-  }
-
-  function hideFloatingSummaryImmediately() {
-    if (hideSummaryTimerRef.current) {
-      window.clearTimeout(hideSummaryTimerRef.current);
-      hideSummaryTimerRef.current = null;
-    }
-    setFloatingSummaryVisible(false);
-  }
-
-  function scheduleHideFloatingSummary() {
-    if (hideSummaryTimerRef.current) {
-      window.clearTimeout(hideSummaryTimerRef.current);
-    }
-    hideSummaryTimerRef.current = window.setTimeout(() => {
-      setFloatingSummaryVisible(false);
-      hideSummaryTimerRef.current = null;
-    }, 150);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (hideSummaryTimerRef.current) {
-        window.clearTimeout(hideSummaryTimerRef.current);
-      }
-    };
-  }, []);
 
   const designation = buildDesignation(catalog, selections);
   const designationPt = buildDesignationByLocale(catalog, selections, "pt");
@@ -1005,7 +969,7 @@ export function SkuGeneratorWizardMain({
           </>
         )}
 
-        <div onMouseEnter={hideFloatingSummaryImmediately}>
+        <div className="space-y-6 xl:pr-[min(36rem,calc(100vw-3rem))]">
         {!isNormalizationMode ? (
           <div className="flex justify-end">
             <Button
@@ -1220,21 +1184,11 @@ export function SkuGeneratorWizardMain({
         </div>
 
         <div
-          className="fixed top-16 right-0 bottom-0 z-40 w-[clamp(3rem,8vw,10rem)]"
-          onMouseEnter={showFloatingSummary}
-          onMouseLeave={scheduleHideFloatingSummary}
-          aria-hidden
-        />
-
-        {floatingSummaryVisible ? (
-          <div
-            className="fixed bottom-4 right-4 z-50 max-h-[calc(100vh-6rem)] w-[min(34rem,calc(100vw-7rem))] space-y-2 overflow-y-auto"
-            onMouseEnter={showFloatingSummary}
-            onMouseLeave={scheduleHideFloatingSummary}
-          >
-            {renderSummaryDock()}
-          </div>
-        ) : null}
+          className="pointer-events-none fixed bottom-4 right-4 z-50 max-h-[calc(100vh-6rem)] w-[min(34rem,calc(100vw-2rem))] space-y-2 overflow-y-auto"
+          aria-label="Resumo de designacao e referencia"
+        >
+          <div className="pointer-events-auto">{renderSummaryDock()}</div>
+        </div>
       </form>
 
       {modalData ? (
