@@ -1,12 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { WordCatalogList } from "@/components/catalog/word-catalog-list";
-import {
-  deleteWordAction,
-  getFieldTypeOptions,
-  getWordsCatalog,
-} from "@/lib/admin-catalog";
-import { buildWordCombinationWarningSummaries } from "@/lib/word-combination-analysis-data";
+import { SearchParamsFlashMessage } from "@/components/ui/search-params-flash-message";
+import { WordCatalogWorkspace } from "@/components/catalog/word-catalog-workspace";
+import { deleteWordAction, getFieldTypeOptions } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -15,19 +12,8 @@ function messageStyles(status?: string) {
   return "border-emerald-500/40 bg-emerald-500/10 text-emerald-100";
 }
 
-export default async function CatalogWordsManagePage({
-  searchParams,
-}: {
-  searchParams?: { status?: string; message?: string };
-}) {
-  const [words, fieldTypes] = await Promise.all([
-    getWordsCatalog(),
-    getFieldTypeOptions(),
-  ]);
-
-  const warningSummaries = await buildWordCombinationWarningSummaries(words);
-  const combinationWarnings = Object.fromEntries(warningSummaries);
-  const wordsWithWarnings = warningSummaries.size;
+export default async function CatalogWordsManagePage() {
+  const fieldTypes = await getFieldTypeOptions();
 
   return (
     <div className="space-y-6">
@@ -42,29 +28,19 @@ export default async function CatalogWordsManagePage({
         </p>
       </div>
 
-      {searchParams?.message ? (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${messageStyles(searchParams.status)}`}>
-          {searchParams.message}
-        </div>
-      ) : null}
+      <Suspense fallback={null}>
+        <SearchParamsFlashMessage messageStyles={messageStyles} />
+      </Suspense>
 
       <Card>
         <CardHeader>
           <CardTitle>Catalogo atual</CardTitle>
           <CardDescription>
-            Lista agrupada por nivel, com busca por palavra, codigo e designacoes.
-            {wordsWithWarnings > 0
-              ? ` ${wordsWithWarnings} palavra(s) com combinacoes que podem exceder os limites PHC.`
-              : ""}
+            20 palavras por pagina. A busca procura em todo o catalogo.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WordCatalogList
-            words={words}
-            fieldTypes={fieldTypes}
-            deleteAction={deleteWordAction}
-            combinationWarnings={combinationWarnings}
-          />
+          <WordCatalogWorkspace fieldTypes={fieldTypes} deleteAction={deleteWordAction} />
         </CardContent>
       </Card>
     </div>
