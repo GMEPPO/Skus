@@ -34,7 +34,6 @@ export type WordCombinationAnalysisResult = {
   violations: CombinationLimitViolation[];
   pathsExplored: number;
   truncated: boolean;
-  totalViolationsFound: number;
 };
 
 export type WordCandidateForAnalysis = Pick<
@@ -51,24 +50,8 @@ export type WordCandidateForAnalysis = Pick<
   | "selectionHierarchy"
 >;
 
-const DEFAULT_MAX_PATHS_EXPLORED = 8_000;
-const DEFAULT_MAX_VIOLATIONS_RETURNED = 30;
-const DETAILED_MAX_PATHS_EXPLORED = 250_000;
-
-export type CombinationAnalysisOptions = {
-  maxPathsExplored?: number;
-  maxViolationsReturned?: number | null;
-};
-
-export const BACKGROUND_COMBINATION_ANALYSIS_OPTIONS: CombinationAnalysisOptions = {
-  maxPathsExplored: DEFAULT_MAX_PATHS_EXPLORED,
-  maxViolationsReturned: DEFAULT_MAX_VIOLATIONS_RETURNED,
-};
-
-export const DETAILED_COMBINATION_ANALYSIS_OPTIONS: CombinationAnalysisOptions = {
-  maxPathsExplored: DETAILED_MAX_PATHS_EXPLORED,
-  maxViolationsReturned: null,
-};
+const MAX_PATHS_EXPLORED = 8_000;
+const MAX_VIOLATIONS_RETURNED = 30;
 
 function isOptionalLevel(level: GeneratorLevel) {
   return level.fieldType === "extra";
@@ -177,19 +160,15 @@ export function analyzeWordCombinationLimits(
   catalog: GeneratorCatalog,
   targetLevelId: string,
   targetWordId: string,
-  options: CombinationAnalysisOptions = BACKGROUND_COMBINATION_ANALYSIS_OPTIONS,
 ): WordCombinationAnalysisResult {
-  const maxPathsExplored = options.maxPathsExplored ?? DEFAULT_MAX_PATHS_EXPLORED;
-  const maxViolationsReturned = options.maxViolationsReturned ?? DEFAULT_MAX_VIOLATIONS_RETURNED;
-
   const targetLevel = catalog.levels.find((level) => level.id === targetLevelId);
   if (!targetLevel) {
-    return { violations: [], pathsExplored: 0, truncated: false, totalViolationsFound: 0 };
+    return { violations: [], pathsExplored: 0, truncated: false };
   }
 
   const targetWord = targetLevel.options.find((option) => option.id === targetWordId);
   if (!targetWord) {
-    return { violations: [], pathsExplored: 0, truncated: false, totalViolationsFound: 0 };
+    return { violations: [], pathsExplored: 0, truncated: false };
   }
 
   const resolvedTargetWord: GeneratorWord = targetWord;
@@ -199,7 +178,6 @@ export function analyzeWordCombinationLimits(
   const seenViolations = new Set<string>();
   let pathsExplored = 0;
   let truncated = false;
-  let totalViolationsFound = 0;
 
   function recordViolation(selections: Record<string, string>) {
     const violation = evaluateSelections(catalog, selections);
@@ -208,15 +186,14 @@ export function analyzeWordCombinationLimits(
     const signature = selectionSignature(selections, levelIds);
     if (seenViolations.has(signature)) return;
     seenViolations.add(signature);
-    totalViolationsFound += 1;
 
-    if (maxViolationsReturned === null || violations.length < maxViolationsReturned) {
+    if (violations.length < MAX_VIOLATIONS_RETURNED) {
       violations.push(violation);
     }
   }
 
   function dfs(levelIndex: number, selections: Record<string, string>) {
-    if (pathsExplored >= maxPathsExplored) {
+    if (pathsExplored >= MAX_PATHS_EXPLORED) {
       truncated = true;
       return;
     }
@@ -252,7 +229,7 @@ export function analyzeWordCombinationLimits(
     }
 
     for (const option of options) {
-      if (pathsExplored >= maxPathsExplored) {
+      if (pathsExplored >= MAX_PATHS_EXPLORED) {
         truncated = true;
         return;
       }
@@ -264,7 +241,7 @@ export function analyzeWordCombinationLimits(
 
   dfs(0, {});
 
-  return { violations, pathsExplored, truncated, totalViolationsFound };
+  return { violations, pathsExplored, truncated };
 }
 
 export function formatCombinationSelectionLine(selections: CombinationSelectionSummary[]) {

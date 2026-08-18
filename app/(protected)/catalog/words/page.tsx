@@ -1,9 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { WordCatalogWorkspace } from "@/components/catalog/word-catalog-workspace";
-import { getFieldTypeOptions } from "@/lib/admin-catalog";
+import { WordCatalogList } from "@/components/catalog/word-catalog-list";
+import { getFieldTypeOptions, getWordsCatalog } from "@/lib/admin-catalog";
 
 export default async function CatalogWordsPage() {
-  const fieldTypes = await getFieldTypeOptions();
+  const [words, fieldTypes] = await Promise.all([
+    getWordsCatalog(),
+    getFieldTypeOptions(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -18,11 +21,11 @@ export default async function CatalogWordsPage() {
         <CardHeader>
           <CardTitle>Palavras por nivel</CardTitle>
           <CardDescription>
-            20 palavras por pagina. A busca procura em todo o catalogo.
+            Busca por palavra, referencia ou designacao em PT, ES e EN.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WordCatalogWorkspace fieldTypes={fieldTypes} showManageActions={false} />
+          <WordCatalogList words={words} fieldTypes={fieldTypes} showManageActions={false} />
         </CardContent>
       </Card>
     </div>
