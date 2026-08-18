@@ -93,6 +93,7 @@ export function WordForm({
   variant = "page",
   generatorCatalog,
   analysisLevelId,
+  showCombinationAnalysis = false,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   clientAction?: (formData: FormData) => Promise<WordFormClientResult>;
@@ -110,6 +111,7 @@ export function WordForm({
   variant?: "page" | "modal";
   generatorCatalog?: GeneratorCatalog;
   analysisLevelId?: string;
+  showCombinationAnalysis?: boolean;
 }) {
   const [label, setLabel] = useState(initialValues.label);
   const [referenceCode, setReferenceCode] = useState(initialValues.referenceCode);
@@ -154,7 +156,7 @@ export function WordForm({
   );
 
   const combinationAnalysis = useMemo(() => {
-    if (!generatorCatalog || !resolvedAnalysisLevelId) return null;
+    if (!showCombinationAnalysis || !generatorCatalog || !resolvedAnalysisLevelId) return null;
 
     const normalizedReference = referenceCode.trim().toUpperCase();
     if (!normalizedReference || normalizedReference === "000") return null;
@@ -188,6 +190,7 @@ export function WordForm({
     referenceCode,
     resolvedAnalysisLevelId,
     selectionHierarchy,
+    showCombinationAnalysis,
   ]);
 
   const selectedFieldType = useMemo(
@@ -406,11 +409,13 @@ export function WordForm({
         </div>
       ) : null}
 
-      <WordCombinationWarningsPanel
-        compact={isModal}
-        analysis={combinationAnalysis}
-        title="Combinacoes SKU que excedem limites com esta palavra"
-      />
+      {showCombinationAnalysis ? (
+        <WordCombinationWarningsPanel
+          compact={isModal}
+          analysis={combinationAnalysis}
+          title="Combinacoes SKU que excedem limites com esta palavra"
+        />
+      ) : null}
 
       {parentLevels.length > 0 ? (
         <WordDependencyFields
