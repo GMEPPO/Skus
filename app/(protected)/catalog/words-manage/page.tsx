@@ -1,12 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { WordCatalogList } from "@/components/catalog/word-catalog-list";
-import {
-  deleteWordAction,
-  getFieldTypeOptions,
-  getWordsCatalog,
-} from "@/lib/admin-catalog";
-import { buildWordCombinationWarningSummaries } from "@/lib/word-combination-analysis-data";
+import { WordCatalogWorkspace } from "@/components/catalog/word-catalog-workspace";
+import { deleteWordAction, getFieldTypeOptions } from "@/lib/admin-catalog";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -20,14 +15,7 @@ export default async function CatalogWordsManagePage({
 }: {
   searchParams?: { status?: string; message?: string };
 }) {
-  const [words, fieldTypes] = await Promise.all([
-    getWordsCatalog(),
-    getFieldTypeOptions(),
-  ]);
-
-  const warningSummaries = await buildWordCombinationWarningSummaries(words);
-  const combinationWarnings = Object.fromEntries(warningSummaries);
-  const wordsWithWarnings = warningSummaries.size;
+  const fieldTypes = await getFieldTypeOptions();
 
   return (
     <div className="space-y-6">
@@ -52,19 +40,11 @@ export default async function CatalogWordsManagePage({
         <CardHeader>
           <CardTitle>Catalogo atual</CardTitle>
           <CardDescription>
-            Lista agrupada por nivel, com busca por palavra, codigo e designacoes.
-            {wordsWithWarnings > 0
-              ? ` ${wordsWithWarnings} palavra(s) com combinacoes que podem exceder os limites PHC.`
-              : ""}
+            20 palavras por pagina, com busca global e ranking de palavras em alertas.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WordCatalogList
-            words={words}
-            fieldTypes={fieldTypes}
-            deleteAction={deleteWordAction}
-            combinationWarnings={combinationWarnings}
-          />
+          <WordCatalogWorkspace fieldTypes={fieldTypes} deleteAction={deleteWordAction} />
         </CardContent>
       </Card>
     </div>
