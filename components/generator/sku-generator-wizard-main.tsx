@@ -1008,7 +1008,7 @@ export function SkuGeneratorWizardMain({
           </>
         )}
 
-        <div className="space-y-6 xl:pr-[min(36rem,calc(100vw-3rem))]">
+        <div className="space-y-6">
         {!isNormalizationMode ? (
           <div className="flex justify-end">
             <Button
