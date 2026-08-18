@@ -1008,7 +1008,8 @@ export function SkuGeneratorWizardMain({
           </>
         )}
 
-        <div className="space-y-6">
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_min(22rem,32vw)] xl:items-start xl:gap-6">
+        <div className="min-w-0 space-y-6">
         {!isNormalizationMode ? (
           <div className="flex justify-end">
             <Button
@@ -1222,11 +1223,12 @@ export function SkuGeneratorWizardMain({
         ) : null}
         </div>
 
-        <div
-          className="pointer-events-none fixed bottom-4 right-4 z-50 max-h-[calc(100vh-6rem)] w-[min(34rem,calc(100vw-2rem))] space-y-2 overflow-y-auto"
+        <aside
+          className="mt-6 space-y-2 xl:sticky xl:top-24 xl:mt-0 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
           aria-label="Resumo de designacao e referencia"
         >
-          <div className="pointer-events-auto">{renderSummaryDock()}</div>
+          {renderSummaryDock()}
+        </aside>
         </div>
       </form>
 
