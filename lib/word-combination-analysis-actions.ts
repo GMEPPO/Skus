@@ -5,8 +5,8 @@ import {
   analyzeDraftWordCombinationLimits,
   analyzeExistingWordCombinationLimits,
   buildWordCombinationWarningSummaries,
-  type WordCombinationWarningSummary,
 } from "@/lib/word-combination-analysis-data";
+import type { WordCombinationWarningSummary } from "@/lib/word-combination-types";
 import { getWordsCatalog } from "@/lib/admin-catalog";
 import type { WordCombinationAnalysisResult } from "@/lib/word-combination-limits";
 import type { ParentMatchMode } from "@/lib/word-dependencies";

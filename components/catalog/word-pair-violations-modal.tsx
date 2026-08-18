@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { WordCombinationWarningsPanel } from "@/components/catalog/word-combination-warnings-panel";
 import { Button } from "@/components/ui/button";
-import type { WordPairViolationAnalysis } from "@/lib/word-combination-insights-actions";
+import type { WordPairViolationAnalysis } from "@/lib/word-combination-types";
 
 function formatPairLine(analysis: WordPairViolationAnalysis) {
   const { pair } = analysis;

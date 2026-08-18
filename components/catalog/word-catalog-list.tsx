@@ -7,7 +7,7 @@ import { WordCombinationWarningsPanel } from "@/components/catalog/word-combinat
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
-import type { WordCombinationWarningSummary } from "@/lib/word-combination-analysis-data";
+import type { WordCombinationWarningSummary } from "@/lib/word-combination-types";
 import type { WordListItem } from "@/lib/types";
 
 function matchesQuery(word: WordListItem, query: string) {

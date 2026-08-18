@@ -1,4 +1,4 @@
-import type { WordCombinationWarningSummary } from "@/lib/word-combination-analysis-data";
+import type { WordCombinationWarningSummary } from "@/lib/word-combination-types";
 import type { CombinationLimitViolation, CombinationSelectionSummary } from "@/lib/word-combination-limits";
 import { MAX_DESIGNATION_LENGTH } from "@/lib/sku";
 import type { WordListItem } from "@/lib/types";

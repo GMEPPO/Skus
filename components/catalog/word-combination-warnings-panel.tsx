@@ -21,6 +21,8 @@ export function WordCombinationWarningsPanel({
 }) {
   if (!analysis || analysis.violations.length === 0) return null;
 
+  const totalFound = analysis.totalViolationsFound ?? analysis.violations.length;
+
   return (
     <div
       className={`rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 ${compact ? "" : "md:col-span-2 xl:col-span-3"}`}
@@ -32,8 +34,8 @@ export function WordCombinationWarningsPanel({
           <p className={`mt-1 text-amber-100/80 ${compact ? "text-[11px]" : "text-xs"}`}>
             Limites: designacao {MAX_DESIGNATION_LENGTH} caracteres (PT/ES/EN) · referencia compacta{" "}
             {MAX_SKU_REFERENCE_COMPACT_LENGTH} caracteres.
-            {analysis.totalViolationsFound > analysis.violations.length
-              ? ` A mostrar ${analysis.violations.length} de ${analysis.totalViolationsFound} combinacoes.`
+            {totalFound > analysis.violations.length
+              ? ` A mostrar ${analysis.violations.length} de ${totalFound} combinacoes.`
               : null}
             {analysis.truncated
               ? " Analise parcial: existem mais combinacoes possiveis do que as exploradas."

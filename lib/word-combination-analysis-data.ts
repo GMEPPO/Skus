@@ -1,5 +1,3 @@
-"use server";
-
 import { getGeneratorCatalogForCategory } from "@/lib/category-catalog";
 import { mapCategoryCatalogToGeneratorCatalog } from "@/lib/generator-catalog-mapper";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
@@ -14,6 +12,9 @@ import {
   type WordCandidateForAnalysis,
   type WordCombinationAnalysisResult,
 } from "@/lib/word-combination-limits";
+import type { WordCombinationWarningSummary } from "@/lib/word-combination-types";
+
+export type { WordCombinationWarningSummary };
 
 async function resolveCategoryIdForLevel(categoryLevelId: string | null): Promise<string | null> {
   if (!categoryLevelId) return null;
@@ -73,23 +74,21 @@ export async function analyzeDraftWordCombinationLimits(input: {
   );
 }
 
-export type WordCombinationWarningSummary = {
-  wordId: string;
-  violationCount: number;
-  violations: WordCombinationAnalysisResult["violations"];
-  truncated: boolean;
-  pathsExplored: number;
-};
-
 export async function buildWordCombinationWarningSummaries(
   words: WordListItem[],
+  options?: { deadlineMs?: number; maxWords?: number },
 ): Promise<Map<string, WordCombinationWarningSummary>> {
   const summaries = new Map<string, WordCombinationWarningSummary>();
   const catalogByCategoryId = new Map<string, GeneratorCatalog>();
   const categoryIdByLevel = new Map<string, string>();
+  const deadline = Date.now() + (options?.deadlineMs ?? Number.POSITIVE_INFINITY);
+  const maxWords = options?.maxWords ?? words.length;
+  let processedWords = 0;
 
   for (const word of words) {
+    if (processedWords >= maxWords || Date.now() >= deadline) break;
     if (!word.categoryLevelId || word.referenceCode === "000") continue;
+    processedWords += 1;
 
     let categoryId = categoryIdByLevel.get(word.categoryLevelId);
     if (!categoryId) {

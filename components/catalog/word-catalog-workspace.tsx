@@ -7,14 +7,14 @@ import { WordCatalogList } from "@/components/catalog/word-catalog-list";
 import { WordCombinationFrequencyDock } from "@/components/catalog/word-combination-frequency-dock";
 import { WordPairViolationsModal } from "@/components/catalog/word-pair-violations-modal";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
+import type { WordPairViolationAnalysis } from "@/lib/word-combination-types";
 import {
   analyzeWordCombinationWarningsForWordAction,
   analyzeWordPairViolationsAction,
   fetchWordCombinationInsightsAction,
-  type WordPairViolationAnalysis,
 } from "@/lib/word-combination-insights-actions";
 import { countWordsCatalogAction, searchWordsCatalogAction } from "@/lib/word-catalog-search-actions";
-import type { WordCombinationWarningSummary } from "@/lib/word-combination-analysis-data";
+import type { WordCombinationWarningSummary } from "@/lib/word-combination-types";
 import type { WordPairInAlerts } from "@/lib/word-combination-frequency";
 import type { WordListItem } from "@/lib/types";
 
@@ -44,6 +44,7 @@ export function WordCatalogWorkspace({
   const [uniqueViolationCount, setUniqueViolationCount] = useState(0);
   const [wordsWithWarnings, setWordsWithWarnings] = useState(0);
   const [insightsLoading, setInsightsLoading] = useState(true);
+  const [insightsPartial, setInsightsPartial] = useState(false);
   const [selectedPair, setSelectedPair] = useState<WordPairInAlerts | null>(null);
   const [pairAnalysis, setPairAnalysis] = useState<WordPairViolationAnalysis | null>(null);
   const [pairAnalysisLoading, setPairAnalysisLoading] = useState(false);
@@ -90,6 +91,14 @@ export function WordCatalogWorkspace({
         setPairRanking(result.pairRanking);
         setUniqueViolationCount(result.uniqueViolationCount);
         setWordsWithWarnings(result.wordsWithWarnings);
+        setInsightsPartial(result.partial);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPairRanking([]);
+        setUniqueViolationCount(0);
+        setWordsWithWarnings(0);
+        setInsightsPartial(true);
       })
       .finally(() => {
         if (!cancelled) setInsightsLoading(false);
@@ -183,6 +192,7 @@ export function WordCatalogWorkspace({
         isLoading={insightsLoading}
         uniqueViolationCount={uniqueViolationCount}
         wordsWithWarnings={wordsWithWarnings}
+        insightsPartial={insightsPartial}
         onSelectPair={(entry) => void handleSelectPair(entry)}
       />
 

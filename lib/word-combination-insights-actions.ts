@@ -5,7 +5,6 @@ import { requireRole } from "@/lib/auth";
 import {
   analyzeExistingWordCombinationLimits,
   buildWordCombinationWarningSummaries,
-  type WordCombinationWarningSummary,
 } from "@/lib/word-combination-analysis-data";
 import {
   buildWordPairFrequencyRanking,
@@ -13,15 +12,15 @@ import {
   type WordPairInAlerts,
 } from "@/lib/word-combination-frequency";
 import type { CombinationLimitViolation } from "@/lib/word-combination-limits";
+import type {
+  WordCombinationInsightsResult,
+  WordCombinationWarningSummary,
+  WordPairViolationAnalysis,
+} from "@/lib/word-combination-types";
 import type { WordListItem } from "@/lib/types";
 
-export type WordPairViolationAnalysis = {
-  pair: WordPairInAlerts;
-  violations: CombinationLimitViolation[];
-  violationCount: number;
-  truncated: boolean;
-  pathsExplored: number;
-};
+const INSIGHTS_DEADLINE_MS = 20_000;
+const INSIGHTS_MAX_WORDS = 40;
 
 function wordTokenKey(label: string, referenceCode: string) {
   return `${label.trim().toLowerCase()}|${referenceCode.trim().toUpperCase()}`;
@@ -65,6 +64,17 @@ function resolveWordForPair(pair: WordPairInAlerts, words: WordListItem[]): Word
   );
 }
 
+function pickInsightCandidateWords(words: WordListItem[]) {
+  return words
+    .filter((word) => word.categoryLevelId && word.referenceCode !== "000" && word.includeInDesignation)
+    .sort((left, right) => {
+      const rightScore = right.designationPt.length + right.label.length;
+      const leftScore = left.designationPt.length + left.label.length;
+      return rightScore - leftScore;
+    })
+    .slice(0, INSIGHTS_MAX_WORDS);
+}
+
 export async function analyzeWordCombinationWarningsForWordAction(
   word: WordListItem,
 ): Promise<WordCombinationWarningSummary | null> {
@@ -106,19 +116,29 @@ export async function analyzeWordPairViolationsAction(
   };
 }
 
-export async function fetchWordCombinationInsightsAction(): Promise<{
-  pairRanking: WordPairInAlerts[];
-  uniqueViolationCount: number;
-  wordsWithWarnings: number;
-}> {
-  await requireRole("viewer");
+export async function fetchWordCombinationInsightsAction(): Promise<WordCombinationInsightsResult> {
+  try {
+    await requireRole("viewer");
 
-  const words = await getWordsCatalog();
-  const summaries = await buildWordCombinationWarningSummaries(words);
+    const words = await getWordsCatalog();
+    const candidates = pickInsightCandidateWords(words);
+    const summaries = await buildWordCombinationWarningSummaries(candidates, {
+      deadlineMs: INSIGHTS_DEADLINE_MS,
+      maxWords: INSIGHTS_MAX_WORDS,
+    });
 
-  return {
-    pairRanking: buildWordPairFrequencyRanking(summaries, words).slice(0, 25),
-    uniqueViolationCount: collectDeduplicatedViolations(summaries).length,
-    wordsWithWarnings: summaries.size,
-  };
+    return {
+      pairRanking: buildWordPairFrequencyRanking(summaries, words).slice(0, 25),
+      uniqueViolationCount: collectDeduplicatedViolations(summaries).length,
+      wordsWithWarnings: summaries.size,
+      partial: candidates.length < words.length,
+    };
+  } catch {
+    return {
+      pairRanking: [],
+      uniqueViolationCount: 0,
+      wordsWithWarnings: 0,
+      partial: true,
+    };
+  }
 }

@@ -16,12 +16,14 @@ export function WordCombinationFrequencyDock({
   isLoading,
   uniqueViolationCount,
   wordsWithWarnings,
+  insightsPartial = false,
   onSelectPair,
 }: {
   pairRanking: WordPairInAlerts[];
   isLoading: boolean;
   uniqueViolationCount: number;
   wordsWithWarnings: number;
+  insightsPartial?: boolean;
   onSelectPair?: (entry: WordPairInAlerts) => void;
 }) {
   return (
@@ -41,6 +43,7 @@ export function WordCombinationFrequencyDock({
               {!isLoading && uniqueViolationCount > 0 ? (
                 <p className="mt-1 text-[11px] text-slate-500">
                   {uniqueViolationCount} combinacao(oes) unicas · {wordsWithWarnings} palavra(s) analisadas com alertas
+                  {insightsPartial ? " · ranking parcial" : ""}
                 </p>
               ) : null}
             </div>
