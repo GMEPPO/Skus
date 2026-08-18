@@ -1223,10 +1223,10 @@ export function SkuGeneratorWizardMain({
         </div>
 
         <aside
-          className="z-40 mt-6 space-y-2 min-[1280px]:pointer-events-none min-[1280px]:absolute min-[1280px]:left-full min-[1280px]:top-0 min-[1280px]:mt-0 min-[1280px]:ml-4 min-[1280px]:w-[min(20rem,22vw)]"
+          className="z-50 mt-6 space-y-2 min-[1280px]:pointer-events-none min-[1280px]:fixed min-[1280px]:bottom-4 min-[1280px]:right-1 min-[1280px]:mt-0 min-[1280px]:w-[min(22rem,calc(100vw-1.5rem))] min-[1280px]:max-h-[calc(100vh-6rem)]"
           aria-label="Resumo de designacao e referencia"
         >
-          <div className="min-[1280px]:pointer-events-auto min-[1280px]:sticky min-[1280px]:top-24 min-[1280px]:max-h-[calc(100vh-7rem)] min-[1280px]:overflow-y-auto min-[1280px]:space-y-2">
+          <div className="min-[1280px]:pointer-events-auto min-[1280px]:max-h-[calc(100vh-6rem)] min-[1280px]:space-y-2 min-[1280px]:overflow-y-auto">
             {renderSummaryDock()}
           </div>
         </aside>
