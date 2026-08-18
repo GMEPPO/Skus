@@ -59,6 +59,7 @@ export interface GeneratorLevel {
   fieldType: string;
   fieldTypeId: string | null;
   label: string;
+  isRequired?: boolean;
   options: GeneratorWord[];
 }
 

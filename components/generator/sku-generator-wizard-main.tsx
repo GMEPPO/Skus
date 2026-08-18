@@ -48,7 +48,12 @@ type GeneratedSkuModalData = {
 };
 
 function isRequiredLevel(level: GeneratorLevel) {
+  if (typeof level.isRequired === "boolean") return level.isRequired;
   return level.fieldType !== "extra";
+}
+
+function isLevelSelectionComplete(selectedId?: string) {
+  return Boolean(selectedId);
 }
 
 function getSelectedWord(level: GeneratorLevel, selectedId?: string) {
@@ -171,10 +176,10 @@ export function SkuGeneratorWizardMain({
   const isNormalizationMode = Boolean(normalizationTarget);
   const usesSecurePayload = secureGenerationV2Enabled || isNormalizationMode;
   const requiredLevels = useMemo(() => catalog.levels.filter(isRequiredLevel), [catalog.levels]);
-  const requiredCompletedCount = requiredLevels.filter((level) => {
-    const selectedId = selections[level.id];
-    return Boolean(selectedId) && !isEmptySelection(selectedId);
-  }).length;
+  const requiredCompletedCount = requiredLevels.filter((level) =>
+    isLevelSelectionComplete(selections[level.id]),
+  ).length;
+  const allLevelsHaveSelection = catalog.levels.every((level) => isLevelSelectionComplete(selections[level.id]));
   const selectedCount = Object.keys(selections).filter((key) => selections[key]).length;
   const activeLevelIndex = useMemo(() => {
     const index = catalog.levels.findIndex((level) => !selections[level.id]);
@@ -212,8 +217,34 @@ export function SkuGeneratorWizardMain({
     : null;
   const measurementsValid = !logisticsRequired || hasAllMeasurements;
   const needsCategoryId = secureGenerationV2Enabled || isNormalizationMode;
+  const submitBlockReason = useMemo(() => {
+    if (catalog.levels.length === 0) return "Catalogo sem niveis.";
+    if (!allLevelsHaveSelection) return "Preenche todos os niveis (Vazio conta como escolha).";
+    if (requiredCompletedCount !== requiredLevels.length) {
+      return "Preenche os niveis obrigatorios.";
+    }
+    if (isDesignationTooLong) return `Designacao demasiado longa (${designationLength}/${MAX_DESIGNATION_LENGTH}).`;
+    if (!measurementsValid) return measurementError ?? "Medidas logisticas incompletas.";
+    if (needsCategoryId && !categoryId) return "Categoria em falta.";
+    if (isNormalizationMode && !normalizationV2Enabled) return "Normalizacao V2 desactivada.";
+    return null;
+  }, [
+    allLevelsHaveSelection,
+    catalog.levels.length,
+    categoryId,
+    designationLength,
+    isDesignationTooLong,
+    isNormalizationMode,
+    measurementError,
+    measurementsValid,
+    needsCategoryId,
+    normalizationV2Enabled,
+    requiredCompletedCount,
+    requiredLevels.length,
+  ]);
   const canSubmit =
     catalog.levels.length > 0 &&
+    allLevelsHaveSelection &&
     requiredCompletedCount === requiredLevels.length &&
     !isDesignationTooLong &&
     measurementsValid &&
@@ -891,7 +922,12 @@ export function SkuGeneratorWizardMain({
               ) : null}
               {renderSkuReferenceSummary()}
             </div>
-            <Button type="submit" disabled={!canSubmit || isSubmitting} className="shrink-0">
+            <Button
+              type="submit"
+              disabled={!canSubmit || isSubmitting}
+              title={!canSubmit && submitBlockReason ? submitBlockReason : undefined}
+              className="shrink-0"
+            >
               {isSubmitting
                 ? "A guardar..."
                 : isNormalizationMode
@@ -900,6 +936,9 @@ export function SkuGeneratorWizardMain({
             </Button>
           </div>
         </div>
+        {!canSubmit && submitBlockReason ? (
+          <p className="text-xs text-amber-200/90">{submitBlockReason}</p>
+        ) : null}
 
         {selectionOrder.length > 0 ? (
           <div className="rounded-2xl border border-slate-700/80 bg-slate-950/95 p-4 shadow-xl shadow-black/20 backdrop-blur">
