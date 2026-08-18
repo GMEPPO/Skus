@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SearchParamsFlashMessage } from "@/components/ui/search-params-flash-message";
 import { WordCatalogWorkspace } from "@/components/catalog/word-catalog-workspace";
 import { deleteWordAction, getFieldTypeOptions } from "@/lib/admin-catalog";
 
@@ -10,11 +12,7 @@ function messageStyles(status?: string) {
   return "border-emerald-500/40 bg-emerald-500/10 text-emerald-100";
 }
 
-export default async function CatalogWordsManagePage({
-  searchParams,
-}: {
-  searchParams?: { status?: string; message?: string };
-}) {
+export default async function CatalogWordsManagePage() {
   const fieldTypes = await getFieldTypeOptions();
 
   return (
@@ -30,11 +28,9 @@ export default async function CatalogWordsManagePage({
         </p>
       </div>
 
-      {searchParams?.message ? (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${messageStyles(searchParams.status)}`}>
-          {searchParams.message}
-        </div>
-      ) : null}
+      <Suspense fallback={null}>
+        <SearchParamsFlashMessage messageStyles={messageStyles} />
+      </Suspense>
 
       <Card>
         <CardHeader>
