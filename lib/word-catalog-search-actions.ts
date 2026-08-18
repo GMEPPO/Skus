@@ -106,7 +106,6 @@ export async function searchWordsCatalogAction(params: {
       "id, label, reference_code, default_field_type_id, category_level_id, designation, designation_pt, designation_es, designation_en, include_in_designation, selection_hierarchy, parent_match_mode, skus_field_types(id, code, name, sort_order)",
     )
     .eq("is_active", true)
-    .order("sort_order", { referencedTable: "skus_field_types", ascending: true })
     .order("label", { ascending: true })
     .range(from, to);
 

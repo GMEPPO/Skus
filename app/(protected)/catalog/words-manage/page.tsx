@@ -5,13 +5,6 @@ import { SearchParamsFlashMessage } from "@/components/ui/search-params-flash-me
 import { WordCatalogWorkspace } from "@/components/catalog/word-catalog-workspace";
 import { deleteWordAction, getFieldTypeOptions } from "@/lib/admin-catalog";
 
-function messageStyles(status?: string) {
-  if (status === "error") {
-    return "border-red-500/40 bg-red-500/10 text-red-100";
-  }
-  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-100";
-}
-
 export default async function CatalogWordsManagePage() {
   const fieldTypes = await getFieldTypeOptions();
 
@@ -29,7 +22,7 @@ export default async function CatalogWordsManagePage() {
       </div>
 
       <Suspense fallback={null}>
-        <SearchParamsFlashMessage messageStyles={messageStyles} />
+        <SearchParamsFlashMessage />
       </Suspense>
 
       <Card>

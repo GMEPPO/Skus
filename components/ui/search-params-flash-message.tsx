@@ -11,11 +11,14 @@ function decodeFlashMessage(raw: string) {
   }
 }
 
-export function SearchParamsFlashMessage({
-  messageStyles,
-}: {
-  messageStyles: (status?: string) => string;
-}) {
+function flashMessageStyles(status?: string) {
+  if (status === "error") {
+    return "border-red-500/40 bg-red-500/10 text-red-100";
+  }
+  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-100";
+}
+
+export function SearchParamsFlashMessage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -35,7 +38,7 @@ export function SearchParamsFlashMessage({
   if (!flash?.message) return null;
 
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm ${messageStyles(flash.status)}`}>
+    <div className={`rounded-lg border px-4 py-3 text-sm ${flashMessageStyles(flash.status)}`}>
       {flash.message}
     </div>
   );
