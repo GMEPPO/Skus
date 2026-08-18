@@ -128,7 +128,7 @@ export function GeneratorWorkspace({
   const activeCategory = categories.find((category) => category.id === categoryId);
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+    <div className="flex flex-col gap-4 overflow-visible xl:flex-row xl:items-start">
       <NormalizationPendingSidebar
         selectedId={selectedNorm?.id ?? null}
         referenceFilter={referenceFilter}
@@ -144,20 +144,20 @@ export function GeneratorWorkspace({
         refreshToken={queueRefreshToken}
       />
 
-      <div className="min-w-0 flex-1 space-y-4">
+      <div className="relative min-w-0 flex-1 space-y-4 overflow-visible">
         <div className="flex flex-wrap items-center justify-end gap-2">
           <WordHistoryModal refreshToken={wordRefreshToken} />
           <NormalizationHistoryModal refreshToken={queueRefreshToken} />
         </div>
 
-        <Card>
+        <Card className="overflow-visible">
           <CardHeader className="pb-3">
             <CardTitle>Wizard de composicao</CardTitle>
             <CardDescription>
               Seleciona a categoria e constrói a referencia. Clica num codigo pendente para normalizar.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="overflow-visible space-y-4">
             <label className="block max-w-md space-y-2">
               <span className="text-sm text-slate-300">Categoria</span>
               <select
