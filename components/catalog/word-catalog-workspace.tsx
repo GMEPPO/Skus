@@ -5,10 +5,13 @@ import { NormalizationPaginationControls } from "@/components/generator/normaliz
 import { useDebouncedValue } from "@/components/generator/use-debounced-value";
 import { WordCatalogList } from "@/components/catalog/word-catalog-list";
 import { WordCombinationFrequencyDock } from "@/components/catalog/word-combination-frequency-dock";
+import { WordPairViolationsModal } from "@/components/catalog/word-pair-violations-modal";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
 import {
   analyzeWordCombinationWarningsForWordAction,
+  analyzeWordPairViolationsAction,
   fetchWordCombinationInsightsAction,
+  type WordPairViolationAnalysis,
 } from "@/lib/word-combination-insights-actions";
 import { countWordsCatalogAction, searchWordsCatalogAction } from "@/lib/word-catalog-search-actions";
 import type { WordCombinationWarningSummary } from "@/lib/word-combination-analysis-data";
@@ -41,6 +44,9 @@ export function WordCatalogWorkspace({
   const [uniqueViolationCount, setUniqueViolationCount] = useState(0);
   const [wordsWithWarnings, setWordsWithWarnings] = useState(0);
   const [insightsLoading, setInsightsLoading] = useState(true);
+  const [selectedPair, setSelectedPair] = useState<WordPairInAlerts | null>(null);
+  const [pairAnalysis, setPairAnalysis] = useState<WordPairViolationAnalysis | null>(null);
+  const [pairAnalysisLoading, setPairAnalysisLoading] = useState(false);
 
   const loadWords = useCallback(async () => {
     setIsLoading(true);
@@ -94,7 +100,17 @@ export function WordCatalogWorkspace({
   }, []);
 
   async function handleRequestWordWarnings(word: WordListItem) {
-    if (combinationWarnings[word.id] || loadingWarningIds.has(word.id) || analyzedNoWarningIds.has(word.id)) {
+    const cached = combinationWarnings[word.id];
+    if (
+      cached &&
+      !cached.truncated &&
+      cached.violations.length >= cached.violationCount &&
+      !loadingWarningIds.has(word.id)
+    ) {
+      return;
+    }
+
+    if (loadingWarningIds.has(word.id) || analyzedNoWarningIds.has(word.id)) {
       return;
     }
 
@@ -115,11 +131,22 @@ export function WordCatalogWorkspace({
     }
   }
 
-  function handleSelectPair(entry: WordPairInAlerts) {
-    const longerLabel =
-      entry.left.label.length >= entry.right.label.length ? entry.left.label : entry.right.label;
-    setQuery(longerLabel);
-    setPage(1);
+  async function handleSelectPair(entry: WordPairInAlerts) {
+    setSelectedPair(entry);
+    setPairAnalysis(null);
+    setPairAnalysisLoading(true);
+    try {
+      const analysis = await analyzeWordPairViolationsAction(entry);
+      setPairAnalysis(analysis);
+    } finally {
+      setPairAnalysisLoading(false);
+    }
+  }
+
+  function handleClosePairModal() {
+    setSelectedPair(null);
+    setPairAnalysis(null);
+    setPairAnalysisLoading(false);
   }
 
   return (
@@ -156,7 +183,13 @@ export function WordCatalogWorkspace({
         isLoading={insightsLoading}
         uniqueViolationCount={uniqueViolationCount}
         wordsWithWarnings={wordsWithWarnings}
-        onSelectPair={handleSelectPair}
+        onSelectPair={(entry) => void handleSelectPair(entry)}
+      />
+
+      <WordPairViolationsModal
+        analysis={pairAnalysis}
+        isLoading={pairAnalysisLoading && selectedPair !== null}
+        onClose={handleClosePairModal}
       />
     </div>
   );

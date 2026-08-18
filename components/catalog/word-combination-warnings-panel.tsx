@@ -32,11 +32,14 @@ export function WordCombinationWarningsPanel({
           <p className={`mt-1 text-amber-100/80 ${compact ? "text-[11px]" : "text-xs"}`}>
             Limites: designacao {MAX_DESIGNATION_LENGTH} caracteres (PT/ES/EN) · referencia compacta{" "}
             {MAX_SKU_REFERENCE_COMPACT_LENGTH} caracteres.
+            {analysis.totalViolationsFound > analysis.violations.length
+              ? ` A mostrar ${analysis.violations.length} de ${analysis.totalViolationsFound} combinacoes.`
+              : null}
             {analysis.truncated
               ? " Analise parcial: existem mais combinacoes possiveis do que as exploradas."
               : null}
           </p>
-          <ul className={`mt-3 space-y-2 ${compact ? "text-[11px]" : "text-xs"} text-amber-100/90`}>
+          <ul className={`mt-3 max-h-[min(60vh,32rem)] space-y-2 overflow-y-auto ${compact ? "text-[11px]" : "text-xs"} text-amber-100/90`}>
             {analysis.violations.map((violation, index) => (
               <ViolationItem key={`${formatCombinationSelectionLine(violation.selections)}-${index}`} violation={violation} />
             ))}

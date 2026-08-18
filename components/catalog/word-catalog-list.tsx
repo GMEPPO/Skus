@@ -184,9 +184,9 @@ export function WordCatalogList({
                               <Badge variant="outline" className="border-amber-400/40 text-amber-200">
                                 {warningSummary.violationCount} combinacao(oes) acima do limite
                               </Badge>
-                              {warningSummary.truncated ? (
-                                <span className="text-xs text-slate-500">Analise parcial</span>
-                              ) : null}
+                          {warningSummary.truncated || warningSummary.violations.length < warningSummary.violationCount ? (
+                            <span className="text-xs text-slate-500">Analise parcial</span>
+                          ) : null}
                             </div>
                             {isExpanded ? (
                               <ChevronUp className="h-4 w-4 text-slate-400" />
@@ -203,6 +203,7 @@ export function WordCatalogList({
                                   violations: warningSummary.violations,
                                   pathsExplored: warningSummary.pathsExplored,
                                   truncated: warningSummary.truncated,
+                                  totalViolationsFound: warningSummary.violationCount,
                                 }}
                               />
                             </div>
