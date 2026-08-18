@@ -40,7 +40,7 @@ export default async function CatalogWordsManagePage({
         <CardHeader>
           <CardTitle>Catalogo atual</CardTitle>
           <CardDescription>
-            20 palavras por pagina, com busca global e ranking de palavras em alertas.
+            20 palavras por pagina, com busca global e ranking de pares em alertas.
           </CardDescription>
         </CardHeader>
         <CardContent>

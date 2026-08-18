@@ -7,7 +7,11 @@ import {
   buildWordCombinationWarningSummaries,
   type WordCombinationWarningSummary,
 } from "@/lib/word-combination-analysis-data";
-import { buildWordFrequencyRanking, type WordFrequencyInAlerts } from "@/lib/word-combination-frequency";
+import {
+  buildWordPairFrequencyRanking,
+  collectDeduplicatedViolations,
+  type WordPairInAlerts,
+} from "@/lib/word-combination-frequency";
 import type { WordListItem } from "@/lib/types";
 
 export async function analyzeWordCombinationWarningsForWordAction(
@@ -28,7 +32,8 @@ export async function analyzeWordCombinationWarningsForWordAction(
 }
 
 export async function fetchWordCombinationInsightsAction(): Promise<{
-  frequencyRanking: WordFrequencyInAlerts[];
+  pairRanking: WordPairInAlerts[];
+  uniqueViolationCount: number;
   wordsWithWarnings: number;
 }> {
   await requireRole("viewer");
@@ -37,7 +42,8 @@ export async function fetchWordCombinationInsightsAction(): Promise<{
   const summaries = await buildWordCombinationWarningSummaries(words);
 
   return {
-    frequencyRanking: buildWordFrequencyRanking(summaries, words).slice(0, 30),
+    pairRanking: buildWordPairFrequencyRanking(summaries, words).slice(0, 25),
+    uniqueViolationCount: collectDeduplicatedViolations(summaries).length,
     wordsWithWarnings: summaries.size,
   };
 }

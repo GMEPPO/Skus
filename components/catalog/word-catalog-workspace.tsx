@@ -12,7 +12,7 @@ import {
 } from "@/lib/word-combination-insights-actions";
 import { countWordsCatalogAction, searchWordsCatalogAction } from "@/lib/word-catalog-search-actions";
 import type { WordCombinationWarningSummary } from "@/lib/word-combination-analysis-data";
-import type { WordFrequencyInAlerts } from "@/lib/word-combination-frequency";
+import type { WordPairInAlerts } from "@/lib/word-combination-frequency";
 import type { WordListItem } from "@/lib/types";
 
 export function WordCatalogWorkspace({
@@ -37,7 +37,8 @@ export function WordCatalogWorkspace({
   );
   const [loadingWarningIds, setLoadingWarningIds] = useState<Set<string>>(new Set());
   const [analyzedNoWarningIds, setAnalyzedNoWarningIds] = useState<Set<string>>(new Set());
-  const [frequencyRanking, setFrequencyRanking] = useState<WordFrequencyInAlerts[]>([]);
+  const [pairRanking, setPairRanking] = useState<WordPairInAlerts[]>([]);
+  const [uniqueViolationCount, setUniqueViolationCount] = useState(0);
   const [wordsWithWarnings, setWordsWithWarnings] = useState(0);
   const [insightsLoading, setInsightsLoading] = useState(true);
 
@@ -80,7 +81,8 @@ export function WordCatalogWorkspace({
     void fetchWordCombinationInsightsAction()
       .then((result) => {
         if (cancelled) return;
-        setFrequencyRanking(result.frequencyRanking);
+        setPairRanking(result.pairRanking);
+        setUniqueViolationCount(result.uniqueViolationCount);
         setWordsWithWarnings(result.wordsWithWarnings);
       })
       .finally(() => {
@@ -113,8 +115,10 @@ export function WordCatalogWorkspace({
     }
   }
 
-  function handleSelectFrequencyWord(entry: WordFrequencyInAlerts) {
-    setQuery(entry.label);
+  function handleSelectPair(entry: WordPairInAlerts) {
+    const longerLabel =
+      entry.left.label.length >= entry.right.label.length ? entry.left.label : entry.right.label;
+    setQuery(longerLabel);
     setPage(1);
   }
 
@@ -148,10 +152,11 @@ export function WordCatalogWorkspace({
       />
 
       <WordCombinationFrequencyDock
-        ranking={frequencyRanking}
+        pairRanking={pairRanking}
         isLoading={insightsLoading}
+        uniqueViolationCount={uniqueViolationCount}
         wordsWithWarnings={wordsWithWarnings}
-        onSelectWord={handleSelectFrequencyWord}
+        onSelectPair={handleSelectPair}
       />
     </div>
   );
