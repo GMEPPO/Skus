@@ -1,12 +1,31 @@
-import * as XLSX from "xlsx";
-import { readSelectionSnapshot } from "@/lib/selection-snapshot";
+import * as XLSX from "xlsx-js-style";
 import type { SkuHistoryExportItem } from "@/lib/sku-history-data";
+
+const HEADERS = ["Fecha", "Referencia", "Designacion PT", "Designacion ES", "Designacion EN"] as const;
+
+const thinBorder = {
+  top: { style: "thin", color: { rgb: "CBD5E1" } },
+  bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+  left: { style: "thin", color: { rgb: "CBD5E1" } },
+  right: { style: "thin", color: { rgb: "CBD5E1" } },
+};
+
+const headerStyle = {
+  font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+  fill: { patternType: "solid", fgColor: { rgb: "1E3A5F" } },
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  border: thinBorder,
+};
+
+export function stripReferenceSeparators(code: string) {
+  return code.replace(/-/g, "");
+}
 
 function formatExportDate(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("pt-PT", {
+  return date.toLocaleString("es-ES", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -15,68 +34,55 @@ function formatExportDate(value: string | null | undefined) {
   });
 }
 
-function buildLevelColumns(item: SkuHistoryExportItem) {
-  const view = readSelectionSnapshot(item.selectionSnapshot, item.snapshotVersion);
-  const columns: Record<string, string> = {};
+function buildDataRows(items: SkuHistoryExportItem[]) {
+  return items.map((item) => [
+    formatExportDate(item.createdAt),
+    stripReferenceSeparators(item.generatedCode),
+    item.designationPt,
+    item.designationEs,
+    item.designationEn,
+  ]);
+}
 
-  if (view.kind === "v2") {
-    const levels = [...view.snapshot.levels].sort((left, right) => left.sortOrder - right.sortOrder);
-    levels.forEach((level, index) => {
-      const prefix = `N${index + 1}_${level.key}`;
-      columns[`${prefix}_nivel`] = level.label;
-      if (level.selection.kind === "word") {
-        columns[`${prefix}_ref`] = level.selection.referenceCode;
-        columns[`${prefix}_palavra`] = level.selection.label;
-        columns[`${prefix}_pt`] = level.selection.designations.pt;
-        columns[`${prefix}_es`] = level.selection.designations.es;
-        columns[`${prefix}_en`] = level.selection.designations.en;
-      } else {
-        columns[`${prefix}_ref`] = level.codeSegment ?? "000";
-        columns[`${prefix}_palavra`] = "";
-        columns[`${prefix}_pt`] = "";
-        columns[`${prefix}_es`] = "";
-        columns[`${prefix}_en`] = "";
-      }
-    });
-    columns.Categoria = view.snapshot.category.name;
+function applyTableStyles(worksheet: XLSX.WorkSheet, rowCount: number) {
+  for (let column = 0; column < HEADERS.length; column += 1) {
+    const headerAddress = XLSX.utils.encode_cell({ r: 0, c: column });
+    if (worksheet[headerAddress]) {
+      worksheet[headerAddress].s = headerStyle;
+    }
   }
 
-  return columns;
+  for (let row = 1; row <= rowCount; row += 1) {
+    const isEvenRow = row % 2 === 0;
+    for (let column = 0; column < HEADERS.length; column += 1) {
+      const address = XLSX.utils.encode_cell({ r: row, c: column });
+      if (!worksheet[address]) continue;
+
+      worksheet[address].s = {
+        font: { sz: 10, color: { rgb: "0F172A" } },
+        fill: isEvenRow ? { patternType: "solid", fgColor: { rgb: "F8FAFC" } } : undefined,
+        alignment: {
+          horizontal: column <= 1 ? "center" : "left",
+          vertical: "center",
+          wrapText: column >= 2,
+        },
+        border: thinBorder,
+      };
+    }
+  }
+
+  worksheet["!cols"] = [{ wch: 20 }, { wch: 18 }, { wch: 44 }, { wch: 44 }, { wch: 44 }];
+  worksheet["!rows"] = [{ hpt: 28 }];
+  worksheet["!autofilter"] = { ref: `A1:E${rowCount + 1}` };
+  worksheet["!views"] = [{ state: "frozen", ySplit: 1, xSplit: 0, topLeftCell: "A2", activeCell: "A2" }];
 }
 
 export function downloadSkuHistoryExcel(items: SkuHistoryExportItem[], fileName?: string) {
-  const exportRows = items.map((item) => {
-    const levelColumns = buildLevelColumns(item);
-    return {
-      Codigo: item.generatedCode,
-      Designacao: item.designation,
-      Designacao_PT: item.designationPt,
-      Designacao_ES: item.designationEs,
-      Designacao_EN: item.designationEn,
-      Categoria: item.categoryName ?? levelColumns.Categoria ?? "",
-      Prefixo: item.prefixSnapshot,
-      ...levelColumns,
-      Caixa: item.unitsPerBox ?? "",
-      Caixa_estado: item.unitsPerBoxStatus ?? "",
-      Multiplos: item.multiples ?? "",
-      Multiplos_estado: item.multiplesStatus ?? "",
-      Peso: item.weight ?? "",
-      Peso_estado: item.weightStatus ?? "",
-      Utilizador: item.createdByName ?? "",
-      Criado_em: formatExportDate(item.createdAt),
-      URL_imagem: item.productImageUrl ?? "",
-      Fingerprint: item.selectionFingerprint ?? "",
-    };
-  });
-
-  const summaryRows = [
-    ["Metrica", "Valor"],
-    ["Total registos", items.length],
-    ["Exportado em", formatExportDate(new Date().toISOString())],
-  ];
+  const dataRows = buildDataRows(items);
+  const worksheet = XLSX.utils.aoa_to_sheet([HEADERS, ...dataRows]);
+  applyTableStyles(worksheet, dataRows.length);
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(exportRows), "Historico");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "Resumen");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Historico SKUs");
   XLSX.writeFile(workbook, fileName ?? "historico-skus.xlsx");
 }
