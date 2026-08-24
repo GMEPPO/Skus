@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx-js-style";
 import type { SkuHistoryExportItem } from "@/lib/sku-history-data";
 
-const HEADERS = ["Fecha", "Referencia", "Designacion PT", "Designacion ES", "Designacion EN"] as const;
+const HEADERS = ["Fecha", "Referencia", "Designacion PT", "Designacion ES", "Designacion EN"];
 
 const thinBorder = {
   top: { style: "thin", color: { rgb: "CBD5E1" } },
