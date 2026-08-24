@@ -39,7 +39,7 @@ const EXPLICIT_SIZE_DEPENDENCIES = [
   {
     childNormalizedLabel: "375ml",
     parentLevelKey: "format",
-    parentNormalizedLabel: "recarga ecosouc",
+    parentNormalizedLabel: "recarga ecosource",
     parentReferenceCode: "ECS",
   },
   {

@@ -1,7 +1,7 @@
 -- Cosmetica / nivel 4 (size) — dicionario novo
 -- Fonte: Nivel 4.xlsx (19 tamanhos + Vazio)
 -- Dependencias (2 tamanhos -> 2 palavras pai no Nivel 2.xlsx / formato):
---   375ml -> Recarga Ecosouc (ECS)
+--   375ml -> Recarga Ecosource (ECS)
 --   5L    -> Recarga 5L (REC)
 -- Executar apos 20260817114500_allow_duplicate_word_references.sql
 
@@ -66,6 +66,7 @@ dictionary(label, normalized_label, reference_code, designation_pt, designation_
   ('500ml', '500ml', '500', '500ml', '500ml', '500ml', false, true),
   ('50ml', '50ml', '050', '50ml', '50ml', '50ml', false, true),
   ('55ml', '55ml', '055', '55ml', '55ml', '55ml', false, true),
+  ('4,5ML', '4,5ml', '045', '4,5ML', '4,5ML', '4,5ML', false, true),
   ('5L', '5l', '005', '', '', '', true, false),
   ('60ml', '60ml', '060', '60ml', '60ml', '60ml', false, true),
   ('80ml', '80ml', '080', '80ml', '80ml', '80ml', false, true)
@@ -123,7 +124,7 @@ dependency_pairs as (
     on child_w.normalized_label = '375ml'
   join public.skus_words parent_w
     on parent_w.category_level_id = parent_level.id
-   and parent_w.normalized_label = 'recarga ecosouc'
+   and parent_w.normalized_label = 'recarga ecosource'
    and parent_w.reference_code = 'ECS'
    and parent_w.is_active = true
   union all

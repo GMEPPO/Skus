@@ -59,7 +59,7 @@ dictionary(label, normalized_label, reference_code, designation_pt, designation_
   ('Manhattan', 'manhattan', 'MAN', 'Manhattan', 'Manhattan', 'Manhattan', false),
   ('Recarga 5L', 'recarga 5l', 'REC', 'Recarga 5L', 'Rec 5L', 'Ref 5L', false),
   ('Recarga Ecofill', 'recarga ecofill', 'ECO', 'Recarga Ecofill', 'Recarga Ecofill', 'Refill Ecofill', false),
-  ('Recarga Ecosouc', 'recarga ecosouc', 'ECS', 'Recarga Ecosouc', 'Recarga Ecosouc', 'Refill Ecosouc', false),
+  ('Recarga Ecosource', 'recarga ecosource', 'ECS', 'RECARGA ECOSOURCE', 'RECARGA ECOSOURCE', 'REFILL ECOSOURCE', false),
   ('Sólido', 'sólido', 'SOL', 'Sólido', 'Sólido', 'Solid', false),
   ('Stick', 'stick', 'STI', 'Stick', 'Stick', 'Stick', false),
   ('TABULEIRO', 'tabuleiro', 'TAB', 'TABULEIRO', 'Bandeja', 'Tray', false),

@@ -39,6 +39,7 @@ const FULL_TRANSLATIONS = {
   AMENDOA: { es: "ALMENDRA", en: "ALMOND" },
   TANGERINA: { es: "MANDARINA", en: "TANGERINE" },
   Limão: { es: "Limón", en: "Lemon" },
+  LUX: { es: "LUX", en: "LUX" },
   "CREME LIMPEZA ROSTO": { es: "CREMA LIMPIEZA ROSTRO", en: "FACE CLEANSING CREAM" },
   "CREME DE CORPO": { es: "CREMA DE CUERPO", en: "BODY CREAM" },
   "Creme Mãos": { es: "CREMA DE MANOS", en: "HAND CREAM" },

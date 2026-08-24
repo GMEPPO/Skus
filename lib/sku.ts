@@ -23,6 +23,13 @@ export function isEmptyReferenceWord(word?: Pick<GeneratorWord, "referenceCode" 
 
 const DESIGNATION_ALWAYS_FIELD_TYPES = new Set(["product", "format"]);
 
+const SOLID_FORMAT_REFERENCE_CODE = "SOL";
+
+type DesignationSegment = {
+  fieldType: string;
+  text: string;
+};
+
 function shouldIncludeWordInDesignation(
   level: Pick<GeneratorLevel, "fieldType">,
   option: GeneratorWord,
@@ -42,6 +49,56 @@ function pickDesignationText(option: GeneratorWord, locale: DesignationLocale): 
   const trimmed = String(value ?? "").trim();
   if (!trimmed || trimmed.toLowerCase() === "vazio") return null;
   return trimmed;
+}
+
+export function isSolidFormatWord(word?: Pick<GeneratorWord, "referenceCode" | "label"> | null) {
+  if (!word) return false;
+  if (word.referenceCode === SOLID_FORMAT_REFERENCE_CODE) return true;
+  const normalizedLabel = String(word.label ?? "")
+    .trim()
+    .toLowerCase();
+  return normalizedLabel === "sólido" || normalizedLabel === "solido";
+}
+
+function collectDesignationSegments(
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+  locale: DesignationLocale,
+): DesignationSegment[] {
+  return catalog.levels
+    .map((level) => {
+      const selectedValue = selections[level.id];
+      if (isEmptySelection(selectedValue)) return null;
+      const option = level.options.find((item) => item.id === selectedValue);
+      if (!option || !shouldIncludeWordInDesignation(level, option)) return null;
+      const text = pickDesignationText(option, locale);
+      if (!text) return null;
+      return { fieldType: level.fieldType, text };
+    })
+    .filter((segment): segment is DesignationSegment => Boolean(segment));
+}
+
+function reorderSolidProductBeforeFormat(
+  catalog: GeneratorCatalog,
+  selections: Record<string, string>,
+  segments: DesignationSegment[],
+): DesignationSegment[] {
+  const formatLevel = catalog.levels.find((level) => level.fieldType === "format");
+  if (!formatLevel) return segments;
+
+  const formatSelection = selections[formatLevel.id];
+  if (isEmptySelection(formatSelection)) return segments;
+
+  const formatOption = formatLevel.options.find((item) => item.id === formatSelection);
+  if (!isSolidFormatWord(formatOption)) return segments;
+
+  const formatIndex = segments.findIndex((segment) => segment.fieldType === "format");
+  const productIndex = segments.findIndex((segment) => segment.fieldType === "product");
+  if (formatIndex < 0 || productIndex < 0 || productIndex < formatIndex) return segments;
+
+  const reordered = [...segments];
+  [reordered[formatIndex], reordered[productIndex]] = [reordered[productIndex], reordered[formatIndex]];
+  return reordered;
 }
 
 export function sortGeneratorWords(options: GeneratorWord[]): GeneratorWord[] {
@@ -93,17 +150,17 @@ export function buildDesignationByLocale(
   selections: Record<string, string>,
   locale: DesignationLocale,
 ) {
-  const segments = catalog.levels
-    .map((level) => {
-      const selectedValue = selections[level.id];
-      if (isEmptySelection(selectedValue)) return null;
-      const option = level.options.find((item) => item.id === selectedValue);
-      if (!option || !shouldIncludeWordInDesignation(level, option)) return null;
-      return pickDesignationText(option, locale);
-    })
-    .filter((value): value is string => Boolean(value));
+  const segments = reorderSolidProductBeforeFormat(
+    catalog,
+    selections,
+    collectDesignationSegments(catalog, selections, locale),
+  );
 
-  return segments.join(" ").trim().replace(/\s+/g, " ");
+  return segments
+    .map((segment) => segment.text)
+    .join(" ")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 export function buildSkuPreview(

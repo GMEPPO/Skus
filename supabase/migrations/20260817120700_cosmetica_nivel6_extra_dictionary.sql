@@ -62,6 +62,7 @@ dictionary(label, normalized_label, reference_code, selection_hierarchy, designa
   ('Creme Mãos', 'creme mãos', 'CM0', 2, 'CREME MÃOS', 'CREMA DE MANOS', 'HAND CREAM', false, true),
   ('ESFOLIANTE', 'esfoliante', 'ESF', 2, '', '', '', true, false),
   ('Limão', 'limão', 'LIM', 2, 'Limão', 'Limón', 'Lemon', false, true),
+  ('LUX', 'lux', 'LUX', 2, 'LUX', 'LUX', 'LUX', false, true),
   ('PRESTIGE', 'prestige', 'PRE', null, 'PRESTIGE', 'PRESTIGE', 'PRESTIGE', false, true),
   ('TANGERINA', 'tangerina', 'TAN', 2, 'TANGERINA', 'MANDARINA', 'TANGERINE', false, true),
   ('V01', 'v01', 'V01', null, 'V01', 'V01', 'V01', false, true),

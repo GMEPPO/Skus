@@ -130,7 +130,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Solido Sabonete 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA Sabonete Solido 20g Caixa Cartao");
   });
 
   it("always includes format level words even when includeInDesignation is false", () => {
@@ -158,7 +158,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Solido Sabonete 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA Sabonete Solido 20g Caixa Cartao");
   });
 
   it("filters words by label, code and localized designation", () => {
@@ -194,7 +194,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Solido Sabonete 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA Sabonete Solido 20g Caixa Cartao");
   });
 
   it("ignores empty reference 000 in designations", () => {
@@ -234,7 +234,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("Solido Sabonete 20g Caixa Cartao");
+    ).toBe("Sabonete Solido 20g Caixa Cartao");
   });
 
   it("builds example pattern with wildcards for unselected levels", () => {
