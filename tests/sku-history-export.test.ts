@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stripReferenceSeparators } from "@/lib/sku-history-export";
+import { stripReferenceSeparators, toUpperDesignationForExport } from "@/lib/sku-history-export";
 
 describe("stripReferenceSeparators", () => {
   it("elimina guiones de la referencia", () => {
@@ -8,5 +8,11 @@ describe("stripReferenceSeparators", () => {
 
   it("deja referencias sin guiones intactas", () => {
     expect(stripReferenceSeparators("ABCDEF123456")).toBe("ABCDEF123456");
+  });
+});
+
+describe("toUpperDesignationForExport", () => {
+  it("convierte designaciones a mayusculas", () => {
+    expect(toUpperDesignationForExport("Sabonete de hotel")).toBe("SABONETE DE HOTEL");
   });
 });

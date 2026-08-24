@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx-js-style";
 import type { SkuHistoryExportItem } from "@/lib/sku-history-data";
 
-const HEADERS = ["Fecha", "Referencia", "Designacion PT", "Designacion ES", "Designacion EN"];
+const HEADERS = ["Data", "Referência", "Designação PT", "Designação ES", "Designação EN"];
 
 const thinBorder = {
   top: { style: "thin", color: { rgb: "CBD5E1" } },
@@ -21,11 +21,15 @@ export function stripReferenceSeparators(code: string) {
   return code.replace(/-/g, "");
 }
 
+export function toUpperDesignationForExport(value: string) {
+  return value.toLocaleUpperCase("pt-PT");
+}
+
 function formatExportDate(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("es-ES", {
+  return date.toLocaleString("pt-PT", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -38,9 +42,9 @@ function buildDataRows(items: SkuHistoryExportItem[]) {
   return items.map((item) => [
     formatExportDate(item.createdAt),
     stripReferenceSeparators(item.generatedCode),
-    item.designationPt,
-    item.designationEs,
-    item.designationEn,
+    toUpperDesignationForExport(item.designationPt),
+    toUpperDesignationForExport(item.designationEs),
+    toUpperDesignationForExport(item.designationEn),
   ]);
 }
 
