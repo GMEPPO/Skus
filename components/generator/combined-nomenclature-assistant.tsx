@@ -5,6 +5,7 @@ import { Copy, Loader2, MessageSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type {
+  CombinedNomenclatureAbbreviation,
   CombinedNomenclatureMessage,
   CombinedNomenclatureProposal,
   CombinedNomenclatureResponse,
@@ -29,11 +30,13 @@ export function CombinedNomenclatureAssistant({
   designationEs,
   designationEn,
   referenceCode,
+  abbreviationGlossary = [],
 }: {
   designationPt: string;
   designationEs: string;
   designationEn: string;
   referenceCode?: string;
+  abbreviationGlossary?: CombinedNomenclatureAbbreviation[];
 }) {
   const [open, setOpen] = useState(true);
   const [input, setInput] = useState("");
@@ -57,6 +60,7 @@ export function CombinedNomenclatureAssistant({
             designationEs,
             designationEn,
             referenceCode,
+            abbreviationGlossary,
             messages: conversation,
           }),
         });
@@ -92,7 +96,7 @@ export function CombinedNomenclatureAssistant({
         setIsLoading(false);
       }
     },
-    [designationEn, designationEs, designationPt, referenceCode],
+    [abbreviationGlossary, designationEn, designationEs, designationPt, referenceCode],
   );
 
   useEffect(() => {

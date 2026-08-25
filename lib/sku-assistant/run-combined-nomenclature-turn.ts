@@ -1,5 +1,7 @@
 import { callOpenAiJson } from "@/lib/sku-assistant/openai-client";
+import { summarizeAbbreviationGlossaryForPrompt } from "@/lib/sku-assistant/build-abbreviation-glossary";
 import type {
+  CombinedNomenclatureAbbreviation,
   CombinedNomenclatureDesignation,
   CombinedNomenclatureMessage,
   CombinedNomenclatureResponse,
@@ -35,6 +37,7 @@ function buildSystemPrompt() {
     "- So propoe type=propose quando tiveres confianca razoavel no codigo NC.",
     "- cnCode deve ter 8 digitos (podes devolver como 'XXXX XX XX' ou 'XXXXXXXX').",
     "- cnDescription: descricao oficial/resumida em portugues europeu da posicao NC.",
+    "- Usa o glossario de abreviaturas internas (ALU, CLS, ECO, etc.) para interpretar a designacao antes de classificar.",
     "- Responde SEMPRE JSON valido:",
     '{"type":"clarify|propose|message","message":"texto em pt-PT","questions":["..."],"cnCode":"3305 90 00","cnDescription":"...","confidence":0.85,"rationale":"...","notes":"..."}',
   ].join("\n");
@@ -82,11 +85,14 @@ function buildProposal(llm: LlmCombinedNomenclatureResponse): CombinedNomenclatu
 export async function runCombinedNomenclatureTurn(input: {
   designation: CombinedNomenclatureDesignation;
   messages: CombinedNomenclatureMessage[];
+  abbreviationGlossary?: CombinedNomenclatureAbbreviation[];
 }): Promise<CombinedNomenclatureResponse> {
   const conversationBlock =
     input.messages.length > 0
       ? ["Conversa:", ...input.messages.map((message) => `${message.role.toUpperCase()}: ${message.content}`)].join("\n")
       : "Conversa: (inicio automatico — classifica a partir da designacao)";
+
+  const glossaryBlock = summarizeAbbreviationGlossaryForPrompt(input.abbreviationGlossary ?? []);
 
   const llm = await callOpenAiJson<LlmCombinedNomenclatureResponse>([
     { role: "system", content: buildSystemPrompt() },
@@ -95,6 +101,8 @@ export async function runCombinedNomenclatureTurn(input: {
       content: [
         "Produto a classificar (responde em portugues europeu):",
         summarizeDesignation(input.designation),
+        "",
+        glossaryBlock,
         "",
         conversationBlock,
       ].join("\n"),

@@ -53,6 +53,14 @@ export type CombinedNomenclatureDesignation = {
   referenceCode?: string;
 };
 
+export type CombinedNomenclatureAbbreviation = {
+  levelLabel: string;
+  fieldType: string;
+  referenceCode: string;
+  label: string;
+  designationPt: string;
+};
+
 export type CombinedNomenclatureProposal = {
   cnCode: string;
   cnDescription: string;

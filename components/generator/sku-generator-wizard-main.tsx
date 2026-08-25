@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WordCreateModal } from "@/components/generator/word-create-modal";
 import { CombinedNomenclatureAssistant } from "@/components/generator/combined-nomenclature-assistant";
+import { buildAbbreviationGlossary } from "@/lib/sku-assistant/build-abbreviation-glossary";
 import { generateSkuAction } from "@/lib/sku-actions";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
 import { fetchSkuCodeExamplesAction, type SkuCodeExample } from "@/lib/generator-code-examples-actions";
@@ -1301,6 +1302,7 @@ export function SkuGeneratorWizardMain({
                   designationPt={modalData.designationPt}
                   designationEs={modalData.designationEs}
                   designationEn={modalData.designationEn}
+                  abbreviationGlossary={buildAbbreviationGlossary(catalog, selections)}
                 />
               ) : null}
             </div>

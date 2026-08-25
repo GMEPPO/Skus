@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { runCombinedNomenclatureTurn } from "@/lib/sku-assistant/run-combined-nomenclature-turn";
-import type { CombinedNomenclatureMessage } from "@/lib/sku-assistant/types";
+import type { CombinedNomenclatureAbbreviation, CombinedNomenclatureMessage } from "@/lib/sku-assistant/types";
 import { isSkuAssistantEnabled } from "@/lib/skus-feature-flags";
 
 function canUseAssistant(role: string) {
@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       designationEn?: string;
       referenceCode?: string;
       messages?: CombinedNomenclatureMessage[];
+      abbreviationGlossary?: CombinedNomenclatureAbbreviation[];
     };
 
     const designationPt = String(body.designationPt ?? "").trim();
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     }
 
     const messages = Array.isArray(body.messages) ? body.messages : [];
+    const abbreviationGlossary = Array.isArray(body.abbreviationGlossary) ? body.abbreviationGlossary : [];
 
     const result = await runCombinedNomenclatureTurn({
       designation: {
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
         referenceCode: String(body.referenceCode ?? "").trim() || undefined,
       },
       messages,
+      abbreviationGlossary,
     });
 
     return NextResponse.json(result);
