@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WordCreateModal } from "@/components/generator/word-create-modal";
-import { SkuAssistantComposer } from "@/components/generator/sku-assistant-composer";
+import { CombinedNomenclatureAssistant } from "@/components/generator/combined-nomenclature-assistant";
 import { generateSkuAction } from "@/lib/sku-actions";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
 import { fetchSkuCodeExamplesAction, type SkuCodeExample } from "@/lib/generator-code-examples-actions";
@@ -28,7 +28,6 @@ import {
   sortGeneratorWords,
 } from "@/lib/sku";
 import { pruneInvalidDownstreamSelections } from "@/lib/word-dependencies";
-import type { SkuAssistantProposal } from "@/lib/sku-assistant/types";
 
 type Selections = Record<string, string>;
 type SearchByLevel = Record<string, string>;
@@ -377,29 +376,6 @@ export function SkuGeneratorWizardMain({
         Ainda nao existem niveis disponiveis. Executa o reset/import global ou cria palavras na Biblioteca.
       </div>
     );
-  }
-
-  function applyAssistantProposal(proposal: SkuAssistantProposal) {
-    let nextSelections = { ...selections };
-    let nextSelectionOrder = [...selectionOrder];
-
-    for (const level of catalog.levels) {
-      const selectedId = proposal.selections[level.id];
-      if (!selectedId) continue;
-      nextSelections = pruneInvalidDownstreamSelections(
-        catalog,
-        {
-          ...nextSelections,
-          [level.id]: selectedId,
-        },
-        level.id,
-      );
-      nextSelectionOrder = [...nextSelectionOrder.filter((id) => id !== level.id), level.id];
-    }
-
-    bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
-    setSelectionOrder(nextSelectionOrder);
-    setSelections(nextSelections);
   }
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
@@ -1318,20 +1294,13 @@ export function SkuGeneratorWizardMain({
                   Copiar
                 </Button>
               </div>
-              {skuAssistantEnabled && categoryId ? (
-                <SkuAssistantComposer
+              {skuAssistantEnabled ? (
+                <CombinedNomenclatureAssistant
                   key={modalData.generatedCodeCompact}
-                  categoryId={categoryId}
-                  currentSelections={selections}
-                  mode="post-generation"
-                  generatedSku={{
-                    codeCompact: modalData.generatedCodeCompact,
-                    designationPt: modalData.designationPt,
-                    designationEs: modalData.designationEs,
-                    designationEn: modalData.designationEn,
-                  }}
-                  onApplyProposal={applyAssistantProposal}
-                  onCloseAfterApply={closeResultModal}
+                  referenceCode={modalData.generatedCodeCompact}
+                  designationPt={modalData.designationPt}
+                  designationEs={modalData.designationEs}
+                  designationEn={modalData.designationEn}
                 />
               ) : null}
             </div>

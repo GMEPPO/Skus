@@ -40,3 +40,39 @@ export type SkuAssistantResponse =
       type: "message";
       message: string;
     };
+
+export type CombinedNomenclatureMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type CombinedNomenclatureDesignation = {
+  designationPt: string;
+  designationEs?: string;
+  designationEn?: string;
+  referenceCode?: string;
+};
+
+export type CombinedNomenclatureProposal = {
+  cnCode: string;
+  cnDescription: string;
+  confidence: number;
+  rationale: string;
+  notes?: string;
+};
+
+export type CombinedNomenclatureResponse =
+  | {
+      type: "clarify";
+      message: string;
+      questions: string[];
+    }
+  | {
+      type: "propose";
+      message: string;
+      proposal: CombinedNomenclatureProposal;
+    }
+  | {
+      type: "message";
+      message: string;
+    };
