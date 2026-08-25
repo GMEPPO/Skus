@@ -1,6 +1,6 @@
 import { callOpenAiJson } from "@/lib/sku-assistant/openai-client";
 import { summarizeAbbreviationGlossaryForPrompt } from "@/lib/sku-assistant/build-abbreviation-glossary";
-import { inferEmptyContainerContext } from "@/lib/sku-assistant/infer-empty-container-context";
+import { inferNcProductContext } from "@/lib/sku-assistant/infer-nc-product-context";
 import type {
   CombinedNomenclatureAbbreviation,
   CombinedNomenclatureDesignation,
@@ -35,12 +35,13 @@ function buildSystemPrompt() {
     "- Se faltarem dados que alterem a NC (material, composicao, uso, forma, conteudo, peso liquido, se e conjunto, etc.), responde type=clarify com perguntas concretas.",
     "- Exemplo: 'percha' sem material -> pergunta se e madeira, plastico ou metal.",
     "",
-    "ENVASES VAZIOS (amenities hoteleiras — MUITO IMPORTANTE):",
-    "- Se a designacao inclui Garrafa, Ecofill, Recarga, Bottle ou formato equivalente, classifica o ENVASE VAZIO, nunca o liquido.",
-    "- Condicionador, Shampoo, Gel, Sabonete, etc. na designacao indicam o tipo de garrafa/envase, NAO o produto cosmetico enchido.",
-    "- NAO uses capitulo 33 (cosmeticos) para garrafas/ecofill vazias.",
-    "- NAO perguntes composicao do condicionador/shampoo/gel; pergunta material, capacidade ou fecho do envase se faltar.",
-    "- Usa ALU/Plastico/Vidro do glossario como material do envase.",
+    "FORMATOS (amenities hoteleiras — MUITO IMPORTANTE):",
+    "- GARRAFA / Garrafa Ecofill = envase VAZIO (sem liquido). Classifica material do envase (7610/7612 aluminio, 3923/3924 plastico). Cap. 33 NAO.",
+    "- RECARGA (Recarga Ecofill, Recarga Ecosource, Recarga 5L, etc.) = produto LIQUIDO ENCHIDO. Classifica cap. 33 (3305 condicionador/shampoo, 3307 gel, etc.).",
+    "- FRASCO = produto LIQUIDO ENCHIDO. Classifica cap. 33 como preparacao cosmetica/higiene.",
+    "- Em Garrafa vazia: Condicionador/Shampoo/Gel indicam o TIPO de garrafa, nao o conteudo.",
+    "- Em Recarga/Frasco: Condicionador/Shampoo/Gel indicam o produto liquido dentro.",
+    "- Usa ALU/Plastico/Vidro do glossario: em Garrafa e material do envase; em Recarga/Frasco pode ser embalagem secundaria.",
     "",
     "OUTROS EXEMPLOS:",
     "- Sabonete solido enchido -> 3401; preparacao capilar liquida enchida -> 3305; envases plasticos vazios -> 3923/3924.",
@@ -104,7 +105,7 @@ export async function runCombinedNomenclatureTurn(input: {
       : "Conversa: (inicio automatico — classifica a partir da designacao)";
 
   const glossaryBlock = summarizeAbbreviationGlossaryForPrompt(input.abbreviationGlossary ?? []);
-  const containerContext = inferEmptyContainerContext(input.designation, input.abbreviationGlossary);
+  const containerContext = inferNcProductContext(input.designation, input.abbreviationGlossary);
 
   const llm = await callOpenAiJson<LlmCombinedNomenclatureResponse>([
     { role: "system", content: buildSystemPrompt() },
