@@ -995,7 +995,7 @@ export function SkuGeneratorWizardMain({
   return (
     <>
     <div className="relative space-y-6">
-      <form id="sku-generator-form" onSubmit={handleSubmit} className="relative space-y-6">
+      <form id="sku-generator-form" onSubmit={handleSubmit} className="relative">
         {usesSecurePayload ? (
           <>
             <input type="hidden" name="categoryId" value={categoryId ?? ""} />
@@ -1012,7 +1012,8 @@ export function SkuGeneratorWizardMain({
           </>
         )}
 
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:gap-6">
+        <div className="min-w-0 flex-1 space-y-6">
         {!isNormalizationMode ? (
           <div className="flex justify-end">
             <Button
@@ -1227,13 +1228,14 @@ export function SkuGeneratorWizardMain({
         </div>
 
         <aside
-          className="z-50 mt-6 space-y-2 min-[1280px]:pointer-events-none min-[1280px]:fixed min-[1280px]:bottom-4 min-[1280px]:right-1 min-[1280px]:mt-0 min-[1280px]:w-[min(22rem,calc(100vw-1.5rem))] min-[1280px]:max-h-[calc(100vh-6rem)]"
+          className="w-full shrink-0 space-y-2 xl:sticky xl:top-4 xl:w-[min(22rem,100%)] xl:max-h-[calc(100vh-2rem)] xl:self-start"
           aria-label="Resumo de designacao e referencia"
         >
-          <div className="min-[1280px]:pointer-events-auto min-[1280px]:max-h-[calc(100vh-6rem)] min-[1280px]:space-y-2 min-[1280px]:overflow-y-auto">
+          <div className="space-y-2 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
             {renderSummaryDock()}
           </div>
         </aside>
+        </div>
       </form>
 
       {modalData ? (
