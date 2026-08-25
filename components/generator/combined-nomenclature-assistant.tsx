@@ -50,6 +50,7 @@ export function CombinedNomenclatureAssistant({
     async (conversation: CombinedNomenclatureMessage[]) => {
       setIsLoading(true);
       setError(null);
+      setProposal(null);
 
       try {
         const response = await fetch("/api/combined-nomenclature-assistant", {
@@ -79,13 +80,7 @@ export function CombinedNomenclatureAssistant({
 
         if (payload.type === "propose") {
           setProposal(payload.proposal);
-          setEntries((current) => [
-            ...current,
-            createEntry(
-              "assistant",
-              `${payload.message}\n\nNC sugerida: ${payload.proposal.cnCode}\n${payload.proposal.cnDescription}`,
-            ),
-          ]);
+          setEntries((current) => [...current, createEntry("assistant", payload.message)]);
           return;
         }
 
@@ -110,7 +105,6 @@ export function CombinedNomenclatureAssistant({
     if (!text || isLoading) return;
 
     setInput("");
-    setProposal(null);
     const userEntry = createEntry("user", text);
     const nextConversation = [...entries, userEntry].map((entry) => ({
       role: entry.role,

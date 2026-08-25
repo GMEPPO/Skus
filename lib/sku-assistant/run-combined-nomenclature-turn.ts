@@ -1,5 +1,6 @@
 import { callOpenAiJson } from "@/lib/sku-assistant/openai-client";
 import { summarizeAbbreviationGlossaryForPrompt } from "@/lib/sku-assistant/build-abbreviation-glossary";
+import { inferEmptyContainerContext } from "@/lib/sku-assistant/infer-empty-container-context";
 import type {
   CombinedNomenclatureAbbreviation,
   CombinedNomenclatureDesignation,
@@ -33,8 +34,18 @@ function buildSystemPrompt() {
     "- Analisa a designacao do produto (PT, ES, EN se estiverem disponiveis).",
     "- Se faltarem dados que alterem a NC (material, composicao, uso, forma, conteudo, peso liquido, se e conjunto, etc.), responde type=clarify com perguntas concretas.",
     "- Exemplo: 'percha' sem material -> pergunta se e madeira, plastico ou metal.",
-    "- Exemplo: cosmeticos -> cap. 33; sabonetes solidos 3401; preparacoes capilares 3305; envases plasticos 3923/3924.",
+    "",
+    "ENVASES VAZIOS (amenities hoteleiras — MUITO IMPORTANTE):",
+    "- Se a designacao inclui Garrafa, Ecofill, Recarga, Bottle ou formato equivalente, classifica o ENVASE VAZIO, nunca o liquido.",
+    "- Condicionador, Shampoo, Gel, Sabonete, etc. na designacao indicam o tipo de garrafa/envase, NAO o produto cosmetico enchido.",
+    "- NAO uses capitulo 33 (cosmeticos) para garrafas/ecofill vazias.",
+    "- NAO perguntes composicao do condicionador/shampoo/gel; pergunta material, capacidade ou fecho do envase se faltar.",
+    "- Usa ALU/Plastico/Vidro do glossario como material do envase.",
+    "",
+    "OUTROS EXEMPLOS:",
+    "- Sabonete solido enchido -> 3401; preparacao capilar liquida enchida -> 3305; envases plasticos vazios -> 3923/3924.",
     "- So propoe type=propose quando tiveres confianca razoavel no codigo NC.",
+    "- Devolve apenas UMA proposta NC por resposta (um unico cnCode).",
     "- cnCode deve ter 8 digitos (podes devolver como 'XXXX XX XX' ou 'XXXXXXXX').",
     "- cnDescription: descricao oficial/resumida em portugues europeu da posicao NC.",
     "- Usa o glossario de abreviaturas internas (ALU, CLS, ECO, etc.) para interpretar a designacao antes de classificar.",
@@ -93,6 +104,7 @@ export async function runCombinedNomenclatureTurn(input: {
       : "Conversa: (inicio automatico — classifica a partir da designacao)";
 
   const glossaryBlock = summarizeAbbreviationGlossaryForPrompt(input.abbreviationGlossary ?? []);
+  const containerContext = inferEmptyContainerContext(input.designation, input.abbreviationGlossary);
 
   const llm = await callOpenAiJson<LlmCombinedNomenclatureResponse>([
     { role: "system", content: buildSystemPrompt() },
@@ -103,6 +115,7 @@ export async function runCombinedNomenclatureTurn(input: {
         summarizeDesignation(input.designation),
         "",
         glossaryBlock,
+        containerContext ? ["", containerContext].join("\n") : "",
         "",
         conversationBlock,
       ].join("\n"),
