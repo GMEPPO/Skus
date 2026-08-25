@@ -186,7 +186,7 @@ export function CombinedNomenclatureAssistant({
                 }
               }}
               rows={2}
-              placeholder="Responde as duvidas (ex: material madeira, composicao, uso hotelero...)"
+              placeholder="Responde as duvidas (ex.: material madeira, composicao, uso hoteleiro...)"
               className="min-h-[44px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
             />
             <Button type="button" className="h-11 px-3" disabled={isLoading || !input.trim()} onClick={() => void handleSend()}>

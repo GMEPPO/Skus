@@ -18,20 +18,25 @@ type LlmCombinedNomenclatureResponse = {
 
 function buildSystemPrompt() {
   return [
-    "Es un asistente especializado en la Nomenclatura Combinada (NC) de la Union Europea para clasificacion arancelaria/aduanera.",
-    "NO clasifiques referencias internas de empresa ni codigos SKU propios.",
-    "Tu objetivo es devolver el codigo NC de 8 digitos correcto para el producto descrito.",
+    "Es um assistente especializado na Nomenclatura Combinada (NC) da Uniao Europeia para classificacao aduaneira/arancelaria.",
+    "NAO classifiques referencias internas de empresa nem codigos SKU proprios.",
+    "O teu objetivo e devolver o codigo NC de 8 digitos correcto para o produto descrito.",
     "",
-    "REGLAS:",
-    "- Analiza la designacion del producto (PT, ES, EN si estan disponibles).",
-    "- Si faltan datos que cambian la NC (material, composicion, uso, forma, contenido, peso neto, si es set, etc.), responde type=clarify con preguntas concretas.",
-    "- Ejemplo: 'percha' sin material -> pregunta si es madera, plastico o metal.",
-    "- Ejemplo: cosmeticos -> cap. 33; jabones solidos 3401; preparaciones capilares 3305; envases plasticos 3923/3924.",
-    "- Solo propone type=propose cuando tengas confianza razonable en el codigo NC.",
-    "- cnCode debe ser 8 digitos (puedes devolverlo como 'XXXX XX XX' o 'XXXXXXXX').",
-    "- cnDescription: descripcion oficial/resumida en portugues de la partida NC.",
-    "- Responde SIEMPRE JSON valido:",
-    '{"type":"clarify|propose|message","message":"texto","questions":["..."],"cnCode":"3305 90 00","cnDescription":"...","confidence":0.85,"rationale":"...","notes":"..."}',
+    "IDIOMA (OBRIGATORIO):",
+    "- Responde SEMPRE em portugues europeu (pt-PT).",
+    "- Nunca uses espanhol, nem mistures idiomas.",
+    "- Os campos message, questions, cnDescription, rationale e notes devem estar todos em pt-PT.",
+    "",
+    "REGRAS:",
+    "- Analisa a designacao do produto (PT, ES, EN se estiverem disponiveis).",
+    "- Se faltarem dados que alterem a NC (material, composicao, uso, forma, conteudo, peso liquido, se e conjunto, etc.), responde type=clarify com perguntas concretas.",
+    "- Exemplo: 'percha' sem material -> pergunta se e madeira, plastico ou metal.",
+    "- Exemplo: cosmeticos -> cap. 33; sabonetes solidos 3401; preparacoes capilares 3305; envases plasticos 3923/3924.",
+    "- So propoe type=propose quando tiveres confianca razoavel no codigo NC.",
+    "- cnCode deve ter 8 digitos (podes devolver como 'XXXX XX XX' ou 'XXXXXXXX').",
+    "- cnDescription: descricao oficial/resumida em portugues europeu da posicao NC.",
+    "- Responde SEMPRE JSON valido:",
+    '{"type":"clarify|propose|message","message":"texto em pt-PT","questions":["..."],"cnCode":"3305 90 00","cnDescription":"...","confidence":0.85,"rationale":"...","notes":"..."}',
   ].join("\n");
 }
 
@@ -57,7 +62,7 @@ function buildProposal(llm: LlmCombinedNomenclatureResponse): CombinedNomenclatu
   if (!normalized) {
     return {
       type: "message",
-      message: "Nao consegui determinar un codigo NC valido de 8 digitos. Da mais detalhes sobre material, composicao ou uso.",
+      message: "Nao consegui determinar um codigo NC valido de 8 digitos. Da mais detalhes sobre material, composicao ou uso.",
     };
   }
 
@@ -88,7 +93,7 @@ export async function runCombinedNomenclatureTurn(input: {
     {
       role: "user",
       content: [
-        "Produto a classificar:",
+        "Produto a classificar (responde em portugues europeu):",
         summarizeDesignation(input.designation),
         "",
         conversationBlock,
