@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WordCreateModal } from "@/components/generator/word-create-modal";
+import { SkuAssistantComposer } from "@/components/generator/sku-assistant-composer";
 import { generateSkuAction } from "@/lib/sku-actions";
 import type { FieldTypeOption } from "@/lib/admin-catalog";
 import { fetchSkuCodeExamplesAction, type SkuCodeExample } from "@/lib/generator-code-examples-actions";
@@ -27,6 +28,7 @@ import {
   sortGeneratorWords,
 } from "@/lib/sku";
 import { pruneInvalidDownstreamSelections } from "@/lib/word-dependencies";
+import type { SkuAssistantProposal } from "@/lib/sku-assistant/types";
 
 type Selections = Record<string, string>;
 type SearchByLevel = Record<string, string>;
@@ -124,6 +126,7 @@ export function SkuGeneratorWizardMain({
   onClearNormalization,
   onNormalizationComplete,
   normalizationSidebarOpen = false,
+  skuAssistantEnabled = false,
 }: {
   catalog: GeneratorCatalog;
   /** When true, calls generate_sku_secure (requires categoryId + level selections). Default OFF. */
@@ -144,6 +147,7 @@ export function SkuGeneratorWizardMain({
   onNormalizationComplete?: () => void;
   /** When true, offsets the normalization dock to sit beside the pending sidebar. */
   normalizationSidebarOpen?: boolean;
+  skuAssistantEnabled?: boolean;
 }) {
   const [selections, setSelections] = useState<Selections>({});
   const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
@@ -373,6 +377,29 @@ export function SkuGeneratorWizardMain({
         Ainda nao existem niveis disponiveis. Executa o reset/import global ou cria palavras na Biblioteca.
       </div>
     );
+  }
+
+  function applyAssistantProposal(proposal: SkuAssistantProposal) {
+    let nextSelections = { ...selections };
+    let nextSelectionOrder = [...selectionOrder];
+
+    for (const level of catalog.levels) {
+      const selectedId = proposal.selections[level.id];
+      if (!selectedId) continue;
+      nextSelections = pruneInvalidDownstreamSelections(
+        catalog,
+        {
+          ...nextSelections,
+          [level.id]: selectedId,
+        },
+        level.id,
+      );
+      nextSelectionOrder = [...nextSelectionOrder.filter((id) => id !== level.id), level.id];
+    }
+
+    bindOrRenewRequestIdForPayload(buildSecurePayloadKey(nextSelections));
+    setSelectionOrder(nextSelectionOrder);
+    setSelections(nextSelections);
   }
 
   function handleSelection(level: GeneratorLevel, word?: GeneratorWord | null) {
@@ -1207,6 +1234,13 @@ export function SkuGeneratorWizardMain({
         <div
           className="space-y-3"
         >
+          {skuAssistantEnabled && categoryId ? (
+            <SkuAssistantComposer
+              categoryId={categoryId}
+              currentSelections={selections}
+              onApplyProposal={applyAssistantProposal}
+            />
+          ) : null}
           {catalog.levels.map((level, levelIndex) => renderLevelPanel(level, levelIndex))}
           {allLevelsCompleted ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-100">

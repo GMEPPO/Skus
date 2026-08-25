@@ -4,7 +4,7 @@ import { getCategories, getGeneratorCatalogForCategory } from "@/lib/category-ca
 import { getFieldTypeOptions } from "@/lib/admin-catalog";
 import { mapCategoryCatalogToGeneratorCatalog } from "@/lib/generator-catalog-mapper";
 import { requireRole } from "@/lib/auth";
-import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
+import { isNormalizationV2Enabled, isSecureGenerationV2Enabled, isSkuAssistantUiEnabled } from "@/lib/skus-feature-flags";
 
 function messageStyles(status?: string) {
   if (status === "error") {
@@ -21,6 +21,7 @@ export default async function GeneratorPage({
   await requireRole("editor");
   const secureGenerationV2Enabled = isSecureGenerationV2Enabled();
   const normalizationV2Enabled = isNormalizationV2Enabled();
+  const skuAssistantEnabled = isSkuAssistantUiEnabled();
   const categories = await getCategories();
   const fieldTypes = await getFieldTypeOptions();
   const preferredCategory = categories.find((category) => category.slug === "cosmetica") ?? categories[0] ?? null;
@@ -73,6 +74,7 @@ export default async function GeneratorPage({
         fieldTypes={fieldTypes}
         secureGenerationV2Enabled={secureGenerationV2Enabled}
         normalizationV2Enabled={normalizationV2Enabled}
+        skuAssistantEnabled={skuAssistantEnabled}
       />
     </div>
   );

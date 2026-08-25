@@ -23,6 +23,7 @@ export function GeneratorWorkspace({
   fieldTypes,
   secureGenerationV2Enabled,
   normalizationV2Enabled,
+  skuAssistantEnabled,
 }: {
   categories: CategoryOption[];
   initialCategoryId: string;
@@ -30,6 +31,7 @@ export function GeneratorWorkspace({
   fieldTypes: FieldTypeOption[];
   secureGenerationV2Enabled: boolean;
   normalizationV2Enabled: boolean;
+  skuAssistantEnabled: boolean;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [referenceFilter, setReferenceFilter] = useState("");
@@ -204,6 +206,7 @@ export function GeneratorWorkspace({
               onClearNormalization={() => void handleClearNormalization()}
               onNormalizationComplete={handleNormalizationComplete}
               normalizationSidebarOpen={sidebarOpen}
+              skuAssistantEnabled={skuAssistantEnabled}
             />
           </CardContent>
         </Card>
