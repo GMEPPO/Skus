@@ -1234,13 +1234,6 @@ export function SkuGeneratorWizardMain({
         <div
           className="space-y-3"
         >
-          {skuAssistantEnabled && categoryId ? (
-            <SkuAssistantComposer
-              categoryId={categoryId}
-              currentSelections={selections}
-              onApplyProposal={applyAssistantProposal}
-            />
-          ) : null}
           {catalog.levels.map((level, levelIndex) => renderLevelPanel(level, levelIndex))}
           {allLevelsCompleted ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-100">
@@ -1268,7 +1261,7 @@ export function SkuGeneratorWizardMain({
 
       {modalData ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold text-slate-50">
                 {modalData.message?.includes("reutilizado") ? "SKU reutilizado" : "SKU gerado com sucesso"}
@@ -1325,6 +1318,22 @@ export function SkuGeneratorWizardMain({
                   Copiar
                 </Button>
               </div>
+              {skuAssistantEnabled && categoryId ? (
+                <SkuAssistantComposer
+                  key={modalData.generatedCodeCompact}
+                  categoryId={categoryId}
+                  currentSelections={selections}
+                  mode="post-generation"
+                  generatedSku={{
+                    codeCompact: modalData.generatedCodeCompact,
+                    designationPt: modalData.designationPt,
+                    designationEs: modalData.designationEs,
+                    designationEn: modalData.designationEn,
+                  }}
+                  onApplyProposal={applyAssistantProposal}
+                  onCloseAfterApply={closeResultModal}
+                />
+              ) : null}
             </div>
           </div>
         </div>

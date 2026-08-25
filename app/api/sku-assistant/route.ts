@@ -24,6 +24,12 @@ export async function POST(request: Request) {
       categoryId?: string;
       messages?: SkuAssistantMessage[];
       currentSelections?: Record<string, string>;
+      generatedSku?: {
+        codeCompact: string;
+        designationPt: string;
+        designationEs: string;
+        designationEn: string;
+      };
     };
 
     const categoryId = String(body.categoryId ?? "").trim();
@@ -38,7 +44,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Mensagens em falta." }, { status: 400 });
     }
 
-    const result = await runSkuAssistantTurn({ categoryId, messages, currentSelections });
+    const result = await runSkuAssistantTurn({
+      categoryId,
+      messages,
+      currentSelections,
+      generatedSku: body.generatedSku,
+    });
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

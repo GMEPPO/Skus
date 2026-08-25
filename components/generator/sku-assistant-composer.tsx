@@ -16,22 +16,33 @@ export function SkuAssistantComposer({
   categoryId,
   currentSelections,
   onApplyProposal,
+  mode = "wizard",
+  generatedSku = null,
+  onCloseAfterApply,
 }: {
   categoryId: string;
   currentSelections: Record<string, string>;
   onApplyProposal: (proposal: SkuAssistantProposal) => void;
+  mode?: "wizard" | "post-generation";
+  generatedSku?: {
+    codeCompact: string;
+    designationPt: string;
+    designationEs: string;
+    designationEn: string;
+  } | null;
+  onCloseAfterApply?: () => void;
 }) {
+  const initialMessage =
+    mode === "post-generation" && generatedSku
+      ? `SKU gerado: ${generatedSku.codeCompact}\nDesignacao PT: ${generatedSku.designationPt}\n\nSe faltar informacao (cor, material, variante, etc.), pergunto antes de sugerir a nomenclatura combinada correcta.`
+      : "Descreve o produto (marca, formato, produto, tamanho, embalagem). Se faltar informacao, pergunto antes de sugerir o codigo.";
+
   const [open, setOpen] = useState(true);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingProposal, setPendingProposal] = useState<SkuAssistantProposal | null>(null);
-  const [entries, setEntries] = useState<ChatEntry[]>([
-    createEntry(
-      "assistant",
-      "Descreve o produto (marca, formato, produto, tamanho, embalagem). Se faltar informacao, pergunto antes de sugerir o codigo.",
-    ),
-  ]);
+  const [entries, setEntries] = useState<ChatEntry[]>([createEntry("assistant", initialMessage)]);
 
   const messages = useMemo(
     () => entries.map((entry) => ({ role: entry.role, content: entry.content })),
@@ -56,6 +67,7 @@ export function SkuAssistantComposer({
         body: JSON.stringify({
           categoryId,
           currentSelections,
+          generatedSku: generatedSku ?? undefined,
           messages: nextEntries.map((entry) => ({ role: entry.role, content: entry.content })),
         }),
       });
@@ -93,7 +105,7 @@ export function SkuAssistantComposer({
   }
 
   return (
-    <Card className="border-violet-500/30 bg-slate-950/80 p-4">
+    <Card className={mode === "post-generation" ? "border-violet-500/40 bg-slate-900/80 p-4" : "border-violet-500/30 bg-slate-950/80 p-4"}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-violet-300" />
@@ -137,6 +149,10 @@ export function SkuAssistantComposer({
                 onClick={() => {
                   onApplyProposal(pendingProposal);
                   setPendingProposal(null);
+                  if (mode === "post-generation") {
+                    onCloseAfterApply?.();
+                    return;
+                  }
                   setEntries((current) => [
                     ...current,
                     createEntry("assistant", "Seleccoes aplicadas no gerador. Revê os niveis e gera o SKU."),
@@ -144,7 +160,7 @@ export function SkuAssistantComposer({
                 }}
               >
                 <Sparkles className="h-4 w-4" />
-                Aplicar seleccoes
+                {mode === "post-generation" ? "Usar referencia sugerida" : "Aplicar seleccoes"}
               </Button>
             </div>
           ) : null}
@@ -162,7 +178,11 @@ export function SkuAssistantComposer({
                 }
               }}
               rows={2}
-              placeholder="Ex: percha branca em madeira, ou sabonete solido Algotherm 20g caixa cartao"
+              placeholder={
+                mode === "post-generation"
+                  ? "Ex: falta indicar cor branca e material madeira para encontrar a nomenclatura combinada"
+                  : "Ex: percha branca em madeira, ou sabonete solido Algotherm 20g caixa cartao"
+              }
               className="min-h-[44px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
             />
             <Button type="button" className="h-11 px-3" disabled={isLoading || !input.trim()} onClick={() => void handleSend()}>

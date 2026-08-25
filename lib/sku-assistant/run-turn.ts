@@ -62,6 +62,12 @@ export async function runSkuAssistantTurn(input: {
   categoryId: string;
   messages: SkuAssistantMessage[];
   currentSelections: Record<string, string>;
+  generatedSku?: {
+    codeCompact: string;
+    designationPt: string;
+    designationEs: string;
+    designationEn: string;
+  };
 }): Promise<SkuAssistantResponse> {
   const categoryCatalog = await getGeneratorCatalogForCategory(input.categoryId);
   if (!categoryCatalog) {
@@ -81,6 +87,16 @@ export async function runSkuAssistantTurn(input: {
       role: "user",
       content: [
         `Seleccao actual: ${summarizeCurrentSelections(catalog, input.currentSelections)}`,
+        input.generatedSku
+          ? [
+              "",
+              "SKU ja gerado nesta sessao:",
+              `Referencia: ${input.generatedSku.codeCompact}`,
+              `Designacao PT: ${input.generatedSku.designationPt}`,
+              `Designacao ES: ${input.generatedSku.designationEs}`,
+              `Designacao EN: ${input.generatedSku.designationEn}`,
+            ].join("\n")
+          : "",
         "",
         "Conversa:",
         ...input.messages.map((message) => `${message.role.toUpperCase()}: ${message.content}`),
