@@ -908,7 +908,7 @@ export function SkuGeneratorWizardMain({
     );
   }
 
-  function renderSummaryDock() {
+  function renderSummaryDockPrimary() {
     return (
       <>
         <div className="rounded-2xl border border-amber-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
@@ -943,7 +943,13 @@ export function SkuGeneratorWizardMain({
         {!canSubmit && submitBlockReason ? (
           <p className="text-xs text-amber-200/90">{submitBlockReason}</p>
         ) : null}
+      </>
+    );
+  }
 
+  function renderSummaryDockSecondary() {
+    return (
+      <>
         {selectionOrder.length > 0 ? (
           <div className="rounded-2xl border border-slate-700/80 bg-slate-950/95 p-4 shadow-xl shadow-black/20 backdrop-blur">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Codigos semelhantes</p>
@@ -992,7 +998,6 @@ export function SkuGeneratorWizardMain({
     );
   }
 
-  return (
     <>
     <div className="relative space-y-6">
       <form id="sku-generator-form" onSubmit={handleSubmit} className="relative">
@@ -1228,12 +1233,11 @@ export function SkuGeneratorWizardMain({
         </div>
 
         <aside
-          className="w-full shrink-0 space-y-2 xl:sticky xl:top-4 xl:w-[min(22rem,100%)] xl:max-h-[calc(100vh-2rem)] xl:self-start"
+          className="w-full shrink-0 xl:sticky xl:top-28 xl:z-20 xl:flex xl:max-h-[calc(100vh-7rem)] xl:w-[min(22rem,100%)] xl:flex-col xl:self-start"
           aria-label="Resumo de designacao e referencia"
         >
-          <div className="space-y-2 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
-            {renderSummaryDock()}
-          </div>
+          <div className="shrink-0 space-y-2">{renderSummaryDockPrimary()}</div>
+          <div className="min-h-0 space-y-2 overflow-y-auto xl:pt-2">{renderSummaryDockSecondary()}</div>
         </aside>
         </div>
       </form>
