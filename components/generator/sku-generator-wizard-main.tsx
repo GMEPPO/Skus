@@ -998,6 +998,7 @@ export function SkuGeneratorWizardMain({
     );
   }
 
+  return (
     <>
     <div className="relative space-y-6">
       <form id="sku-generator-form" onSubmit={handleSubmit} className="relative">
