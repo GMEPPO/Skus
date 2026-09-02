@@ -145,6 +145,10 @@ export function buildDesignation(
   return designation.replace(/\s+/g, " ");
 }
 
+export function toUpperDesignation(value: string) {
+  return value.toLocaleUpperCase("pt-PT");
+}
+
 export function buildDesignationByLocale(
   catalog: GeneratorCatalog,
   selections: Record<string, string>,
@@ -156,11 +160,13 @@ export function buildDesignationByLocale(
     collectDesignationSegments(catalog, selections, locale),
   );
 
-  return segments
-    .map((segment) => segment.text)
-    .join(" ")
-    .trim()
-    .replace(/\s+/g, " ");
+  return toUpperDesignation(
+    segments
+      .map((segment) => segment.text)
+      .join(" ")
+      .trim()
+      .replace(/\s+/g, " "),
+  );
 }
 
 export function buildSkuPreview(

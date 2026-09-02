@@ -130,7 +130,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Sabonete Solido 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA SABONETE SOLIDO 20G CAIXA CARTAO");
   });
 
   it("always includes format level words even when includeInDesignation is false", () => {
@@ -158,7 +158,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Sabonete Solido 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA SABONETE SOLIDO 20G CAIXA CARTAO");
   });
 
   it("filters words by label, code and localized designation", () => {
@@ -194,7 +194,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("ALG OCEAN SPA Sabonete Solido 20g Caixa Cartao");
+    ).toBe("ALG OCEAN SPA SABONETE SOLIDO 20G CAIXA CARTAO");
   });
 
   it("ignores empty reference 000 in designations", () => {
@@ -234,7 +234,7 @@ describe("sku builder", () => {
         },
         "pt",
       ),
-    ).toBe("Sabonete Solido 20g Caixa Cartao");
+    ).toBe("SABONETE SOLIDO 20G CAIXA CARTAO");
   });
 
   it("builds example pattern with wildcards for unselected levels", () => {
@@ -264,6 +264,22 @@ describe("sku builder", () => {
       "ALG-%-%-%-%-%",
       "ALG%",
     ]);
+  });
+
+  it("always returns designations in uppercase", () => {
+    expect(
+      buildDesignationByLocale(
+        sabsolCatalog,
+        {
+          brand: "alg",
+          format: "sol",
+          product: "sab",
+          size: "020",
+          packaging: "cxa",
+        },
+        "pt",
+      ),
+    ).toBe("ALG OCEAN SPA SABONETE SOLIDO 20G CAIXA CARTAO");
   });
 
   it("builds compact prefix for normalized codes without hyphens", () => {

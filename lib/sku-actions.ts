@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseServiceServerClient } from "@/lib/supabase-service-server";
 import { findTakenSkuReferences, formatTakenSkuReferenceMessage } from "@/lib/sku-reference-uniqueness-data";
+import { toUpperDesignation } from "@/lib/sku";
 
 const PRODUCT_IMAGE_BUCKET = "sku-product-images";
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -104,6 +105,11 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     return { ok: false, message: "Dados invalidos na geracao do SKU." };
   }
 
+  const designation = toUpperDesignation(parsed.data.designation);
+  const designationPt = toUpperDesignation(parsed.data.designationPt);
+  const designationEs = toUpperDesignation(parsed.data.designationEs);
+  const designationEn = toUpperDesignation(parsed.data.designationEn);
+
   const supabase = createSupabaseServiceServerClient();
   if (!supabase) {
     return { ok: false, message: "Supabase service role nao configurada." };
@@ -167,10 +173,10 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     .from("skus_sku_generations")
     .insert({
       generated_code: parsed.data.generatedCode,
-      designation: parsed.data.designation,
-      designation_pt: parsed.data.designationPt,
-      designation_es: parsed.data.designationEs,
-      designation_en: parsed.data.designationEn,
+      designation,
+      designation_pt: designationPt,
+      designation_es: designationEs,
+      designation_en: designationEn,
       product_image_path: productImagePath,
       product_image_url: productImageUrl,
       sequence_value: sequenceValue,
@@ -232,9 +238,9 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     generatedCode: parsed.data.generatedCode,
     generatedCodeCompact: parsed.data.generatedCode.replaceAll("-", ""),
     productImageUrl: productImageUrl ?? undefined,
-    designationPt: parsed.data.designationPt,
-    designationEs: parsed.data.designationEs,
-    designationEn: parsed.data.designationEn,
+    designationPt,
+    designationEs,
+    designationEn,
     unitsPerBox: parsed.data.unitsPerBox,
     unitsPerBoxStatus: parsed.data.unitsPerBoxStatus,
     multiples: parsed.data.multiples,

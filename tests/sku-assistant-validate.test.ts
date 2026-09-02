@@ -57,7 +57,7 @@ describe("validateAssistantProposal", () => {
     if (!result.ok) return;
     expect(result.proposal.codeHyphen).toContain("ALG");
     expect(result.proposal.codeHyphen).toContain("SAB");
-    expect(result.proposal.designationPt).toContain("Sabonete");
+    expect(result.proposal.designationPt).toContain("SABONETE");
   });
 
   it("ignora wordId invalido em vez de falhar", () => {

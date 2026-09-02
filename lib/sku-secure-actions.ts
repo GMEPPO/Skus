@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { isNormalizationV2Enabled, isSecureGenerationV2Enabled } from "@/lib/skus-feature-flags";
+import { toUpperDesignation } from "@/lib/sku";
 
 const measureStatusSchema = z.enum(["real", "estimated"]);
 
@@ -192,9 +193,9 @@ export async function generateSkuSecureAction(formData: FormData): Promise<Gener
     generationId: String(row.generationId ?? ""),
     generatedCode,
     generatedCodeCompact: generatedCode.replaceAll("-", ""),
-    designationPt: String(row.designationPt ?? ""),
-    designationEs: String(row.designationEs ?? ""),
-    designationEn: String(row.designationEn ?? ""),
+    designationPt: toUpperDesignation(String(row.designationPt ?? "")),
+    designationEs: toUpperDesignation(String(row.designationEs ?? "")),
+    designationEn: toUpperDesignation(String(row.designationEn ?? "")),
     snapshotVersion: Number(row.snapshotVersion ?? 2),
     selectionFingerprint: String(row.selectionFingerprint ?? ""),
     unitsPerBox: parsed.data.unitsPerBox,
