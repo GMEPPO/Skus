@@ -76,10 +76,11 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   category_has_no_levels: "A categoria nao tem niveis ativos.",
   category_has_no_code_levels: "A categoria nao tem niveis de codigo.",
   measurement_request_conflict: "Conflito de requestId nas medidas.",
-  sku_code_collision: "Colisao de codigo SKU (v2).",
-  sku_code_collision_legacy: "Colisao com geracao legacy (fingerprint NULL).",
+  sku_code_collision: "Este codigo SKU ja existe (colisao). Altera a combinacao ou elimina o codigo antigo no Historico.",
+  sku_code_collision_legacy:
+    "Este codigo SKU ja existe numa geracao anterior. Altera a combinacao ou elimina o codigo antigo no Historico.",
   sku_reference_duplicate:
-    "Esta referencia SKU ja existe no historico de codigos novos ou normalizados. Escolhe outra combinacao.",
+    "Este codigo SKU ja existe no historico de codigos novos ou normalizados. Nao e possivel criar a mesma referencia duas vezes.",
   sku_generation_invariant_violation: "Invariante de geracao violada.",
   word_not_in_level:
     "Uma palavra selecionada nao pertence ao nivel correto (catalogo desatualizado). Recarrega a pagina ou usa Limpar tudo.",

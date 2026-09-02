@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSkuReferenceBlank, normalizeSkuReference } from "@/lib/sku-reference-uniqueness";
+import { isDuplicateSkuErrorMessage, isSkuReferenceBlank, normalizeSkuReference } from "@/lib/sku-reference-uniqueness";
 import { findDuplicateSkuReferencesWithinList } from "@/lib/sku-reference-uniqueness-data";
 
 describe("sku reference uniqueness helpers", () => {
@@ -14,9 +14,13 @@ describe("sku reference uniqueness helpers", () => {
     expect(isSkuReferenceBlank("ABC")).toBe(false);
   });
 
+  it("isDuplicateSkuErrorMessage detecta avisos de codigo repetido", () => {
+    expect(isDuplicateSkuErrorMessage("Este codigo SKU ja existe no historico: ABC.")).toBe(true);
+    expect(isDuplicateSkuErrorMessage("sku_reference_duplicate")).toBe(true);
+    expect(isDuplicateSkuErrorMessage("Dados invalidos na geracao do SKU.")).toBe(false);
+  });
+
   it("findDuplicateSkuReferencesWithinList detecta duplicados normalizados", () => {
-    expect(
-      findDuplicateSkuReferencesWithinList(["ABC-123", "abc123", "XYZ"]),
-    ).toEqual(["ABC123"]);
+    expect(findDuplicateSkuReferencesWithinList(["ABC-123", "abc123", "XYZ"])).toEqual(["ABC123"]);
   });
 });

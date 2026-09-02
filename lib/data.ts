@@ -207,14 +207,14 @@ export async function getGeneratorCatalog(): Promise<GeneratorCatalog> {
   return generatorCatalog;
 }
 
-export async function getRecentSkuGenerations(): Promise<RecentSkuGeneration[]> {
+export async function getRecentSkuGenerations(limit = 10): Promise<RecentSkuGeneration[]> {
   const supabase = createSupabaseServiceServerClient();
   if (supabase) {
     const result = await supabase
       .from("skus_sku_generations")
       .select("id, generated_code, designation, product_image_url, created_at, units_per_box, units_per_box_status, multiples, multiples_status, weight, weight_status, skus_profiles(name)")
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(Math.min(Math.max(limit, 1), 500));
 
     return ((result.data ?? []) as SupabaseSkuHistoryRow[]).map((row) => {
       const profileRelation = Array.isArray(row.skus_profiles) ? row.skus_profiles[0] : row.skus_profiles;

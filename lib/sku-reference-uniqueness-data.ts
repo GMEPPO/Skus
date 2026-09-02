@@ -91,9 +91,9 @@ export async function findTakenSkuReferences(
 
 export function formatTakenSkuReferenceMessage(references: string[]): string {
   if (references.length === 0) {
-    return "Referencia SKU ja existente no historico de codigos novos ou normalizados.";
+    return "Este codigo SKU ja existe no historico. Nao e possivel criar a mesma referencia duas vezes.";
   }
   const preview = references.slice(0, 3).join(", ");
   const suffix = references.length > 3 ? ` (+${references.length - 3})` : "";
-  return `Referencia SKU ja existente no historico: ${preview}${suffix}.`;
+  return `Este codigo SKU ja existe no historico: ${preview}${suffix}. Nao e possivel criar a mesma referencia duas vezes.`;
 }

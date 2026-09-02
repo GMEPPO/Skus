@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ChevronDown, ChevronRight, ImagePlus, Plus, RotateCcw, Search, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, ImagePlus, Plus, RotateCcw, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import {
   sortGeneratorWords,
 } from "@/lib/sku";
 import { pruneInvalidDownstreamSelections } from "@/lib/word-dependencies";
+import { isDuplicateSkuErrorMessage } from "@/lib/sku-reference-uniqueness";
 
 type Selections = Record<string, string>;
 type SearchByLevel = Record<string, string>;
@@ -161,6 +162,7 @@ export function SkuGeneratorWizardMain({
   const [logisticsRequired, setLogisticsRequired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [modalData, setModalData] = useState<GeneratedSkuModalData | null>(null);
   const [productImagePreviewUrl, setProductImagePreviewUrl] = useState<string | null>(null);
   const [productImageName, setProductImageName] = useState("");
@@ -593,22 +595,28 @@ export function SkuGeneratorWizardMain({
     );
   }
 
+  function showSubmitError(message: string) {
+    setSubmitError(message);
+    setErrorModalOpen(true);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit || isSubmitting) return;
     if (measurementError) {
-      setSubmitError(measurementError);
+      showSubmitError(measurementError);
       return;
     }
 
     const selectionError = validateSecureSelections(catalog, selections);
     if (selectionError) {
-      setSubmitError(selectionError);
+      showSubmitError(selectionError);
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setErrorModalOpen(false);
     const formData = new FormData(event.currentTarget);
     formData.set("requireLogisticsData", logisticsRequired ? "on" : "off");
 
@@ -625,7 +633,7 @@ export function SkuGeneratorWizardMain({
 
     if (isNormalizationMode && normalizationTarget) {
       if (!normalizationV2Enabled) {
-        setSubmitError("Normalização V2 desativada (funcionalidade desligada).");
+        showSubmitError("Normalização V2 desativada (funcionalidade desligada).");
         setIsSubmitting(false);
         return;
       }
@@ -652,7 +660,7 @@ export function SkuGeneratorWizardMain({
 
       const completeResult = await completeSkuNormalizationSecureAction(formData);
       if (!completeResult.ok) {
-        setSubmitError(completeResult.message);
+        showSubmitError(completeResult.message);
         setModalData(null);
         setIsSubmitting(false);
         return;
@@ -681,7 +689,7 @@ export function SkuGeneratorWizardMain({
 
     if (secureGenerationV2Enabled) {
       if (!categoryId) {
-        setSubmitError("Geracao V2 requer categoryId (catalogo por categoria).");
+        showSubmitError("Geracao V2 requer categoryId (catalogo por categoria).");
         setIsSubmitting(false);
         return;
       }
@@ -705,7 +713,7 @@ export function SkuGeneratorWizardMain({
 
       const secureResult = await generateSkuSecureAction(formData);
       if (!secureResult.ok) {
-        setSubmitError(secureResult.message);
+        showSubmitError(secureResult.message);
         setModalData(null);
         setIsSubmitting(false);
         return;
@@ -733,7 +741,7 @@ export function SkuGeneratorWizardMain({
 
     const result = await generateSkuAction(formData);
     if (!result.ok) {
-      setSubmitError(result.message);
+      showSubmitError(result.message);
       setModalData(null);
       setIsSubmitting(false);
       return;
@@ -747,7 +755,7 @@ export function SkuGeneratorWizardMain({
     try {
       await navigator.clipboard.writeText(value);
     } catch {
-      setSubmitError("Nao foi possivel copiar automaticamente. Verifica as permissoes do navegador.");
+      showSubmitError("Nao foi possivel copiar automaticamente. Verifica as permissoes do navegador.");
     }
   }
 
@@ -813,9 +821,8 @@ export function SkuGeneratorWizardMain({
     setUnitsPerBoxStatus("estimated");
     setMultiplesStatus("estimated");
     setWeightStatus("estimated");
-    setLogisticsRequired(false);
     setSubmitError(null);
-    setCodeExamples([]);
+    setErrorModalOpen(false);
     setProductImagePreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return null;
@@ -1227,7 +1234,7 @@ export function SkuGeneratorWizardMain({
         </div>
 
         {submitError ? (
-          <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <div className="rounded-lg border border-red-500/50 bg-red-500/15 px-4 py-3 text-sm font-medium text-red-100">
             {submitError}
           </div>
         ) : null}
@@ -1242,6 +1249,39 @@ export function SkuGeneratorWizardMain({
         </aside>
         </div>
       </form>
+
+      {errorModalOpen && submitError ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="sku-submit-error-title"
+            className="w-full max-w-lg rounded-2xl border-2 border-red-500 bg-slate-950 p-6 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500/20">
+                <AlertTriangle className="h-7 w-7 text-red-400" />
+              </div>
+              <div>
+                <h3 id="sku-submit-error-title" className="text-xl font-semibold text-red-100">
+                  {isDuplicateSkuErrorMessage(submitError) ? "Codigo SKU ja existente" : "Nao foi possivel concluir"}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-200">{submitError}</p>
+                {isDuplicateSkuErrorMessage(submitError) && skuPreview ? (
+                  <p className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 font-mono text-sm text-red-50">
+                    Referencia tentada: {skuPreview.replaceAll("-", "")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button type="button" onClick={() => setErrorModalOpen(false)}>
+                Entendido
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {modalData ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

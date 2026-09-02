@@ -197,6 +197,10 @@ export async function generateSkuAction(formData: FormData): Promise<GenerateSku
     if (productImagePath) {
       await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([productImagePath]);
     }
+    const errorText = insertResult.error?.message ?? "";
+    if (errorText.includes("sku_reference_duplicate") || errorText.includes("sku_code_collision")) {
+      return { ok: false, message: formatTakenSkuReferenceMessage([parsed.data.generatedCode]) };
+    }
     return { ok: false, message: "Nao foi possivel guardar o SKU." };
   }
 
